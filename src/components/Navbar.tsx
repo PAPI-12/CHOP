@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { resetMachineAct } from './WhatIDo';
-import { usePageTransition } from './PageTransition';
 
 const Navbar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
-  const { transitionTo } = usePageTransition();
+  const navigate = useNavigate();
 
   useEffect(() => {
     let ticking = false;
@@ -43,31 +42,26 @@ const Navbar: React.FC = () => {
    * It used to smooth-scroll the whole way up, which meant travelling back
    * THROUGH the pinned What I Do sequence — that section re-arms and takes
    * the scroll while you are passing through it, and you get left stranded
-   * somewhere in the middle of the page. So the journey is hidden instead:
-   * the transition panel covers the screen, the page is put at the hero
-   * instantly underneath it, and the panel opens on the hero. No scroll to
-   * hijack, and no distance to travel.
+   * somewhere in the middle of the page. So there is no journey: the page is
+   * simply put at the hero. Nothing to hijack, nothing to fight.
    */
   const goToHero = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsMobileMenuOpen(false);
+    resetMachineAct();
 
     const atHero = () => {
       window.scrollTo(0, 0);
-      // Belt and braces: some browsers restore scroll asynchronously after a
-      // route swap, so re-assert on the next frame.
+      // Some browsers restore scroll asynchronously after a route swap.
       requestAnimationFrame(() => window.scrollTo(0, 0));
     };
 
     if (location.pathname === '/') {
-      // Already home and already looking at the hero — do nothing rather
-      // than play a transition for no reason.
-      if (window.scrollY < 40) return;
-      transitionTo('/', atHero);
+      atHero();
       return;
     }
-
-    transitionTo('/', atHero);
+    navigate('/');
+    atHero();
   };
 
   const navLinks = [
@@ -83,7 +77,7 @@ const Navbar: React.FC = () => {
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 flex justify-between items-center">
           {/* Clicking the brand also re-arms the What I Do machine act — it is
               the explicit "play it again" affordance besides a page reload. */}
-          <Link to="/" data-no-transition onClick={(e) => { resetMachineAct(); goToHero(e); }} className="flex items-center gap-3 group" aria-label="Papi Raborife — back to top">
+          <Link to="/" data-no-transition onClick={goToHero} className="flex items-center gap-3 group" aria-label="Papi Raborife — back to top">
             <svg width="40" height="40" viewBox="0 0 40 40" fill="none" className="transition-transform group-hover:rotate-12">
               <rect x="2" y="2" width="36" height="36" rx="18" stroke="#D7FF4F" strokeWidth="1.5" />
               <path d="M20 8L25 18H15L20 8Z" fill="#F5F3EE" />

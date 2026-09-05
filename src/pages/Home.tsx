@@ -1,7 +1,7 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import Hero from '../components/Hero';
 import Clients from '../components/Clients';
+import SelectedWork from '../components/SelectedWork';
 import WhatIDo from '../components/WhatIDo';
 import CTAButton from '../components/CTAButton';
 import { ScribbleX } from '../components/Scribbles';
@@ -71,44 +71,7 @@ const Home: React.FC = () => {
         <WhatIDo />
       </div>
 
-      <section className="relative z-20 px-4 sm:px-6 lg:px-12 xl:px-24 py-20 md:py-32 bg-[#1d1d1a]">
-        <div className="max-w-[1600px] mx-auto">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 md:mb-16">
-            <div>
-              <p className="text-[10px] md:text-xs font-bold tracking-[0.3em] uppercase mb-4 text-[#8f8f88]">Selected Work</p>
-              <h2 className="text-[11vw] md:text-[5vw] font-display leading-[0.85] text-[#f5f3ee]">
-                FEATURED<br /><span className="text-[#d7c4aa]">PROJECTS</span>
-              </h2>
-            </div>
-            <CTAButton to="/work" className="self-start md:self-auto">VIEW ALL PROJECTS</CTAButton>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
-            {projects.map((project, index) => (
-              <Reveal
-                key={index}
-                as="article"
-                delay={index * 0.12}
-                className="group relative aspect-[4/5] rounded-2xl overflow-hidden"
-              >
-                <Link to={project.link}>
-                  <img
-                    src={project.image}
-                    alt={project.title}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-full h-full object-cover grayscale brightness-50 group-hover:grayscale-0 group-hover:brightness-75 group-hover:scale-105 transition-all duration-700"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#171715] via-transparent to-transparent" />
-                  <div className="absolute bottom-0 left-0 p-5 md:p-8">
-                    <p className="text-[9px] md:text-[10px] text-[#d7ff4f] uppercase tracking-wider mb-2">{project.subtitle}</p>
-                    <h3 className="text-xl md:text-3xl font-display text-[#f5f3ee]">{project.title}</h3>
-                  </div>
-                </Link>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
+      <SelectedWork projects={projects} />
 
       <Clients />
 

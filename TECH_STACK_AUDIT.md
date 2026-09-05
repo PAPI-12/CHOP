@@ -86,8 +86,10 @@ to a `transform` without ever entering React.
 
 React Router 7.18.3. 15 routes; only `/` is eagerly bundled. `useRoutePrefetch()`
 imports each lazy chunk on its own `requestIdleCallback` slice starting 1.2 s
-after mount, so by the time anyone clicks a link the chunk is resident — the
-transition panel never covers an empty Suspense fallback.
+after mount, so by the time anyone clicks a link the chunk is resident. Since the
+route transition was removed this pass, that prefetch is now the *only* thing
+standing between a click and a Suspense fallback — which makes it more load-
+bearing than it was, not less. It stays.
 
 ---
 
@@ -149,29 +151,55 @@ Scroll-pinned, drawn on a half-cadence tick (falling code reads as continuous at
 machine has finished speaking — and, new this pass, **opened rather than faded**
 (see below).
 
-**c) The transition panel — `PageTransition.tsx`**
-Full-viewport rain that exists for ~1 second at a time, clipped with
-`clip-path: inset()` rather than scaled, so glyphs keep their true size while the
-rectangle opens.
+**c) The Selected Work hand-off — `SelectedWork.tsx`**
+The same rain, arriving in the next section. Scoped `absolute inset-0` inside
+that `<section>`, DPR capped at 1.5, half-cadence, and it rains itself *out*
+after ~3.3 s and then early-returns every frame for nothing.
 
-### One gesture, used twice
+### One gesture, used twice — and now it goes somewhere
 
-The matrix now appears in exactly two places, and both use the same move: a 2px
+The matrix appears in exactly two places, and both use the same move: a 2 px
 hairline is struck, then a rectangle opens symmetrically out of it, then the code
 is inside. Same `expoOut` curve, same `LINE_PX`, same `clip-path` mechanism.
 
 - In **What I Do**, it fires the moment the machine finishes typing. The human
   text speaks on a clean stage; the line is struck; the rain opens out of it.
-- In **navigation**, it fires on a click, and only when the homepage is one end
-  of the journey. Move between two inner pages and the panel is solid dark — the
-  identical line → rectangle → page motion, without code that was never earned
-  there.
+- The rain then **carries across the section boundary into Selected Work**, where
+  each card is struck as a hairline at its own centre and cut out of the code on
+  a 260 ms stagger, its title resolving out of scrambled glyphs. The rain runs
+  out of the bottom of the page and the section is just the work again.
 
-🟢 **Removed this pass:** a viewport-fixed "spill" canvas, portalled to `<body>`
-at `z-[30]`, that kept raining over Featured Work and everything below it. That
-was the matrix being everywhere. Its `IntersectionObserver` also carried a
-`160%` top margin purely to keep the loop alive off-screen for it; that margin is
-now `20%`, so the section stops computing as soon as it is out of view.
+🔴 **Removed this pass: the route transition entirely — `PageTransition.tsx` is
+deleted.** It was firing the matrix on *every* navigation, which is what turned a
+signature moment into wallpaper. Nothing replaces it: pages now change on a plain
+`page-enter` fade-up. The matrix is a thing the homepage does once, in the
+section that is about the machine, and nowhere else. Deleting the provider meant
+sweeping every consumer — `Navbar`'s `goToHero` now does a plain double
+`scrollTo(0, 0)` across a rAF.
+
+🟢 **Removed in the previous pass:** a viewport-fixed "spill" canvas, portalled to
+`<body>` at `z-[30]`, that kept raining over Featured Work and everything below.
+
+### Layer 5b — The hero pane
+
+The steam is **procedural — there is no image in the overlay**. One gradient
+sheet, nine radial mist patches, ~7 k single-pixel frost flecks, eight wandering
+runnels and ~6 k beads, all baked into one offscreen canvas and thereafter only
+composited. The wipe is a `destination-out` stamp of a pre-rendered brush sprite,
+and **it does not heal** — glass you have cleared stays clear.
+
+The one performance trap here is that ~14 k draw operations is nothing per frame
+but very much something inside the *first* frame of the site. So the pane is
+built in two stages: `paintOverlay` lays down the flat gradient synchronously
+(instant, visually near-identical) and the water is rendered on the next
+`requestIdleCallback` and swapped in — unless the visitor has already started
+wiping, in which case it is never stamped over their work.
+
+Governing principle, arrived at the hard way over four calibration passes: **a
+runnel must thin the mist, never punch through it.** Clearing all the way to the
+photograph makes the channel pick up skin tone and the whole pane instantly reads
+as grime. Legibility comes from the lit shoulders on either side of the channel —
+water on glass is a lens, not a window.
 
 ---
 
@@ -286,17 +314,26 @@ PASS  every srcset width is the same photograph
 PASS  wordmark from an inner page lands on home
 PASS  wordmark lands at the hero, not mid-page
 PASS  wordmark from deep in the homepage returns to the hero
+PASS  lime cursor circle is rendered
+PASS  CULTURE LED CREATIVE ring is present
+PASS  the ring has a magnifier lens
+PASS  the earring is on the photograph
 PASS  no matrix canvas portalled loose onto <body>
-PASS  transition from the homepage shows the matrix
-PASS  transition between inner pages is solid, no matrix
+PASS  no page-transition panel exists at all
+PASS  clicking through to another page shows no transition panel
+PASS  inner-page navigation shows no transition panel
+PASS  Selected Work renders its cards
+PASS  each card is cut out of a struck hairline
+PASS  the cards have opened
+PASS  the hand-off rain is scoped inside a section, not the body
 ALL REGRESSION GUARDS PASS
 ```
 
 …plus zero iframes before play on every case study, and instant navigation under
 `prefers-reduced-motion`.
 
-🟢 **26 assertions, 15 routes, 0 thrown errors, 0 `console.error`, 0
-ErrorBoundary fallbacks.** See `tools/smoke/README.md`.
+🟢 **21 regression guards + 15 routes + 3 video cases, 0 thrown errors, 0
+`console.error`, 0 ErrorBoundary fallbacks.** See `tools/smoke/README.md`.
 
 🟡 Two `(import.meta as any)` casts in `Contact.tsx`. A `vite-env.d.ts` with a
 typed `ImportMetaEnv` would remove them.

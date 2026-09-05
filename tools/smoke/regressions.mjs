@@ -47,11 +47,9 @@ const click = (window, el) =>
   const { window } = await boot('/');
   const hero = window.document.getElementById('hero');
   const imgs = [...hero.querySelectorAll('img')];
-  const pictures = hero.querySelectorAll('picture').length;
-  const sources = hero.querySelectorAll('source').length;
   check('hero uses exactly one <img>', imgs.length === 1, `found ${imgs.length}`);
-  check('hero has no <picture> art-direction switch', pictures === 0 && sources === 0,
-    `${pictures} picture / ${sources} source`);
+  check('hero has no <picture> art-direction switch',
+    hero.querySelectorAll('picture').length === 0 && hero.querySelectorAll('source').length === 0);
   const srcset = imgs[0]?.getAttribute('srcset') || '';
   const families = new Set([...srcset.matchAll(/\/images\/([a-z-]+?)-\d+\.webp/g)].map((m) => m[1]));
   check('every srcset width is the same photograph', families.size === 1,
@@ -59,13 +57,31 @@ const click = (window, el) =>
   window.close();
 }
 
-/* ── 2. The wordmark goes to the hero and nowhere else ─────────────── */
+/* ── 2. The lime cursor, the lens and the earring all exist ────────── */
+{
+  const { window } = await boot('/');
+  const doc = window.document;
+  const cursors = [...doc.querySelectorAll('.custom-cursor')];
+  const limeRing = cursors.find((c) => (c.className || '').includes('border-[#d7ff4f]'));
+  check('lime cursor circle is rendered', !!limeRing, `${cursors.length} cursor nodes`);
+  check('lime cursor circle is above everything', (limeRing?.className || '').includes('z-[9999]'));
+
+  const hero = doc.getElementById('hero');
+  check('CULTURE LED CREATIVE ring is present',
+    (hero.querySelector('.hero-ring textPath')?.textContent || '').includes('CULTURE LED CREATIVE'));
+  check('the ring has a magnifier lens', !!hero.querySelector('.hero-ring canvas.hero-lens'));
+  check('the lens has a lime rim', !!hero.querySelector('.hero-ring .hero-lens-rim'));
+  check('the earring is on the photograph', !!hero.querySelector('.hero-earring'));
+  window.close();
+}
+
+/* ── 3. The wordmark goes to the hero and nowhere else ─────────────── */
 {
   const { window, scrolledTo } = await boot('/work/audi');
   const mark = window.document.querySelector('a[aria-label*="back to top"]');
   check('wordmark exists', !!mark);
   click(window, mark);
-  await wait(1600);
+  await wait(600);
   check('wordmark from an inner page lands on home', window.location.pathname === '/',
     window.location.pathname);
   check('wordmark lands at the hero, not mid-page', scrolledTo() === 0, `scrollY=${scrolledTo()}`);
@@ -74,45 +90,59 @@ const click = (window, el) =>
 {
   const { window, scrolledTo } = await boot('/');
   Object.defineProperty(window, 'scrollY', { value: 4000, configurable: true, writable: true });
-  const mark = window.document.querySelector('a[aria-label*="back to top"]');
-  click(window, mark);
-  await wait(1600);
+  click(window, window.document.querySelector('a[aria-label*="back to top"]'));
+  await wait(400);
   check('wordmark from deep in the homepage returns to the hero',
-    window.location.pathname === '/' && scrolledTo() === 0, `path=${window.location.pathname} scrollY=${scrolledTo()}`);
+    window.location.pathname === '/' && scrolledTo() === 0,
+    `path=${window.location.pathname} scrollY=${scrolledTo()}`);
   window.close();
 }
 
-/* ── 3. The matrix stays where it belongs ──────────────────────────── */
+/* ── 4. The matrix lives in exactly two places ─────────────────────── */
 {
   const { window } = await boot('/');
-  const strays = [...window.document.body.children].filter(
-    (n) => n.tagName === 'CANVAS' && n.id !== 'root',
-  );
+  const doc = window.document;
+  const strays = [...doc.body.children].filter((n) => n.tagName === 'CANVAS');
   check('no matrix canvas portalled loose onto <body>', strays.length === 0,
     `${strays.length} stray canvas`);
-  window.close();
-}
-{
-  // Homepage -> anywhere carries the code. Inner -> inner does not.
-  const { window } = await boot('/');
-  const panelCanvas = () => window.document.querySelector('.page-transition canvas');
-  click(window, [...window.document.querySelectorAll('a')].find((a) => a.getAttribute('href') === '/work'));
-  await wait(120);
-  check('transition from the homepage shows the matrix', panelCanvas()?.style.opacity === '1',
-    `opacity=${panelCanvas()?.style.opacity}`);
-  await wait(1500);
+  check('no page-transition panel exists at all', !doc.querySelector('.page-transition'));
+
+  // Navigating must not raise a matrix panel of any kind.
+  click(window, [...doc.querySelectorAll('a')].find((a) => a.getAttribute('href') === '/work'));
+  await wait(400);
+  check('clicking through to another page shows no transition panel',
+    window.location.pathname === '/work' && !window.document.querySelector('.page-transition'),
+    window.location.pathname);
   window.close();
 }
 {
   const { window } = await boot('/work');
-  const panelCanvas = () => window.document.querySelector('.page-transition canvas');
   const inner = [...window.document.querySelectorAll('a')].find((a) => /^\/work\/[a-z-]+$/.test(a.getAttribute('href') || ''));
-  check('found an inner-page link', !!inner, inner?.getAttribute('href'));
   click(window, inner);
-  await wait(120);
-  check('transition between inner pages is solid, no matrix', panelCanvas()?.style.opacity === '0',
-    `opacity=${panelCanvas()?.style.opacity}`);
-  await wait(1500);
+  await wait(400);
+  check('inner-page navigation shows no transition panel',
+    window.location.pathname.startsWith('/work/') && !window.document.querySelector('.page-transition'),
+    window.location.pathname);
+  window.close();
+}
+
+/* ── 5. Selected Work is introduced by the code, and its rain is
+       scoped to that section ─────────────────────────────────────── */
+{
+  const { window } = await boot('/');
+  const doc = window.document;
+  const cards = [...doc.querySelectorAll('.wk-card')];
+  check('Selected Work renders its cards', cards.length === 3, `${cards.length} cards`);
+  check('each card is cut out of a struck hairline',
+    cards.every((c) => !!c.querySelector('.wk-card-strike')));
+  await wait(1600);
+  check('the cards have opened', cards.every((c) => c.getAttribute('data-open') === '1'),
+    cards.map((c) => c.getAttribute('data-open')).join(','));
+
+  const rain = doc.querySelector('section canvas[aria-hidden]');
+  const section = rain?.closest('section');
+  check('the hand-off rain is scoped inside a section, not the body',
+    !!section && section.parentElement?.tagName !== 'BODY');
   window.close();
 }
 

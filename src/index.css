@@ -159,17 +159,41 @@
    that mists over again afterwards. Touch and reduced-motion visitors — who
    have nothing to wipe with — get this static equivalent instead. It is pure
    CSS, so it costs one composited layer and never repaints. */
-/* One hero plate for every viewport. The photograph is a wide 16:9 outpaint
-   with the subject just right of centre, so a narrow screen re-frames toward
-   him instead of cropping to the empty wall. */
+/* One hero plate for every viewport, centred. A hair above true centre only
+   so a tall phone crop keeps his head rather than his shoulders. */
 .hero-photo {
-  object-position: 61% 42%;
+  object-position: 50% 46%;
 }
-@media (min-width: 768px) {
-  .hero-photo { object-position: 54% 46%; }
+
+/* ── The lens ──────────────────────────────────────────────────────────
+   CULTURE LED CREATIVE orbits a real magnifying glass. The canvas inside it
+   is redrawn each frame with the photograph enlarged; these rules are only
+   the glass furniture around it. */
+.hero-lens {
+  box-shadow:
+    inset 0 2px 10px rgba(255, 255, 255, 0.14),
+    inset 0 -6px 18px rgba(8, 12, 14, 0.4),
+    0 14px 34px rgba(0, 0, 0, 0.45);
 }
-@media (min-width: 1280px) {
-  .hero-photo { object-position: 50% 48%; }
+.hero-lens-rim {
+  border: 2px solid #d7ff4f;
+  box-shadow:
+    0 0 0 1px rgba(23, 25, 24, 0.6),
+    0 0 20px rgba(215, 255, 79, 0.32);
+}
+
+/* ── The earring ───────────────────────────────────────────────────────
+   A lime cross on the subject's ear. It belongs to the photograph, so it is
+   deliberately inert: no float, no spin, no physics — the same stillness as
+   the PAPI RABORIFE line above the headline. */
+.hero-earring {
+  will-change: transform;
+  transition: opacity 240ms ease;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d7ff4f' stroke-width='4.5' stroke-linecap='round'%3E%3Cpath d='M5 5 19 19M19 5 5 19'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  filter: drop-shadow(0 0 6px rgba(215, 255, 79, 0.55)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
 }
 
 /* ── Breathed-on glass, no cursor ──────────────────────────────────────
@@ -184,15 +208,9 @@
     linear-gradient(180deg, rgba(23, 25, 24, 0.3), rgba(23, 25, 24, 0.2) 34%, rgba(23, 25, 24, 0.74));
 }
 
-/* ── Thin line → matrix → new page ──────────────────────────────────────
-   The panel is clipped, never scaled, so the code keeps its true size while
-   the rectangle opens. See components/PageTransition.tsx. */
-.page-transition {
-  will-change: clip-path, opacity;
-  contain: layout paint;
-  background: #0c0d0a;
-}
-.page-transition-line {
+/* ── The matrix strike ─────────────────────────────────────────────────
+   The hairline What I Do's code rain opens out of. See WhatIDo.tsx. */
+.matrix-strike-line {
   height: 2px;
   margin-top: -1px;
   background: linear-gradient(
@@ -219,11 +237,11 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .page-enter { animation: none; opacity: 1; transform: none; }
-  .page-transition { display: none; }
 }
 
 /* Cursor ring carrying CULTURE LED CREATIVE. Its size and position are set
-   from JS each frame; this only establishes the compositor layer. */.hero-ring {
+   from JS each frame; this only establishes the compositor layer. */
+.hero-ring {
   will-change: transform, opacity;
   transition: opacity 260ms ease;
 }
@@ -406,6 +424,88 @@ button:focus-visible { outline: 2px solid var(--text-lime); outline-offset: 2px;
   #main-nav, .site-footer, .resume-actions, .custom-cursor, .no-print { display: none !important; }
   .resume-page { padding-top: 0 !important; }
   .resume-content { padding-left: 0 !important; padding-right: 0 !important; }
+}
+
+/* ── Selected Work: cards cut out of the code ──────────────────────────
+   The rain hands over from What I Do, and each card is struck as a hairline
+   at its own centre, then opened into a rectangle. clip-path, so the artwork
+   is revealed at its true size — scaling it would betray the gesture. See
+   components/SelectedWork.tsx. */
+.wk-card {
+  clip-path: inset(50% 0 50% 0 round 1rem);
+  opacity: 0;
+  transition:
+    clip-path 760ms cubic-bezier(0.16, 0.84, 0.3, 1) var(--wk-delay, 0ms),
+    opacity 180ms linear var(--wk-delay, 0ms);
+}
+.wk-card[data-open='1'] {
+  clip-path: inset(0 0 0 0 round 1rem);
+  opacity: 1;
+}
+
+/* The struck line. Sits at the card's centre, burns bright as the rectangle
+   opens, and is gone by the time the artwork has arrived. */
+.wk-card-strike {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(215, 255, 79, 0) 0%,
+    #f4ffd8 50%,
+    rgba(215, 255, 79, 0) 100%
+  );
+  box-shadow: 0 0 18px rgba(215, 255, 79, 0.65);
+}
+.wk-card[data-open='1'] .wk-card-strike {
+  animation: wk-strike 760ms cubic-bezier(0.16, 0.84, 0.3, 1) var(--wk-delay, 0ms) both;
+}
+@keyframes wk-strike {
+  0% { opacity: 0; transform: scaleX(0.15); }
+  18% { opacity: 1; transform: scaleX(1); }
+  100% { opacity: 0; transform: scaleX(1); }
+}
+
+/* A single lime scanline running down the artwork as it lands. */
+.wk-card-scan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 28%;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(215, 255, 79, 0) 0%,
+    rgba(215, 255, 79, 0.14) 60%,
+    rgba(244, 255, 216, 0.5) 100%
+  );
+}
+.wk-card[data-open='1'] .wk-card-scan {
+  animation: wk-scan 900ms cubic-bezier(0.33, 0, 0.2, 1) calc(var(--wk-delay, 0ms) + 120ms) both;
+}
+@keyframes wk-scan {
+  0% { opacity: 0; transform: translateY(-100%); }
+  22% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(360%); }
+}
+
+.wk-card-inner { position: relative; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wk-card {
+    clip-path: none;
+    opacity: 1;
+    transition: none;
+  }
+  .wk-card-strike,
+  .wk-card-scan { display: none; }
 }
 
 /* ── Work page marquee ─────────────────────────────────────────────────── */

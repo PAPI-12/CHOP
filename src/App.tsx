@@ -6,7 +6,6 @@ import Navbar from './components/Navbar';
 import CustomCursor from './components/CustomCursor';
 import Home from './pages/Home';
 import ErrorBoundary from './components/ErrorBoundary';
-import PageTransitionProvider from './components/PageTransition';
 
 const Work = lazy(() => import('./pages/Work'));
 const About = lazy(() => import('./pages/About'));
@@ -176,9 +175,7 @@ const App: React.FC = () => {
       <MouseProvider>
         <ErrorBoundary>
           <ScrollToTop />
-          <PageTransitionProvider>
-            <AppContent />
-          </PageTransitionProvider>
+          <AppContent />
         </ErrorBoundary>
       </MouseProvider>
     </Router>

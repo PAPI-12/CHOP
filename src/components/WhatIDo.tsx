@@ -33,10 +33,9 @@ const expoOut = (t: number) => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t));
 /* ── The matrix arrives the way a page does ────────────────────────────
    Once the machine has finished speaking, the code does not fade up. A
    hairline is struck across the stage and the rain opens out of it,
-   symmetrically, exactly like the thin line → rectangle → matrix panel that
-   carries you between pages. Same gesture, same easing — so the transition
-   reads as one idea the site keeps using, and the rain always has a reason
-   to be on screen. */
+   symmetrically. That rain then carries over the section boundary and hands
+   the visitor to Selected Work, where the cards are cut out of it by the
+   same gesture. The code exists here and nowhere else on the site. */
 /** The hairline is drawn for this long before the rectangle opens. */
 const STRIKE_S = 0.22;
 /** How long the rectangle takes to open to the full stage. */
@@ -898,7 +897,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
           />
           <div
             ref={rainLineRef}
-            className="page-transition-line pointer-events-none absolute left-0 right-0 top-1/2 z-[3]"
+            className="matrix-strike-line pointer-events-none absolute left-0 right-0 top-1/2 z-[3]"
             style={{ opacity: 0 }}
             aria-hidden
           />
