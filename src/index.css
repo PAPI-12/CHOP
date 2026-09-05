@@ -153,12 +153,13 @@
   .matrix-guide-caret { animation: none; }
 }
 
-/* ── Hero: fogged shower glass ──────────────────────────────────────────
+/* ── Hero: rain-glass vapor ────────────────────────────────────────────
    Pointer-driven visitors get the real thing on a canvas (see Hero.tsx): a
-   neutral condensation field with dark water drop lenses and wide runnels,
-   which the cursor and the letters squeegee clear, and which stays cleared
-   for the visit. Touch and reduced-motion visitors — who have nothing to
-   wipe with — land on the clean hero image. */
+   dark blue-grey vapor pane with dense small beads and near-vertical
+   runnels, lit from the top-left, which the cursor and the letters squeegee
+   clear, and which stays cleared for the visit. It plays only on the first
+   visit to `/` in a browser session. Touch and reduced-motion visitors — who
+   have nothing to wipe with — land on the clean hero image. */
 /* ── Reserve the scrollbar's lane, permanently ─────────────────────────
    Every modal on this site locks the page with `overflow: hidden`, which on
    any platform drawing a classic scrollbar reclaims ~15px of width — and the
@@ -188,18 +189,11 @@ html {
   }
 }
 
-/* ── The one lime circle ───────────────────────────────────────────────
-   CULTURE LED CREATIVE orbits a single lime ring. It is the cursor and the
-   eraser: what it passes over, it clears. There is deliberately nothing
-   inside it — no lens, no fill, no second rim — because two concentric
-   circles read as a mistake, and a magnifier that enlarges the very thing it
-   is wiping fights the effect it sits on. */
-.hero-ring-circle {
-  border: 3px solid #d7ff4f;
-  box-shadow:
-    0 0 0 1px rgba(23, 25, 24, 0.45),
-    0 0 22px rgba(215, 255, 79, 0.3);
-}
+/* ── The CULTURE LED CREATIVE label ────────────────────────────────────
+   The ring has no lime rim, no SVG circle and no `<path>` any more: the bold
+   label is the ring's only visible body, orbiting the eraser centre. The
+   site's own lime cursor circle (see .custom-cursor) reads inside the orbit
+   and is the lime circle the hero now shows. */
 
 /* ── The earring ───────────────────────────────────────────────────────
    A lime cross on the subject's ear. It belongs to the photograph, so it is
@@ -215,16 +209,11 @@ html {
   filter: drop-shadow(0 0 6px rgba(215, 255, 79, 0.55)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
 }
 
-/* ── The site cursor stands down over the hero ─────────────────────────
-   The CULTURE LED CREATIVE ring IS the cursor there, and its lime ring is the
-   one lime circle the hero should contain. Toggled from Hero.tsx on pointer
-   enter/leave rather than by hover, so it survives the ring being
-   pointer-events: none. */
+/* ── The site cursor is the hero's lime circle ─────────────────────────
+   CULTURE LED CREATIVE no longer owns a lime rim, so the site's own lime
+   cursor stays up over the hero and reads inside the orbiting label. */
 .custom-cursor {
   transition: opacity 180ms ease;
-}
-body[data-hero-cursor='1'] .custom-cursor {
-  opacity: 0 !important;
 }
 
 /* ── The matrix strike ─────────────────────────────────────────────────
@@ -260,8 +249,9 @@ body[data-hero-cursor='1'] .custom-cursor {
   .page-enter { animation: none; opacity: 1; }
 }
 
-/* Cursor ring carrying CULTURE LED CREATIVE. Its size and position are set
-   from JS each frame; this only establishes the compositor layer. */
+/* Cursor ring carrying CULTURE LED CREATIVE. No lime rim and no SVG circle:
+   the label is the only visible body. Its size and position are set from JS
+   each frame; this only establishes the compositor layer. */
 .hero-ring {
   will-change: transform, opacity;
   transition: opacity 260ms ease;

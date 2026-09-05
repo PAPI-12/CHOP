@@ -63,8 +63,8 @@ const click = (window, el) =>
   window.close();
 }
 
-/* ── 2. The limes CULTURE LED CREATIVE ring, the one circle and the
-       earring all exist; the magnifying glass is gone ───────────────── */
+/* ── 2. The CULTURE LED CREATIVE ring (no lime rim, no SVG path) and the
+       earring exist; the magnifying glass is gone ─────────────────────── */
 {
   const { window } = await boot('/');
   const doc = window.document;
@@ -74,15 +74,19 @@ const click = (window, el) =>
   check('lime cursor circle is above everything', (limeRing?.className || '').includes('z-[9999]'));
 
   const hero = doc.getElementById('hero');
-  check('CULTURE LED CREATIVE ring is present',
-    (hero.querySelector('.hero-ring textPath')?.textContent || '').includes('CULTURE LED CREATIVE'));
+  const ringText = [...(hero.querySelectorAll('.hero-ring .hero-ring-glyph') || [])]
+    .map((n) => n.textContent || '').join('');
+  check('CULTURE LED CREATIVE ring is present', ringText.includes('CULTURE LED CREATIVE'));
   check('the magnifying glass is gone', !hero.querySelector('.hero-lens, canvas.hero-lens'));
-  check('the ring carries one lime circle', !!hero.querySelector('.hero-ring .hero-ring-circle'));
+  check('the ring no longer carries its own lime circle',
+    !hero.querySelector('.hero-ring .hero-ring-circle') &&
+    !hero.querySelector('.hero-ring circle') &&
+    !hero.querySelector('.hero-ring path'));
   check('the earring is on the photograph', !!hero.querySelector('.hero-earring'));
   window.close();
 }
 
-/* ── 2b. The ring holds exactly one lime circle, and the label is bold ─ */
+/* ── 2b. The ring now has no lime circle and no SVG path; label is bold ─ */
 {
   const { window } = await boot('/');
   const ring = window.document.querySelector('.hero-ring');
@@ -97,9 +101,10 @@ const click = (window, el) =>
     const isLime = lime.test(cls) || lime.test(style) || cls.includes('hero-ring-circle');
     return round && isLime;
   });
-  check('the ring contains exactly one lime circle', circles.length === 1,
+  check('the ring contains no lime circle', circles.length === 0,
     circles.map((c) => c.getAttribute('class') || c.tagName).join(' | ') || 'none');
-  check('the second lime circle is the site cursor, which stands aside',
+  check('there is no SVG path left in the ring', !ring.querySelector('path'));
+  check('the lime cursor circle is the site cursor, shown over the hero',
     !!window.document.querySelector('.custom-cursor'));
 
   const text = ring.querySelector('text');
@@ -111,12 +116,12 @@ const click = (window, el) =>
   window.close();
 }
 
-/* ── 2c. Mobile lands on the photograph, with no steam over it ─────── */
+/* ── 2c. Mobile lands on the photograph, with no vapor over it ─────── */
 {
   const { window, errors } = await boot('/', { touch: true });
   const hero = window.document.getElementById('hero');
   check('mobile renders the hero photograph', !!hero.querySelector('img.hero-photo'));
-  check('mobile has no steam overlay at all',
+  check('mobile has no vapor overlay at all',
     !hero.querySelector('.hero-glass-static') && hero.querySelectorAll('canvas').length === 0,
     `${hero.querySelectorAll('canvas').length} canvas`);
   check('mobile has no CULTURE LED CREATIVE ring', !hero.querySelector('.hero-ring'));
@@ -205,10 +210,10 @@ const click = (window, el) =>
     offenders.length === 0, offenders.join(', '));
 }
 
-/* ── 2f. The pane is a field, and there is no flour in it ──────────── */
+/* ── 2f. The pane is a field, dark rain glass, and no flour next to it ── */
 {
   const hero = fs.readFileSync(new URL('../../src/components/Hero.tsx', import.meta.url), 'utf8');
-  const fog = hero.slice(hero.indexOf('const buildFog'), hero.indexOf('const paintOverlay'));
+  const vapor = hero.slice(hero.indexOf('const buildVapor'), hero.indexOf('const paintOverlay'));
 
   // The single-pixel frost pass. It is what read as flour, and nothing on a
   // real pane looks like it.
@@ -218,10 +223,22 @@ const click = (window, el) =>
   // A constant alpha is what makes an overlay feel like a solid panel, so the
   // density has to come from a computed field, not a gradient stop.
   check('the pane density is a computed field',
-    /createImageData/.test(fog) && /octaves/.test(fog));
-  check('the field has soft blooms where the fog has cleared', /blooms/.test(fog));
+    /createImageData/.test(vapor) && /octaves/.test(vapor));
+  check('the field has soft blooms where the vapor has cleared', /blooms/.test(vapor));
   check('water is a dark lens, not a hole in the glass',
-    /source-atop/.test(fog) && /destination-out/.test(fog));
+    /source-atop/.test(vapor) && /destination-out/.test(vapor));
+  check('the vapor is the dark blue-grey rain glass', /blue-grey/.test(vapor));
+}
+
+/* ── 2g. The vapor is a once-per-session first impression only ──────── */
+{
+  const hero = fs.readFileSync(new URL('../../src/components/Hero.tsx', import.meta.url), 'utf8');
+  check('vapor is gated by a per-session flag',
+    /VAPOR_SEEN_KEY/.test(hero) && /sessionStorage/.test(hero));
+  check('a return to `/` withholds the pane',
+    /if \(!firstVaporVisit\) return;/.test(hero));
+  check('mobile/touch never consumes the impression',
+    /\(!interactive \|\| !firstVaporVisit\) return;/.test(hero));
 }
 
 /* ── 3. The wordmark goes to the hero and nowhere else ─────────────── */
