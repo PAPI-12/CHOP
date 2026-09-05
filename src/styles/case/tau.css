@@ -1,0 +1,90 @@
+/* ── Tau Foods Case Study scoped styles ───────────────────────────────── */
+
+.tau-case {
+  --tau-green: #1a4d2e;
+  --tau-green-mid: #2d6a4f;
+  --tau-green-light: #40916c;
+  --tau-green-pale: #74c69d;
+  --tau-green-mist: #b7e4c7;
+  --tau-green-tint: #d8f3dc;
+  --tau-black: #0a0a0a;
+  --tau-dark: #111a14;
+  --tau-card: #162b1e;
+  --tau-border: #243d2c;
+  --tau-text-muted: rgba(255, 255, 255, 0.45);
+  --tau-text-faint: rgba(255, 255, 255, 0.25);
+  --tau-gold: #f4c430;
+  --tau-red: #de3831;
+  color: #fff;
+}
+
+.tau-case .font-tau-futura {
+  font-family: 'Futura', 'Trebuchet MS', 'Century Gothic', 'Inter', sans-serif !important;
+  letter-spacing: -0.01em;
+}
+
+@keyframes tau-ticker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.tau-case .tau-ticker-track { animation: tau-ticker 38s linear infinite; }
+.tau-case .tau-ticker-track:hover { animation-play-state: paused; }
+
+@keyframes tau-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-12px); }
+}
+.tau-case .animate-tau-float { animation: tau-float 5s ease-in-out infinite; }
+
+.tau-case .tau-code-wrap {
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.75;
+}
+.tau-case .ck { color: #c792ea; }
+.tau-case .cf { color: #82aaff; }
+.tau-case .cs { color: #c3e88d; }
+.tau-case .cn { color: #f78c6c; }
+.tau-case .cc { color: #4a6741; font-style: italic; }
+.tau-case .cv { color: #eeffff; }
+
+.tau-case .tau-week-1 { background: #1f4d38; border-color: #2d6a4f; }
+.tau-case .tau-week-2 { background: #1a3d4a; border-color: #2a6278; }
+.tau-case .tau-week-3 { background: #3d2d1a; border-color: #7a5c2a; }
+.tau-case .tau-week-4 { background: #3d1a1a; border-color: #7a2a2a; }
+
+.tau-case .tau-flow-node {
+  border: 1.5px solid var(--tau-border);
+  background: var(--tau-card);
+  border-radius: 10px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+  padding: 6px 14px;
+  white-space: nowrap;
+  text-align: center;
+}
+.tau-case .tau-flow-node-decision {
+  background: #1a3d2a;
+  border-color: var(--tau-green-pale);
+  color: var(--tau-green-pale);
+  border-radius: 6px;
+  font-size: 10px;
+  padding: 5px 10px;
+  text-align: center;
+}
+.tau-case .tau-flow-arrow {
+  color: var(--tau-green-pale);
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.tau-case .tau-card-glow {
+  box-shadow: 0 0 0 1px var(--tau-border), 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+.tau-case .tau-card-glow-green {
+  box-shadow: 0 0 0 1px #2d6a4f, 0 8px 48px rgba(45, 106, 79, 0.2);
+}
+
+.tau-case .tau-section-line {
+  border-top: 1px solid var(--tau-border);
+}

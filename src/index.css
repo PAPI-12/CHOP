@@ -1,0 +1,357 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cornetto-purple: #563092;
+  --color-cornetto-deep: #27143f;
+  --color-cornetto-violet: #7650b4;
+  --color-cornetto-lavender: #c8b5e7;
+  --color-cornetto-orange: #ffb51b;
+  --color-cornetto-peach: #ffe9ca;
+  --color-cornetto-cream: #fff1da;
+  --color-cornetto-ink: #211434;
+  --color-cornetto-blue: #6e51b0;
+  --color-cornetto-red: #ee3d32;
+}
+
+:root {
+  --bg-main: #171715;
+  --bg-panel: #1d1d1a;
+  --bg-panel-alt: #23221f;
+  --text-main: #f5f3ee;
+  --text-muted: #8f8f88;
+  --text-cream: #d7c4aa;
+  --text-lime: #d7ff4f;
+  --line-soft: rgba(245, 243, 238, 0.1);
+}
+
+@layer base {
+  html {
+    background: var(--bg-main);
+    overflow-x: hidden;
+    overflow-x: clip;
+  }
+
+  body {
+    @apply antialiased;
+    background: var(--bg-main);
+    color: var(--text-main);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+    overflow-x: clip;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  * { box-sizing: border-box; scroll-margin-top: 6rem; min-width: 0; }
+  a { color: inherit; text-decoration: none; }
+  img { max-width: 100%; height: auto; display: block; }
+  ::selection { background: rgba(215, 255, 79, 0.9); color: #11110f; }
+}
+
+.font-display { font-weight: 900; letter-spacing: -0.04em; text-transform: uppercase; }
+.hand-note { font-family: 'Caveat', 'Brush Script MT', cursive; font-weight: 600; }
+.font-mono { font-family: 'JetBrains Mono', monospace; }
+
+.text-cream { color: var(--text-cream); }
+.text-lime { color: var(--text-lime); }
+.text-muted { color: var(--text-muted); }
+.bg-panel { background: var(--bg-panel); }
+.bg-panel-alt { background: var(--bg-panel-alt); }
+.text-accent { color: var(--text-lime); }
+.bg-accent { background-color: var(--text-lime); }
+.border-accent { border-color: var(--text-lime); }
+
+.text-stroke { -webkit-text-stroke: 1.5px rgba(245, 243, 238, 0.4); color: transparent; }
+@media (max-width: 768px) { .text-stroke { -webkit-text-stroke: 1px rgba(245, 243, 238, 0.4); } }
+
+.mix-grain { position: relative; }
+/* Grain film — a FIXED full-viewport layer, not a per-section one.
+   A section-absolute film (the old behaviour) made each section's own grain
+   slide into view, which read as the whole site "jittering" while scrolling.
+   One viewport-locked layer keeps the film still and continuous. */
+.mix-grain::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+  transform: translateZ(0);
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 180px 180px;
+}
+.film-grain {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.045;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 160px 160px;
+}
+
+/* --- Split-flap ---
+   Smoother rotation curve, gentler brightness pulse, hardware-friendly hints.
+   Width is locked per-tile in JS so the word never reflows mid-flip. */
+@keyframes splitflap {
+  0%   { transform: rotateX(0deg);   opacity: 1;    filter: brightness(1); }
+  45%  { transform: rotateX(86deg);  opacity: 0.55; filter: brightness(1.35); }
+  55%  { transform: rotateX(-86deg); opacity: 0.55; filter: brightness(1.35); }
+  100% { transform: rotateX(0deg);   opacity: 1;    filter: brightness(1); }
+}
+.splitflap-tile {
+  display: inline-block;
+  transform-origin: center center;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  will-change: transform;
+  transform: translateZ(0);
+}
+.splitflap-tile[data-flipping="true"] {
+  animation: splitflap 0.46s cubic-bezier(0.45, 0, 0.2, 1);
+  text-shadow: 0 0 18px rgba(215, 255, 79, 0.45);
+}
+.splitflap-hero[data-flipping="true"] {
+  animation-duration: 0.58s;
+}
+.hero-physics-letter {
+  display: inline-block;
+  pointer-events: none;
+  user-select: none;
+  will-change: transform;
+}
+
+/* Machine dialogue caret. Only the line currently being written blinks. */
+.robot-line[data-caret='true']::after {
+  content: '_';
+  margin-left: 0.12em;
+  animation: robot-caret 0.9s steps(1) infinite;
+}
+@keyframes robot-caret {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .robot-line[data-caret='true']::after { animation: none; opacity: 0; }
+}
+
+/* Matrix hand-off guide: the caret at the foot of the What I Do stage that
+   points the visitor down into Featured Work once the machine hands over. */
+.matrix-guide-caret {
+  animation: matrix-guide-caret 1.4s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+}
+
+@keyframes matrix-guide-caret {
+  0% { opacity: 0; transform: translateY(-6px); }
+  45% { opacity: 1; transform: translateY(0); }
+  75% { opacity: 0.9; transform: translateY(2px); }
+  100% { opacity: 0; transform: translateY(8px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .matrix-guide-caret { animation: none; }
+}
+
+/* Cursor ring carrying CULTURE LED CREATIVE. Its size and position are set
+   from JS each frame; this only establishes the compositor layer. */
+.hero-ring {
+  will-change: transform, opacity;
+  transition: opacity 260ms ease;
+}
+.hero-ring svg {
+  overflow: visible;
+}
+.hero-ring text {
+  text-transform: uppercase;
+}
+
+.will-change-transform {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* --- Ambient floaters ---
+   Compositor-only keyframes. Previously fifteen framer-motion loops ticked on
+   the main thread every frame; these run off-thread and cost nothing. */
+@keyframes float-cross {
+  0%   { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+  25%  { transform: translate3d(0, -12px, 0) rotate(14deg) scale(1.08); }
+  50%  { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+  75%  { transform: translate3d(0, 10px, 0) rotate(-12deg) scale(1); }
+  100% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+}
+@keyframes float-wave {
+  0%   { transform: translate3d(0, 0, 0); opacity: 0.45; }
+  25%  { transform: translate3d(14px, 0, 0); opacity: 0.9; }
+  50%  { transform: translate3d(0, 0, 0); opacity: 0.45; }
+  75%  { transform: translate3d(-10px, 0, 0); opacity: 0.7; }
+  100% { transform: translate3d(0, 0, 0); opacity: 0.45; }
+}
+.float-cross {
+  animation-name: float-cross;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+.float-wave {
+  animation-name: float-wave;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+/* --- Navbar --- */
+@keyframes nav-drop {
+  from { transform: translate3d(0, -100%, 0); }
+  to   { transform: none; }
+}
+.nav-drop { animation: nav-drop 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Mobile menu stays mounted and slides on the compositor. */
+.mobile-menu {
+  transform: translate3d(100%, 0, 0);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease, visibility 0s linear 0.42s;
+}
+.mobile-menu[data-open='true'] {
+  transform: none;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease, visibility 0s;
+}
+.mobile-menu-item {
+  opacity: 0;
+  transform: translate3d(20px, 0, 0);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.mobile-menu[data-open='true'] .mobile-menu-item {
+  opacity: 1;
+  transform: none;
+}
+
+/* --- Scroll progress bar --- */
+.scroll-progress {
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+
+/* --- Scroll reveal (see components/Reveal.tsx) --- */
+.reveal {
+  opacity: 0;
+  transition-property: opacity, transform;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+.reveal-up    { transform: translate3d(0, 30px, 0); }
+.reveal-left  { transform: translate3d(-4rem, 0, 0); }
+.reveal-right { transform: translate3d(4rem, 0, 0); }
+.reveal-scale { transform: scale(0.86); }
+.reveal[data-shown='true'] {
+  opacity: 1;
+  transform: none;
+  will-change: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+}
+
+/* --- Hero intro ---
+   Was framer-motion. The hero headline is the LCP element, so animating it
+   from JS meant the largest text on the page could not paint until React had
+   hydrated and the motion runtime had mounted. As CSS it paints with the very
+   first frame. */
+@keyframes hero-rise {
+  from { opacity: 0; transform: translate3d(0, 20px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes hero-pop {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes hero-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.hero-rise { animation: hero-rise 0.8s ease-out both; }
+.hero-pop { animation: hero-pop 0.9s ease-out both; }
+.hero-pop-late { animation-delay: 0.3s; }
+.hero-fade { animation: hero-fade 0.6s ease-out 0.15s both; }
+
+/* Idle handwriting sway, used by the studio signature / floating notes. */
+@keyframes sway {
+  0%   { transform: rotate(-5deg) translate3d(0, 0, 0); }
+  50%  { transform: rotate(-2.5deg) translate3d(0, -5px, 0); }
+  100% { transform: rotate(-5deg) translate3d(0, 0, 0); }
+}
+.sway {
+  animation: sway 6s ease-in-out infinite;
+  transform-origin: center;
+}
+
+
+/* Responsive size variables for stacked brand typography */
+:root {
+  --brand-mobile-max: 15vw;
+  --brand-desktop-max: 10vw;
+}
+
+.brand-name {
+  font-size: clamp(1.25rem, var(--brand-mobile-max), 4.75rem);
+  max-width: 100%;
+  overflow: visible;
+}
+
+@media (min-width: 768px) {
+  .brand-name {
+    font-size: clamp(1.75rem, var(--brand-desktop-max), 10rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splitflap-tile[data-flipping="true"] { animation: none; }
+  .float-cross,
+  .float-wave,
+  .work-marquee-track,
+  .sway,
+  .hero-rise,
+  .hero-pop,
+  .hero-fade { animation: none !important; opacity: 1 !important; transform: none !important; }
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+
+@media (max-width: 640px) { html { font-size: 14px; } }
+
+.no-select { user-select: none; -webkit-user-select: none; }
+
+a:focus-visible,
+button:focus-visible { outline: 2px solid var(--text-lime); outline-offset: 2px; }
+
+@media print {
+  @page { size: A4; margin: 12mm; }
+  html, body { background: var(--bg-main) !important; color: var(--text-main) !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  #main-nav, .site-footer, .resume-actions, .custom-cursor, .no-print { display: none !important; }
+  .resume-page { padding-top: 0 !important; }
+  .resume-content { padding-left: 0 !important; padding-right: 0 !important; }
+}
+
+/* ── Work page marquee ─────────────────────────────────────────────────── */
+
+@keyframes work-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.work-marquee-track {
+  animation: work-marquee 32s linear infinite;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+

@@ -1,0 +1,48 @@
+/* ── Vodacom "Ready Business" scoped styles ───────────────────────────── */
+
+.vodacom-case {
+  font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  color: #1B1210;
+}
+
+.vodacom-case .font-vodacom-display {
+  font-family: 'Fraunces', ui-serif, Georgia, serif;
+}
+
+.vodacom-case .vodacom-link-underline {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 2px;
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  transition: background-size 0.35s ease;
+}
+.vodacom-case .vodacom-link-underline:hover { background-size: 100% 2px; }
+
+@keyframes vodacom-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.vodacom-case .vodacom-marquee-track {
+  animation: vodacom-marquee 40s linear infinite;
+}
+
+@keyframes vodacom-slow-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.vodacom-case .vodacom-slow-spin { animation: vodacom-slow-spin 22s linear infinite; }
+
+.vodacom-case .grain::after {
+  content: "";
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(0,0,0,.08) 1px, transparent 1px);
+  background-size: 3px 3px;
+  mix-blend-mode: multiply;
+  opacity: .25;
+}
+
+.vodacom-case .vodacom-dice-dot { fill: #1B1210; }
+
+.vodacom-case .tile { transition: transform .3s ease; }
+.vodacom-case .tile:hover { transform: translateY(-4px) rotate(-1deg); }

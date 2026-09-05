@@ -1,0 +1,91 @@
+/* ── Cornetto Case Study scoped styles ────────────────────────────────── */
+
+.cornetto-case {
+  --c-purple: #563092;
+  --c-deep: #27143f;
+  --c-violet: #7650b4;
+  --c-lavender: #c8b5e7;
+  --c-orange: #ffb51b;
+  --c-peach: #ffe9ca;
+  --c-cream: #fff1da;
+  --c-ink: #211434;
+  --c-blue: #6e51b0;
+  --c-red: #ee3d32;
+  color: #211434;
+}
+
+.cornetto-case .font-corn-display { font-family: 'Bowlby One SC', sans-serif !important; }
+.cornetto-case .font-corn-round   { font-family: 'Baloo 2', sans-serif !important; }
+.cornetto-case .font-corn-body    { font-family: 'Nunito Sans', system-ui, sans-serif !important; }
+.cornetto-case .font-corn-hand    { font-family: 'Permanent Marker', cursive !important; }
+
+.cornetto-case .corn-outline-shadow {
+  border: 3px solid var(--c-ink);
+  box-shadow: 8px 8px 0 var(--c-ink);
+}
+
+.cornetto-case .corn-outline-sm {
+  border: 3px solid var(--c-ink);
+  box-shadow: 5px 5px 0 var(--c-ink);
+}
+
+.cornetto-case .corn-pill-cream {
+  border: 3px solid var(--c-ink);
+  background: var(--c-cream);
+  color: var(--c-purple);
+  box-shadow: 5px 5px 0 var(--c-ink);
+}
+
+.cornetto-case .corn-pill-yellow {
+  border: 3px solid var(--c-ink);
+  background: var(--c-orange);
+  color: var(--c-ink);
+  box-shadow: 5px 5px 0 var(--c-ink);
+}
+
+.cornetto-case .corn-pill-red {
+  border: 3px solid var(--c-ink);
+  background: var(--c-red);
+  color: var(--c-cream);
+  box-shadow: 5px 5px 0 var(--c-ink);
+}
+
+.cornetto-case .corn-phone-frame {
+  border-radius: 1.75rem;
+  border: 3px solid var(--c-ink);
+  box-shadow: 8px 8px 0 var(--c-ink);
+  overflow: hidden;
+  background: var(--c-deep);
+  contain: layout paint;
+}
+
+@keyframes cornetto-marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.cornetto-case .animate-corn-marquee {
+  animation: cornetto-marquee 28s linear infinite;
+  will-change: transform;
+}
+
+.cornetto-case .corn-section-kicker {
+  color: var(--c-orange);
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.cornetto-case .hero-title-shadow {
+  text-shadow: 7px 7px 0 var(--c-deep);
+}
+
+.cornetto-case .corn-gradient-section {
+  background: linear-gradient(180deg, #fff1da 0%, #fff1da 55%, #eadff5 100%);
+}
+
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 800px;
+}

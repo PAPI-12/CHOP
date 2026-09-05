@@ -1,0 +1,36 @@
+/* ── SARS "MobiApp" scoped styles ─────────────────────────────────────── */
+
+.sars-case {
+  color: #e7e3de;
+}
+
+.sars-case .font-sars-serif {
+  font-family: 'Instrument Serif', 'Times New Roman', ui-serif, Georgia, serif;
+}
+
+.sars-case .sars-hero-type {
+  font-feature-settings: "ss01" on, "cv01" on;
+}
+
+@keyframes sars-reveal-kf {
+  from { opacity: 0; transform: translateY(36px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.sars-case .sars-reveal { animation: sars-reveal-kf 900ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.sars-case .sars-reveal-delayed { animation: sars-reveal-kf 900ms 180ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.sars-case .sars-reveal-slow { animation: sars-reveal-kf 1100ms 280ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@keyframes sars-marquee-kf {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.sars-case .sars-marquee { animation: sars-marquee-kf 34s linear infinite; }
+
+@keyframes sars-text-pan-kf {
+  from { background-position: 0% center; }
+  to   { background-position: 100% center; }
+}
+.sars-case .sars-text-pan {
+  animation: sars-text-pan-kf 7s ease-in-out infinite alternate;
+  background-image: linear-gradient(90deg, #b4613b 0%, #e7e3de 22%, #027466 48%, #e27953 74%, #b4613b 100%);
+}

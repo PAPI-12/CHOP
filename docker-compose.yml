@@ -1,0 +1,38 @@
+# Layer 2 — orchestration. The React build ships as static files
+# (dist/); this compose file runs the Python backend beside it.
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DEBUG: ${DEBUG:-0}
+      ENFORCE_HTTPS: ${ENFORCE_HTTPS:-0}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DATABASE_PATH: /srv/backend/data/portfolio.db
+      CONTACT_RETENTION_DAYS: ${CONTACT_RETENTION_DAYS:-365}
+      MAX_REQUEST_BYTES: ${MAX_REQUEST_BYTES:-16384}
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-30}
+      RATE_LIMIT_WINDOW: ${RATE_LIMIT_WINDOW:-60}
+      CACHE_TTL: ${CACHE_TTL:-300}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      NOTIFY_TO: ${NOTIFY_TO:-papiraborife@gmail.com}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
+    ports:
+      - "8000:8000"
+    volumes:
+      - db-data:/srv/backend/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  db-data:

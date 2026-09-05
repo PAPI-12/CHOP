@@ -1,0 +1,6 @@
+# Production runtime — bounded major versions prevent surprise breaking
+# upgrades while still receiving compatible security/bugfix releases.
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.34,<1.0
+pydantic[email]>=2.10,<3.0
+email-validator>=2.2,<3.0

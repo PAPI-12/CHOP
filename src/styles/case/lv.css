@@ -1,0 +1,15 @@
+/* ── Louis Vuitton "Outlandish" scoped styles ─────────────────────────── */
+
+.lv-case {
+  color: #f3ead7;
+}
+
+.lv-case .font-lv-bebas {
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.lv-case .font-lv-serif {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+}

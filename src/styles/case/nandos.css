@@ -1,0 +1,60 @@
+/* ── Nando's "Boujee Bowl" scoped styles ──────────────────────────────── */
+
+.nandos-case {
+  font-family: 'Archivo', sans-serif;
+  color: #171412;
+}
+
+.nandos-case .font-nandos-display {
+  font-family: 'Anton', sans-serif;
+}
+
+.nandos-case .font-mono {
+  font-family: 'Space Mono', monospace;
+}
+
+.nandos-case .grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.055;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.nandos-case .nandos-marquee-track {
+  animation: nandos-marquee 22s linear infinite;
+}
+@keyframes nandos-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.nandos-case .reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.nandos-case .reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.nandos-case .stagger > * {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: nandos-rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes nandos-rise {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.nandos-case .nandos-outline-text {
+  -webkit-text-stroke: 1.5px #171412;
+  color: transparent;
+}
+.nandos-case .nandos-outline-white {
+  -webkit-text-stroke: 1.5px #f5efe4;
+  color: transparent;
+}
