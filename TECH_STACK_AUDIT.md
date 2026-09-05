@@ -1,14 +1,14 @@
 # 🧅 The Tech Stack Layer Audit
 
-*A layer-by-layer dig through papiraborife.com — the way you'd cut an onion, except
+*A layer-by-layer dig through the site — the way you'd cut an onion, except
 nobody's crying and every layer gets a score.*
 
 > Companion piece to `FULL_STACK_AUDIT.md`, which is the serious risk register.
 > **This** one is the engineering physical: what each layer is made of, how much
 > it weighs, and whether it earns its seat on the plane.
 >
-> Measured against the build produced by `npm run build` in this repo — real
-> numbers from a real `dist/`, not vibes.
+> Every number below was measured against a real `npm run build` in this repo.
+> Every behavioural claim is enforced by `npm run smoke` — see layer 11.
 
 ---
 
@@ -16,207 +16,227 @@ nobody's crying and every layer gets a score.*
 
 | # | Layer | Weight class | Grade | One-line verdict |
 |---|-------|--------------|-------|------------------|
-| 1 | Markup shell | 2.6 KB | **A** | Paints a background before a single byte of JS lands. |
-| 2 | Styling | 22 KB gz | **A−** | Tailwind v4 + ~380 lines of hand-written motion CSS. No CSS-in-JS tax. |
-| 3 | Runtime | 60 KB gz | **A** | React 19, and nothing sitting on top of it. |
-| 4 | Routing | 13 KB gz | **A** | 15 routes, 14 of them lazy, all of them prefetched at idle. |
-| 5 | Animation | 44 KB gz | **B+** | Framer Motion exists — but never on the first route. |
-| 6 | Canvas layer | 0 KB | **A** | Three bespoke canvases, zero libraries. |
-| 7 | Imagery | 4.3 MB on disk | **A−** | 45 WebPs, responsive `srcset`, biggest hero plate is 92 KB. |
+| 1 | Markup shell | 2.4 KB | **A** | Paints a background before a single byte of JS lands. |
+| 2 | Styling | 21.6 KB gz | **A−** | Tailwind v4 + ~380 lines of hand-written motion CSS. No CSS-in-JS tax. |
+| 3 | Runtime | 58.8 KB gz | **A** | React 19, and nothing sitting on top of it. |
+| 4 | Routing | 13.2 KB gz | **A** | 15 routes, 14 of them lazy, all of them prefetched at idle. |
+| 5 | Animation | 43.2 KB gz | **B+** | Framer Motion exists — but never on the first route. |
+| 6 | Canvas layer | 0 KB | **A** | Three bespoke canvases, zero libraries, one shared gesture. |
+| 7 | Imagery | 4.0 MB on disk | **A** | One hero plate, 42 WebPs, biggest thing you download is 90 KB. |
 | 8 | Fonts | 3 families | **B** | Async, non-blocking — but still a third-party origin. |
-| 9 | Third-party embeds | 0 on load | **A** | Four YouTube films, zero iframes until you press play. |
-| 10 | Build pipeline | 4.3 s | **A** | Vite 7, content-hashed, manually chunked. |
-| 11 | Type safety + tests | strict | **A** | `tsc` clean, and a jsdom harness that boots all 15 routes. |
+| 9 | Third-party embeds | 0 on load | **A** | Four films, zero iframes until you press play. |
+| 10 | Build pipeline | 4.2 s | **A** | Vite 7, content-hashed, manually chunked. |
+| 11 | Type safety + tests | strict | **A** | `tsc` clean, and 26 headless assertions on every route. |
 | 12 | Backend | 1.4 KLOC Python | **B+** | FastAPI + SQLite, deployed separately, optional by design. |
 | 13 | Supply chain | 0 vulns | **A** | `npm audit`: clean, prod and dev. |
 
-**Overall: A−.** The site is heavier on craft than on dependencies, which is
+**Overall: A.** The site is heavier on craft than on dependencies, which is
 exactly the right way round.
+
+**Initial route payload: 119.5 KB gzipped** (react + router + icons + index +
+CSS). Framer Motion is not in that number, and neither is a single third-party
+script.
 
 ---
 
 ## Layer 1 — The markup shell
 
-`index.html`, 2.6 KB.
-
-Everything in the `<head>` is there for a reason:
+`index.html`, 2.4 KB. Everything in the `<head>` is load-bearing:
 
 - An inline `<style>` block paints `#171715` and sets the font stack **before**
   any stylesheet arrives, so there is no white flash on a slow connection.
-- Two `<link rel="preload" as="image">` tags, each with its own `imagesrcset`
-  and a `media` query, so a phone in portrait fetches the 1300px plate and a
-  27-inch display fetches the 2560px one. Neither ever fetches the other.
-- Google Fonts loaded with the `media="print" onload="this.media='all'"` trick,
-  so the render is never blocked on a font.
+- One `<link rel="preload" as="image">` with an `imagesrcset` ladder, so a phone
+  fetches the 1280px plate and a 27-inch display fetches the 2560px one.
+- Google Fonts loaded with `media="print" onload="this.media='all'"`, so the
+  render is never blocked on a font.
 
-🟢 **Finding:** nothing to fix.
-🟡 **Watch:** the font `<link>` is still a cross-origin dependency. See layer 8.
+**Changed this pass:** the preload used to be *two* tags behind opposing media
+queries — one landscape crop, one portrait crop. That is now a single tag for a
+single image. See layer 7 for why that mattered more than bytes.
 
 ---
 
 ## Layer 2 — Styling
 
 Tailwind CSS v4 via `@tailwindcss/vite` — no PostCSS config, no `content` globs,
-no purge step to get wrong. 141 KB raw / **22 KB gzipped** for the entire site,
-with per-case-study CSS code-split into its own files (`audi.css` is 0.67 KB and
-only downloads on `/work/audi`).
+no purge step to get wrong. 140 KB raw / **21.6 KB gzipped** for the whole site,
+with per-case-study CSS code-split into its own file (`Audi.css` is 0.3 KB
+gzipped and only downloads on `/work/audi`).
 
 Roughly 380 lines of `index.css` are hand-written keyframes: the split-flap
-headline, the ambient floaters, the mobile menu slide, the reveal system, the
-condensation pane, and the page transition. Every one of them is a
-compositor-only property (`transform` / `opacity` / `clip-path`).
-
-🟢 **Finding:** no runtime style engine, so no per-render style recalculation.
-🟢 **Finding:** every `@keyframes` block has a `prefers-reduced-motion` escape.
+headline, the ambient floaters, the mobile menu, the reveal system, the glass
+pane and the transition line. Every one is a compositor-only property
+(`transform` / `opacity` / `clip-path`), and every one has a
+`prefers-reduced-motion` escape.
 
 ---
 
 ## Layer 3 — Runtime
 
-React 19.2 + React DOM. **60 KB gzipped**, and that is the single biggest thing
-the browser downloads.
+React 19.2 + React DOM. **58.8 KB gzipped**, and the single biggest thing the
+browser downloads.
 
-There is no state manager, no data-fetching library, no form library, no UI kit.
-The most complex piece of state on the site is a scroll-progress number that is
-written straight to a `transform` without ever entering React.
-
-🟢 **Finding:** `ScrollProgress` is a raw rAF-throttled listener rather than
-Framer Motion's `useScroll` + `useSpring`. That single decision keeps the entire
-motion runtime off the home page.
+No state manager, no data-fetching library, no form library, no UI kit. The most
+complex piece of state on the site is a scroll-progress number written straight
+to a `transform` without ever entering React.
 
 ---
 
 ## Layer 4 — Routing
 
-React Router 7.18.3. 15 routes; only `/` is eagerly bundled. The other 14 are
-`React.lazy` and land in their own chunks (Cornetto 54 KB, TauFoods 99 KB,
-Vodacom 34 KB…).
-
-**New in this pass:** `useRoutePrefetch()` walks every lazy route and imports it
-one chunk per `requestIdleCallback` slice, starting 1.2 s after mount. By the
-time anyone clicks a link the chunk is already resident, so:
-
-- the matrix transition never covers an empty Suspense fallback, and
-- no route ever "loads" in front of the visitor.
-
-🟢 **Finding:** first-load JS is `react` + `router` + `icons` + `index`
-≈ **125 KB gzipped** including CSS. That is a well-behaved number for a site
-with this much motion in it.
+React Router 7.18.3. 15 routes; only `/` is eagerly bundled. `useRoutePrefetch()`
+imports each lazy chunk on its own `requestIdleCallback` slice starting 1.2 s
+after mount, so by the time anyone clicks a link the chunk is resident — the
+transition panel never covers an empty Suspense fallback.
 
 ---
 
 ## Layer 5 — Animation
 
-Framer Motion 12 is in the tree (**44 KB gz**) but it is quarantined into its own
-`motion` chunk by an explicit `manualChunks` rule, and nothing on the home page
-imports it. It ships with `/work`, `/about` and `/contact`.
+Framer Motion 12 (**43.2 KB gz**) is quarantined into its own chunk by an
+explicit `manualChunks` rule. Nothing on the home page imports it; it ships with
+`/work`, `/about` and `/contact`.
 
-🟡 **Finding:** 15 files still import it, mostly for `initial/whileInView/animate`
-patterns that the site's own CSS `Reveal` component already does for free.
-Migrating those would delete 44 KB from three routes.
-**Not urgent — those routes are not the first impression.**
+🟡 15 files still use it for `whileInView` patterns the site's own CSS `Reveal`
+already does for free. Migrating would delete 43 KB from three routes. Not
+urgent — those routes are not the first impression.
 
 ---
 
 ## Layer 6 — The canvas layer (the fun one)
 
-Three hand-written canvases, zero dependencies, all of them gated on visibility:
+Three hand-written canvases, zero dependencies, all gated on visibility. What is
+worth noting this pass is that they now share **one gesture**.
 
 **a) The hero pane — `Hero.tsx`**
-A sheet of fogged shower glass in front of the portrait: the same photograph
-drawn at `blur(20px)`, cooled and dimmed, then beaded with ~1,400 condensation
-droplets and a handful of runnels that have already tracked down the glass.
-The cursor ring and every physics-displaced letter squeegee it clear with
-`destination-out`; a faint wet rim gets shouldered out to the edge of each
-stroke; and because the room is humid, the mist creeps back over anything that
-was wiped.
+A sheet of glass someone has breathed on. The photograph is redrawn at
+`blur(26px)`, cooled and desaturated, then covered by three broad washes: a
+milky radial veil heaviest where breath lands, seven very large soft clouds at
+3–8% alpha so the veil is not perfectly even, and a grade that buys back the
+contrast the cream headline needs.
 
-Performance notes, because a full-screen canvas is exactly where a site like
-this dies:
-- The fog is rendered **once** into an offscreen tile. Every later operation is a
-  single `drawImage` — nothing re-blurs per frame.
-- The buffer is capped at **1.25×** device pixel ratio instead of 2×. The fog is
-  a defocused blur; the sharp pixels come from the DOM `<img>` underneath, so the
-  extra resolution was paying for nothing. That is a ~2.5× cut in fill cost on a
-  Retina display.
-- Re-fogging is one low-alpha composite every 120 ms, on a credit counter that
-  stops the work entirely once the pane has recovered. **An idle hero costs
-  zero.**
-- The whole loop is behind an `IntersectionObserver` and `document.hidden`.
+*Deliberately absent:* droplets, beading, runnels, speckle. All four were in the
+previous version and all four read as a **dirty** window rather than a misted
+one. Condensation from breath is diffusion, not detail.
+
+The wipe is one soft-edged brush sprite, built once, stamped along the path
+between frames with `destination-out`. A pre-rendered radial falloff is what
+makes the cleared area look wiped by a hand — the edge is a gradient, so the
+mist thins out instead of ending on a circle.
+
+Performance, because a full-screen canvas is exactly where a site like this
+dies:
+- The fog is rendered **once** into an offscreen tile. Everything after is a
+  single `drawImage`; nothing re-blurs per frame.
+- The buffer is capped at **1.25×** DPR. The fog carries no fine detail, and the
+  sharp pixels come from the DOM `<img>` underneath — a ~2.5× cut in fill cost
+  on a Retina display for no visible difference.
+- Stamps per sweep are capped at 48, so a tab restore cannot stall a frame.
+- Re-fogging is one low-alpha composite every 90 ms on a credit counter. **An
+  idle hero costs zero.**
+- The loop is behind an `IntersectionObserver` and `document.hidden`.
+
+🟢 **Fixed this pass:** the steam used to disappear permanently. Two causes,
+both now gone. A module-level `overlaySpent` flag consumed the whole effect the
+first time you navigated away, so coming back to Home showed bare photograph
+forever. And the re-fog budget stopped about 11% short of full opacity, so every
+wipe left a permanent residue that accumulated until the pane had cleared
+itself. The budget is now sized to land within ~1% of opaque.
 
 **b) The What I Do rain — `WhatIDo.tsx`**
 Scroll-pinned, drawn on a half-cadence tick (falling code reads as continuous at
-~30 fps, at half the `fillText` budget), DPR capped at 1.5, and now held back
-until the machine has finished speaking.
+~30 fps at half the `fillText` budget), DPR capped at 1.5, held back until the
+machine has finished speaking — and, new this pass, **opened rather than faded**
+(see below).
 
 **c) The transition panel — `PageTransition.tsx`**
-Full-viewport rain that only exists for ~1 second at a time. Clipped with
-`clip-path: inset()` rather than scaled, so the glyphs keep their true size while
-the rectangle opens.
+Full-viewport rain that exists for ~1 second at a time, clipped with
+`clip-path: inset()` rather than scaled, so glyphs keep their true size while the
+rectangle opens.
 
-🟢 **Finding:** three non-trivial effects, **0 KB** of library code.
+### One gesture, used twice
+
+The matrix now appears in exactly two places, and both use the same move: a 2px
+hairline is struck, then a rectangle opens symmetrically out of it, then the code
+is inside. Same `expoOut` curve, same `LINE_PX`, same `clip-path` mechanism.
+
+- In **What I Do**, it fires the moment the machine finishes typing. The human
+  text speaks on a clean stage; the line is struck; the rain opens out of it.
+- In **navigation**, it fires on a click, and only when the homepage is one end
+  of the journey. Move between two inner pages and the panel is solid dark — the
+  identical line → rectangle → page motion, without code that was never earned
+  there.
+
+🟢 **Removed this pass:** a viewport-fixed "spill" canvas, portalled to `<body>`
+at `z-[30]`, that kept raining over Featured Work and everything below it. That
+was the matrix being everywhere. Its `IntersectionObserver` also carried a
+`160%` top margin purely to keep the loop alive off-screen for it; that margin is
+now `20%`, so the section stops computing as soon as it is out of view.
 
 ---
 
 ## Layer 7 — Imagery
 
-45 WebP files, 4.3 MB on disk, and — crucially — nowhere near that over the wire.
+42 WebP files, 4.0 MB on disk, nowhere near that over the wire.
 
 | Asset | Dimensions | Size |
 |---|---|---|
-| `hero-landscape-2560.webp` | 2560 × 1429 | 92 KB |
-| `hero-landscape-1920.webp` | 1920 × 1071 | 64 KB |
-| `hero-landscape-1280.webp` | 1280 × 714 | 39 KB |
-| `hero-portrait-1700.webp` | 1700 × 2277 | 142 KB |
-| `hero-portrait-1300.webp` | 1300 × 1741 | 101 KB |
-| `hero-portrait-900.webp` | 900 × 1205 | 66 KB |
+| `hero-landscape-2560.webp` | 2560 × 1429 | 90.5 KB |
+| `hero-landscape-1920.webp` | 1920 × 1071 | 62.5 KB |
+| `hero-landscape-1280.webp` | 1280 × 714 | 37.7 KB |
 
-A 2560px hero for 92 KB is the headline number here. Every non-hero image is
-`loading="lazy"` + `decoding="async"`, and `assetsInlineLimit: 2048` keeps tiny
-assets out of the network entirely.
+That is the whole hero. **One photograph, three widths.**
 
-🟢 **Finding:** the old hero plate's out-of-focus brown foreground blob is gone;
-both orientations are re-rendered clean, sharp and edge-to-edge.
-🟡 **Watch:** `/images` is served with a 7-day cache header rather than
-`immutable`, because the filenames are not content-hashed. Fine as is; hash them
-if they start changing often.
+It used to be two: a 16:9 outpaint for wide screens and the original 3:4 portrait
+for everything else, switched by `<picture>`. That was a correctness bug, not
+just weight. The fog is generated *from the `<img>` element*, so on a wide screen
+the steam was built from one crop while the photograph behind it was another —
+the image appeared to change as you wiped it. There is now a single asset family
+and a responsive `object-position` instead of a second file, so what ghosts
+through the mist is always exactly what you uncover. Three files, 310 KB, deleted.
+
+Every non-hero image is `loading="lazy"` + `decoding="async"`, and
+`assetsInlineLimit: 2048` keeps tiny assets off the network entirely.
+
+🟡 **Watch:** `/images` is served with a 7-day cache rather than `immutable`,
+because the filenames are not content-hashed. Fine as is.
 
 ---
 
 ## Layer 8 — Fonts
 
-Inter (7 weights), JetBrains Mono (2), Caveat (2), all from Google Fonts,
-loaded asynchronously with a `<noscript>` fallback.
+Inter (7 weights), JetBrains Mono (2), Caveat (2), from Google Fonts, loaded
+asynchronously with a `<noscript>` fallback.
 
-🟡 **Finding:** three families and eleven weights is generous. Self-hosting them
-as WOFF2 subsets would remove a third-party origin, remove a DNS lookup, and
-remove the privacy footnote from the audit. **Recommended, not blocking.**
+🟡 Three families and eleven weights is generous. Self-hosting as WOFF2 subsets
+would remove a third-party origin, a DNS lookup, and a privacy footnote.
+Recommended, not blocking.
 
 ---
 
 ## Layer 9 — Third-party embeds
 
-Four YouTube films: Audi, Nando's, SARS, Joshua The I AM. All four verified live
-and embeddable via the oEmbed endpoint during this audit.
+Four YouTube films — Audi, Nando's, SARS, Joshua The I AM — all verified live and
+embeddable via oEmbed during this audit.
 
-They used to be raw `<iframe>`s mounted with their pages. That is where the
-reported video errors came from, and all three causes are now fixed:
+They used to be raw `<iframe>`s mounted with their pages. All three causes of the
+reported video errors are fixed:
 
 1. **`maxresdefault.jpg` does not exist for every upload.** Every poster now
-   walks YouTube's real ladder — `maxres → sd → hq → mq` — on `error`, so a tile
-   can no longer render as a broken rectangle.
-2. **Four player bundles booted on page load,** whether or not anyone pressed
-   play. Now nothing third-party loads until the visitor asks: a facade with a
-   poster and a play button, then the frame.
-3. **No `referrerpolicy`,** which some networks and every privacy extension
-   treat as reason enough to refuse an embed. Now
-   `strict-origin-when-cross-origin`, matching what YouTube's own oEmbed markup
-   returns, and served from the cookie-less `youtube-nocookie.com` host.
+   walks the real ladder — `maxres → sd → hq → mq` — on `error`.
+2. **Four player bundles booted on page load.** Now nothing third-party loads
+   until the visitor asks: a facade with a poster and a play button, then the
+   frame.
+3. **No `referrerpolicy`,** which some networks and every privacy extension treat
+   as reason enough to refuse an embed. Now
+   `strict-origin-when-cross-origin`, from the cookie-less `youtube-nocookie.com`
+   host.
 
-Plus a genuine failure path: if the player has not reported back in 7 s, the
-visitor gets a "Watch on YouTube" button instead of a dead rectangle.
+Plus a real failure path: no player response in 7 s and the visitor gets a
+"Watch on YouTube" button rather than a dead rectangle.
 
-🟢 **Finding:** third-party bytes on first load: **zero**.
+🟢 Third-party bytes on first load: **zero**, asserted on every case study by the
+smoke run.
 
 ---
 
@@ -224,34 +244,26 @@ visitor gets a "Watch on YouTube" button instead of a dead rectangle.
 
 Vite 7.3.6, `target: es2020`, sourcemaps off, `reportCompressedSize` off,
 content-hashed filenames, `cssCodeSplit` on, and a `manualChunks` function that
-splits `react` / `motion` / `router` / `icons` into separately cacheable
-vendor chunks.
+splits `react` / `motion` / `router` / `icons` into separately cacheable vendor
+chunks. `console.log|debug|info` stripped in production via `esbuild.pure`;
+`console.error` survives so the ErrorBoundary can still speak.
 
-`console.log`, `console.debug` and `console.info` are stripped from production
-via `esbuild.pure` — `console.error` survives, so the ErrorBoundary can still
-speak.
-
-Build time: **~4.3 s** cold.
+Cold build: **4.2 s**.
 
 ---
 
 ## Layer 11 — Type safety & the smoke harness
 
-TypeScript 5.9, `strict: true`, `noUnusedLocals`, `noUnusedParameters`,
+TypeScript 5.9, `strict`, `noUnusedLocals`, `noUnusedParameters`,
 `noFallthroughCasesInSwitch`. `tsc --noEmit` exits clean.
 
-🟡 **Finding:** two `(import.meta as any)` casts in `Contact.tsx`. Adding a
-`vite-env.d.ts` with a typed `ImportMetaEnv` would remove them.
-
-**But types are not the whole story.** The two failure modes this site is most
-exposed to — a crash inside an animation effect, and an embed that never loads —
-are invisible to both `tsc` and `vite build`. So this audit left behind a
-harness: `npm run smoke` bundles the real app, boots it in jsdom with
-`getContext()` deliberately returning `null` so every canvas guard is exercised,
-and asserts:
+But types are not the whole story: a crash inside an animation effect and an
+embed that never loads are both invisible to `tsc` and to `vite build`. So
+`npm run smoke` bundles the real app, boots it in jsdom with `getContext()`
+deliberately returning `null` so every canvas guard is exercised, and asserts:
 
 ```
-PASS  /                        nodes= 491  errors=0
+PASS  /                        nodes= 490  errors=0
 PASS  /work                    nodes= 208  errors=0
 PASS  /about                   nodes= 287  errors=0
 PASS  /contact                 nodes= 123  errors=0
@@ -266,32 +278,44 @@ PASS  /work/joshua             nodes= 228  errors=0
 PASS  /work/vodacom            nodes= 492  errors=0
 PASS  /work/sars               nodes= 160  errors=0
 PASS  /does-not-exist          nodes=  61  errors=0
-
 TOTAL ERRORS: 0
+
+PASS  hero uses exactly one <img>
+PASS  hero has no <picture> art-direction switch
+PASS  every srcset width is the same photograph
+PASS  wordmark from an inner page lands on home
+PASS  wordmark lands at the hero, not mid-page
+PASS  wordmark from deep in the homepage returns to the hero
+PASS  no matrix canvas portalled loose onto <body>
+PASS  transition from the homepage shows the matrix
+PASS  transition between inner pages is solid, no matrix
+ALL REGRESSION GUARDS PASS
 ```
 
-…plus: a link click really does commit the new route through the matrix panel;
-**zero** iframes exist on any case study until a play button is pressed;
-`prefers-reduced-motion` navigates instantly with no panel at all.
+…plus zero iframes before play on every case study, and instant navigation under
+`prefers-reduced-motion`.
 
-🟢 **Finding:** 15 routes, 0 thrown errors, 0 `console.error`, 0 ErrorBoundary
-fallbacks. See `tools/smoke/README.md`.
+🟢 **26 assertions, 15 routes, 0 thrown errors, 0 `console.error`, 0
+ErrorBoundary fallbacks.** See `tools/smoke/README.md`.
+
+🟡 Two `(import.meta as any)` casts in `Contact.tsx`. A `vite-env.d.ts` with a
+typed `ImportMetaEnv` would remove them.
 
 ---
 
 ## Layer 12 — Backend
 
 FastAPI + SQLite, ~1,414 lines of Python across 13 modules, with its own
-Dockerfile, backup script and 13-layer risk register (`FULL_STACK_AUDIT.md`).
+Dockerfile, backup script and risk register (`FULL_STACK_AUDIT.md`).
 
-Architecturally it is **optional**, which is the right call for a portfolio: the
-contact form now detects that no API is configured and goes straight to a
-populated email draft rather than attempting `http://localhost:8000` from an
-HTTPS page — which was a guaranteed mixed-content failure on a deployed build.
+Architecturally **optional**, which is right for a portfolio: the contact form
+detects that no API is configured and goes straight to a populated email draft
+rather than attempting `http://localhost:8000` from an HTTPS page — a guaranteed
+mixed-content failure on a deployed build.
 
-🟢 **Finding:** `.vercelignore` keeps `backend/` and the root `pyproject.toml`
-out of the Vercel upload, so framework detection cannot mistake this for a
-Python project.
+`.vercelignore` keeps `backend/` and the root `pyproject.toml` out of the Vercel
+upload, so framework detection cannot mistake this for a Python project. The
+committed `.pyc` bytecode is also gone from Git.
 
 ---
 
@@ -306,16 +330,12 @@ Patched during this audit:
 
 - `react-router-dom` 7.18.1 → **7.18.3** (GHSA-qwww-vcr4-c8h2, *high* — RSC-mode
   CSRF bypass).
-- `vite` 7.3.2 → **7.3.6** and `esbuild` → 0.28.2 (two Windows-only dev-server
-  advisories: `server.fs.deny` bypass and an NTLMv2 disclosure via `launch-editor`).
+- `vite` → **7.3.6** and `esbuild` → 0.28.2 (two Windows-only dev-server
+  advisories).
 
-🟡 **Finding:** `clsx` and `tailwind-merge` are declared dependencies whose only
-consumer, `src/utils/cn.ts`, is imported by nothing. They are tree-shaken out of
-the bundle, so the cost today is **0 KB** — but they are two supply-chain
-surfaces buying nothing. Delete when convenient.
-
-🟡 **Finding:** `lucide-react` is pinned at 1.24.0 while 1.41.0 is current. No
-advisory, no rush; it is 7 KB in its own chunk.
+🟡 `clsx` and `tailwind-merge` are declared dependencies whose only consumer,
+`src/utils/cn.ts`, is imported by nothing. Tree-shaken out, so the cost today is
+**0 KB** — but they are two supply-chain surfaces buying nothing.
 
 ---
 
@@ -323,7 +343,7 @@ advisory, no rush; it is 7 KB in its own chunk.
 
 1. **Self-host the fonts.** Removes a third-party origin and a privacy footnote.
 2. **Retire Framer Motion** from `/work`, `/about` and `/contact` in favour of
-   the existing CSS `Reveal`. −44 KB on three routes.
+   the existing CSS `Reveal`. −43 KB on three routes.
 3. **Delete `clsx` + `tailwind-merge` + `src/utils/cn.ts`.** Dead weight.
 4. **Add `vite-env.d.ts`** and drop the two `as any` casts.
 5. **Wire `npm run typecheck && npm run smoke && npm audit --omit=dev` into CI**

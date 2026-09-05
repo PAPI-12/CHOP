@@ -17,22 +17,6 @@ const RING_TEXT = `${RING_WORD} \u00B7 `;
 /** Eraser stroke key reserved for the cursor ring; bodies use their own keys. */
 const RING_STROKE = -1;
 
-/**
- * Module-level, so it survives client-side route changes but NOT a reload.
- * The dark overlay is a first-impression device: once the visitor has been
- * through the hero and navigated away, coming back to Home shows the clean
- * full-colour image with just the letter physics. A real page reload resets
- * this module and the overlay returns.
- */
-let overlaySpent = false;
-/**
- * Consuming the overlay is deferred by a tick. React's StrictMode mounts,
- * unmounts and re-mounts every effect in development — without this, that
- * synthetic unmount ate the overlay before the visitor ever saw it, and the
- * hero looked broken in dev while being fine in production.
- */
-let overlaySpendTimer = 0;
-
 const HeroLetters: React.FC<{ text: string }> = ({ text }) => (
   <>
     {Array.from(text).map((ch, i) =>
@@ -100,9 +84,6 @@ const Hero: React.FC = () => {
     const canvas = eraserRef.current;
     if (!hero || !ring || !canvas) return;
 
-    // A re-mount inside the same tick (StrictMode) cancels the pending spend.
-    if (overlaySpendTimer) { clearTimeout(overlaySpendTimer); overlaySpendTimer = 0; }
-
     let boxLeft = 0;
     let boxTop = 0;
     let boxW = 0;
@@ -129,14 +110,21 @@ const Hero: React.FC = () => {
     const strokes = new Map<number, { x: number; y: number }>();
 
     /**
-     * Humidity. The room never dries out: whatever gets wiped slowly mists
-     * over again. One low-alpha composite of the fog tile every REFOG_MS is
-     * all it takes — and the credit counter stops the work entirely once the
-     * pane has fully recovered, so an idle hero costs nothing.
+     * The breath comes back.
+     *
+     * Whatever gets wiped slowly mists over again — one low-alpha composite
+     * of the fog tile every REFOG_MS, on a credit counter, so an untouched
+     * hero costs nothing at all.
+     *
+     * The tick budget is sized so the pane genuinely reaches full opacity
+     * again: 0.978^220 leaves about 1% of the wipe showing, which is
+     * invisible. The previous budget stopped ~11% short, and because that
+     * residue accumulated with every pass the glass slowly cleared itself
+     * and never fogged back up.
      */
-    const REFOG_MS = 120;
-    const REFOG_TICKS = 110;
-    const REFOG_ALPHA = 0.02;
+    const REFOG_MS = 90;
+    const REFOG_TICKS = 220;
+    const REFOG_ALPHA = 0.022;
     let refogTicks = 0;
     let lastRefog = 0;
 
@@ -266,8 +254,11 @@ const Hero: React.FC = () => {
         const oy = (boxH - dh) * (posY / 100);
         // Overscan past the canvas so the blur kernel never samples the
         // transparent edge and leaves a bright rim around the pane.
-        const pad = 72;
-        f.filter = 'blur(20px) saturate(0.6) brightness(0.66) contrast(1.02)';
+        const pad = 84;
+        // Heavier defocus than before: through breath on glass you get shape
+        // and tone, never an edge. That total loss of detail is the whole
+        // illusion — and it is also why the wipe feels like a reveal.
+        f.filter = 'blur(26px) saturate(0.44) brightness(0.79) contrast(0.96)';
         f.drawImage(src, ox - pad, oy - pad, dw + pad * 2, dh + pad * 2);
         f.filter = 'none';
       } else {
@@ -275,89 +266,53 @@ const Hero: React.FC = () => {
         f.fillRect(0, 0, boxW, boxH);
       }
 
-      // Cold steam sitting on the pane. Cool at the top where the mist
-      // gathers, deepening to near-black at the foot so the headline and the
-      // bottom furniture keep their contrast.
-      const steam = f.createLinearGradient(0, 0, 0, boxH);
-      steam.addColorStop(0, 'rgba(214,231,236,0.16)');
-      steam.addColorStop(0.34, 'rgba(198,216,222,0.10)');
-      steam.addColorStop(1, 'rgba(214,231,236,0.03)');
-      f.fillStyle = steam;
+      /* Warm breath on cold glass.
+         The signature of real condensation is not detail, it is DIFFUSION:
+         an even milky veil that thins toward the edges of the breath. So
+         there is deliberately no speckle, no beading and no drips here —
+         those read as a dirty window rather than a misted one. Three broad
+         washes and nothing else. */
+
+      // 1 — the veil. Cool, milky, and heaviest through the middle of the
+      // pane where breath actually lands.
+      const bloom = f.createRadialGradient(
+        boxW * 0.5, boxH * 0.44, Math.min(boxW, boxH) * 0.05,
+        boxW * 0.5, boxH * 0.46, Math.max(boxW, boxH) * 0.78,
+      );
+      bloom.addColorStop(0, 'rgba(222,238,246,0.34)');
+      bloom.addColorStop(0.55, 'rgba(214,232,240,0.25)');
+      bloom.addColorStop(1, 'rgba(206,226,236,0.14)');
+      f.fillStyle = bloom;
       f.fillRect(0, 0, boxW, boxH);
 
+      // 2 — where the breath pooled. A handful of very large, very soft
+      // clouds at low alpha: enough to stop the veil looking sprayed on,
+      // far too broad to ever read as specks.
+      const rnd = seeded(9187 + Math.round(boxW) * 31 + Math.round(boxH));
+      const clouds = 7;
+      for (let i = 0; i < clouds; i++) {
+        const cxp = (0.12 + rnd() * 0.76) * boxW;
+        const cyp = (0.08 + rnd() * 0.8) * boxH;
+        const rad = Math.max(boxW, boxH) * (0.18 + rnd() * 0.26);
+        const g = f.createRadialGradient(cxp, cyp, 0, cxp, cyp, rad);
+        const a = 0.035 + rnd() * 0.045;
+        g.addColorStop(0, `rgba(233,244,248,${a.toFixed(3)})`);
+        g.addColorStop(0.6, `rgba(233,244,248,${(a * 0.45).toFixed(3)})`);
+        g.addColorStop(1, 'rgba(233,244,248,0)');
+        f.fillStyle = g;
+        f.fillRect(0, 0, boxW, boxH);
+      }
+
+      // 3 — the grade. Keeps the headline readable against the pane and
+      // sits the hero back into the site's dark. Cream type over milk is
+      // unreadable; this is what buys the contrast back.
       const grade = f.createLinearGradient(0, 0, 0, boxH);
-      grade.addColorStop(0, 'rgba(23,23,21,0.44)');
-      grade.addColorStop(0.32, 'rgba(23,23,21,0.30)');
-      grade.addColorStop(1, 'rgba(23,23,21,0.86)');
+      grade.addColorStop(0, 'rgba(23,25,24,0.30)');
+      grade.addColorStop(0.34, 'rgba(23,25,24,0.20)');
+      grade.addColorStop(1, 'rgba(23,25,24,0.74)');
       f.fillStyle = grade;
       f.fillRect(0, 0, boxW, boxH);
 
-      // A soft breath of light across the pane — the sheen that tells the eye
-      // it is looking AT a surface, not through it.
-      const sheen = f.createLinearGradient(0, boxH, boxW, 0);
-      sheen.addColorStop(0, 'rgba(255,255,255,0)');
-      sheen.addColorStop(0.5, 'rgba(226,242,247,0.05)');
-      sheen.addColorStop(1, 'rgba(255,255,255,0)');
-      f.fillStyle = sheen;
-      f.fillRect(0, 0, boxW, boxH);
-
-      /* Condensation. Baked once: thousands of beads cost nothing at runtime
-         because they never get re-drawn, only re-composited. */
-      const rnd = seeded(9187 + Math.round(boxW) * 31 + Math.round(boxH));
-      const beads = Math.min(1400, Math.round((boxW * boxH) / 2200));
-      for (let i = 0; i < beads; i++) {
-        const x = rnd() * boxW;
-        const y = rnd() * boxH;
-        const bias = rnd();
-        const r = 0.5 + bias * bias * 3.6;
-        f.globalAlpha = 0.16 + rnd() * 0.3;
-        // Body: a slightly clearer, slightly cooler lens of water.
-        f.fillStyle = 'rgba(233,246,250,0.34)';
-        f.beginPath();
-        f.arc(x, y, r, 0, Math.PI * 2);
-        f.fill();
-        // Specular pin-light, up and to the left, like the key light.
-        f.globalAlpha = 0.5 + rnd() * 0.45;
-        f.fillStyle = 'rgba(255,255,255,0.9)';
-        f.beginPath();
-        f.arc(x - r * 0.3, y - r * 0.34, Math.max(0.35, r * 0.3), 0, Math.PI * 2);
-        f.fill();
-        // Shadowed underside gives the bead volume.
-        f.globalAlpha = 0.24;
-        f.fillStyle = 'rgba(10,12,12,0.75)';
-        f.beginPath();
-        f.arc(x + r * 0.26, y + r * 0.34, Math.max(0.3, r * 0.34), 0, Math.PI * 2);
-        f.fill();
-      }
-      f.globalAlpha = 1;
-
-      /* Runnels: drips that have already tracked down the glass, cutting
-         part-clear channels. Cut with destination-out so the sharp image
-         genuinely reads through them. */
-      f.globalCompositeOperation = 'destination-out';
-      f.lineCap = 'round';
-      const runs = Math.max(5, Math.round(boxW / 190));
-      for (let i = 0; i < runs; i++) {
-        const x = rnd() * boxW;
-        const top = rnd() * boxH * 0.5;
-        const len = boxH * (0.16 + rnd() * 0.44);
-        const w = 1.2 + rnd() * 3.4;
-        f.globalAlpha = 0.2 + rnd() * 0.36;
-        f.lineWidth = w;
-        f.beginPath();
-        f.moveTo(x, top);
-        const steps = 5;
-        for (let s = 1; s <= steps; s++) {
-          const t = s / steps;
-          f.lineTo(x + Math.sin(t * 6 + i) * (2 + w), top + len * t);
-        }
-        f.stroke();
-        // The bead that stopped at the end of the run.
-        f.globalAlpha = 0.42 + rnd() * 0.3;
-        f.beginPath();
-        f.arc(x + Math.sin(6 + i) * (2 + w), top + len, w * 1.25, 0, Math.PI * 2);
-        f.fill();
-      }
       f.globalAlpha = 1;
       f.globalCompositeOperation = 'source-over';
     };
@@ -389,13 +344,6 @@ const Hero: React.FC = () => {
       ctx.globalAlpha = 1;
       ctx.clearRect(0, 0, boxW, boxH);
 
-      // Already seen this session: leave the pane clear so the hero image
-      // reads at its full quality, and never re-fog it.
-      if (overlaySpent) {
-        strokes.clear();
-        return;
-      }
-
       buildFog();
       if (fog) ctx.drawImage(fog, 0, 0, boxW, boxH);
       refogTicks = 0;
@@ -403,66 +351,78 @@ const Hero: React.FC = () => {
     };
 
     /**
-     * The squeegee. Carve a capsule from the emitter's previous point to
-     * (x, y) — drawing the connecting segment, not just a dot, is what makes a
-     * fast sweep leave one continuous clean trail instead of a dotted line.
+     * The squeegee.
      *
-     * A faint wet rim is laid down just outside the wipe first, so the water
-     * reads as being pushed aside rather than deleted.
+     * A single soft-edged brush sprite, built once, stamped along the path
+     * from the emitter's previous point to (x, y) with destination-out.
+     *
+     * Stamping a pre-rendered radial falloff is what makes the cleared area
+     * look like glass wiped by a hand: the edge is a gradient, so the mist
+     * thins out rather than ending on a circle. It is also the cheapest way
+     * to do it — no per-frame ctx.filter, no multi-pass alpha stack, and the
+     * interpolation means a fast sweep leaves one continuous trail instead
+     * of a dotted line.
+     *
+     * There is no "wet rim" pass. Piling bright alpha around every stroke is
+     * what made the pane look grubby rather than clear.
      */
+    let brush: HTMLCanvasElement | null = null;
+    let brushR = 0;
+
+    const buildBrush = (r: number) => {
+      const size = Math.ceil(r * 2);
+      if (brush && brushR === r) return brush;
+      brush = brush || document.createElement('canvas');
+      brush.width = size;
+      brush.height = size;
+      const b = brush.getContext('2d');
+      if (!b) return null;
+      b.clearRect(0, 0, size, size);
+      const g = b.createRadialGradient(r, r, 0, r, r, r);
+      g.addColorStop(0, 'rgba(0,0,0,1)');
+      g.addColorStop(0.62, 'rgba(0,0,0,0.98)');
+      g.addColorStop(0.84, 'rgba(0,0,0,0.55)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      b.fillStyle = g;
+      b.fillRect(0, 0, size, size);
+      brushR = r;
+      return brush;
+    };
+
     const erase = (key: number, x: number, y: number, r: number) => {
       if (!ctx) return;
       const prev = strokes.get(key);
       // Nothing meaningful moved: skip the composite op entirely.
       if (prev && Math.hypot(x - prev.x, y - prev.y) < 0.6) return;
 
-      // Humidity has something to reclaim again.
+      // The breath has something to reclaim again.
       refogTicks = REFOG_TICKS;
 
-      const moved = prev ? Math.hypot(x - prev.x, y - prev.y) : 0;
+      // Brushes are cached per radius; the ring and the letters use two
+      // sizes between them, so this rebuilds at most twice.
+      const sprite = buildBrush(Math.round(r * 1.18));
+      if (!sprite) return;
+      const br = sprite.width / 2;
 
-      // 1 — moisture shouldered out to the edge of the stroke. Only on real
-      // travel: stamping this every frame while the cursor barely moves would
-      // pile alpha up in one spot and burn a white blob into the pane.
-      if (prev && moved > r * 0.35) {
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = 'rgba(228,244,248,1)';
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.globalAlpha = 0.045;
-        ctx.lineWidth = r * 0.5;
-        ctx.beginPath();
-        ctx.arc(x, y, r * 1.1, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      // 2 — the wipe itself.
       ctx.globalCompositeOperation = 'destination-out';
-      // NOTE: no ctx.filter blur here. A blurred stroke per segment is a
-      // full-canvas filter repaint — the main source of hero lag while the
-      // cursor sweeps. Two alpha passes fake the feather for nearly free.
-      ctx.fillStyle = '#000';
-      ctx.strokeStyle = '#000';
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
+      ctx.globalAlpha = 1;
+
+      const stamp = (px: number, py: number) => {
+        ctx!.drawImage(sprite, px - br, py - br, sprite.width, sprite.height);
+      };
 
       if (prev) {
-        ctx.globalAlpha = 0.4;
-        ctx.lineWidth = r * 2;
-        ctx.beginPath();
-        ctx.moveTo(prev.x, prev.y);
-        ctx.lineTo(x, y);
-        ctx.stroke();
+        const dx = x - prev.x;
+        const dy = y - prev.y;
+        const dist = Math.hypot(dx, dy);
+        // Overlap the stamps by two thirds so the trail is solid, and cap the
+        // count so a huge jump (tab restore, scroll snap) can never stall a
+        // frame drawing hundreds of sprites.
+        const step = Math.max(r * 0.34, 1);
+        const n = Math.min(Math.ceil(dist / step), 48);
+        for (let i = 1; i <= n; i++) stamp(prev.x + (dx * i) / n, prev.y + (dy * i) / n);
       }
-
-      ctx.globalAlpha = 0.55;
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.beginPath();
-      ctx.arc(x, y, r * 0.85, 0, Math.PI * 2);
-      ctx.fill();
+      stamp(x, y);
 
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1;
@@ -590,7 +550,7 @@ const Hero: React.FC = () => {
 
       // The steam creeps back over anything that was wiped. Throttled hard,
       // and switched off completely once the pane has recovered.
-      if (!overlaySpent && ctx && fog && refogTicks > 0 && now - lastRefog >= REFOG_MS) {
+      if (ctx && fog && refogTicks > 0 && now - lastRefog >= REFOG_MS) {
         lastRefog = now;
         refogTicks--;
         ctx.globalCompositeOperation = 'source-over';
@@ -615,11 +575,6 @@ const Hero: React.FC = () => {
     raf = requestAnimationFrame(frame);
 
     return () => {
-      // Leaving the hero (route change or unmount) consumes the overlay —
-      // unless we are straight back in a moment, which is a StrictMode
-      // remount rather than the visitor actually leaving.
-      if (overlaySpendTimer) clearTimeout(overlaySpendTimer);
-      overlaySpendTimer = window.setTimeout(() => { overlaySpent = true; }, 80);
       cancelAnimationFrame(raf);
       io.disconnect();
       bodyTrailRef.current = null;
@@ -640,35 +595,23 @@ const Hero: React.FC = () => {
       className="relative h-[100svh] min-h-[540px] flex items-center justify-center overflow-hidden bg-[#171715]"
     >
       <div className="absolute inset-0 z-0">
-        {/* Full-colour source image. Wide screens receive a seamless 16:9,
-            high-density outpaint so the complete portrait can fill the hero
-            without the old side blocks. Each orientation ships three widths so
-            a phone never downloads a 2560px plate. The picture itself must own
-            the hero bounds; otherwise percentage sizing on its child can
-            collapse. */}
-        <picture className="absolute inset-0 block h-full w-full">
-          <source
-            srcSet="/images/hero-landscape-1280.webp 1280w, /images/hero-landscape-1920.webp 1920w, /images/hero-landscape-2560.webp 2560w"
-            sizes="100vw"
-            media="(min-width: 1024px) and (min-aspect-ratio: 5/4)"
-            type="image/webp"
-            width="2560"
-            height="1429"
-          />
-          <img
-            ref={overlayImgRef}
-            src="/images/hero-portrait-1300.webp"
-            srcSet="/images/hero-portrait-900.webp 900w, /images/hero-portrait-1300.webp 1300w, /images/hero-portrait-1700.webp 1700w"
-            sizes="100vw"
-            alt="Papi Raborife"
-            className="absolute inset-0 h-full w-full object-cover object-center"
-            width="1700"
-            height="2277"
-            fetchPriority="high"
-            decoding="async"
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-          />
-        </picture>
+        {/* ONE hero plate. There is no second crop and no <picture> switch:
+            the steam is generated from this exact image, so what you see
+            ghosting through the fog is always what you uncover underneath.
+            Three widths so a phone never downloads a 2560px file. */}
+        <img
+          ref={overlayImgRef}
+          src="/images/hero-landscape-1920.webp"
+          srcSet="/images/hero-landscape-1280.webp 1280w, /images/hero-landscape-1920.webp 1920w, /images/hero-landscape-2560.webp 2560w"
+          sizes="100vw"
+          alt="Papi Raborife"
+          className="hero-photo absolute inset-0 h-full w-full object-cover"
+          width="2560"
+          height="1429"
+          fetchPriority="high"
+          decoding="async"
+          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+        />
         {interactive ? (
           <canvas ref={eraserRef} className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden />
         ) : (

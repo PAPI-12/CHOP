@@ -10,7 +10,7 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "typecheck": "tsc --noEmit",
-    "smoke": "esbuild tools/smoke/entry.tsx --bundle --format=iife --jsx=automatic --loader:.css=empty --define:process.env.NODE_ENV='\"production\"' --outfile=tools/smoke/bundle.js --log-level=error && node tools/smoke/routes.mjs && node tools/smoke/run.mjs && node tools/smoke/video.mjs"
+    "smoke": "esbuild tools/smoke/entry.tsx --bundle --format=iife --jsx=automatic --loader:.css=empty --define:process.env.NODE_ENV='\"production\"' --outfile=tools/smoke/bundle.js --log-level=error && node tools/smoke/routes.mjs && node tools/smoke/run.mjs && node tools/smoke/video.mjs && node tools/smoke/regressions.mjs"
   },
   "dependencies": {
     "clsx": "2.1.1",

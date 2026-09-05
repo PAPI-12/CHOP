@@ -36,41 +36,38 @@ const Navbar: React.FC = () => {
     return () => { document.body.style.overflow = prev; };
   }, [isMobileMenuOpen]);
 
-  // Clicking the wordmark should always land on the hero, whether we are
-  // already on "/" (smooth scroll up) or on a case-study page (navigate first).
+  /**
+   * The wordmark has exactly one job: put the visitor on the hero. Nowhere
+   * else, ever.
+   *
+   * It used to smooth-scroll the whole way up, which meant travelling back
+   * THROUGH the pinned What I Do sequence — that section re-arms and takes
+   * the scroll while you are passing through it, and you get left stranded
+   * somewhere in the middle of the page. So the journey is hidden instead:
+   * the transition panel covers the screen, the page is put at the hero
+   * instantly underneath it, and the panel opens on the hero. No scroll to
+   * hijack, and no distance to travel.
+   */
   const goToHero = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsMobileMenuOpen(false);
 
-    const scrollHero = () => {
-      const hero = document.getElementById('hero');
-      if (hero) hero.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      else window.scrollTo({ top: 0, behavior: 'smooth' });
+    const atHero = () => {
+      window.scrollTo(0, 0);
+      // Belt and braces: some browsers restore scroll asynchronously after a
+      // route swap, so re-assert on the next frame.
+      requestAnimationFrame(() => window.scrollTo(0, 0));
     };
 
     if (location.pathname === '/') {
-      scrollHero();
+      // Already home and already looking at the hero — do nothing rather
+      // than play a transition for no reason.
+      if (window.scrollY < 40) return;
+      transitionTo('/', atHero);
       return;
     }
 
-    // Coming from another route the hero does not exist yet. A fixed timeout
-    // was a guess and missed whenever the lazy chunk resolved slowly, which is
-    // why the wordmark sometimes did nothing. Poll for the element instead and
-    // give up cleanly after a bounded window. The navigation itself goes
-    // through the matrix panel like every other link on the site.
-    transitionTo('/', () => {
-      let tries = 0;
-      const findHero = () => {
-        if (document.getElementById('hero')) {
-          // Already at the top under the panel — no need to animate a scroll.
-          window.scrollTo({ top: 0 });
-          return;
-        }
-        if (tries++ < 40) requestAnimationFrame(findHero);
-        else window.scrollTo({ top: 0 });
-      };
-      requestAnimationFrame(findHero);
-    });
+    transitionTo('/', atHero);
   };
 
   const navLinks = [

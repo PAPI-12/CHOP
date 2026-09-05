@@ -214,7 +214,22 @@ const PageTransitionProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       busyRef.current = true;
       boostRef.current = 1;
-      startRain();
+
+      /**
+       * The code belongs to the homepage.
+       *
+       * What I Do is where the matrix is established, so a journey that
+       * STARTS on the homepage carries it out with you — the rain you were
+       * just looking at is the thing that wipes the screen. Move between two
+       * inner pages and there is no code to carry: the panel is solid, and
+       * the line → rectangle → page motion is identical. Same architecture,
+       * no matrix where it was never earned.
+       */
+      const home = (path: string) => path === '/' || path === '';
+      const useRain = home(window.location.pathname) || home(to.split(/[?#]/)[0]);
+      const canvas = canvasRef.current;
+      if (canvas) canvas.style.opacity = useRain ? '1' : '0';
+      if (useRain) startRain();
 
       root.style.visibility = 'visible';
       root.style.pointerEvents = 'auto';
