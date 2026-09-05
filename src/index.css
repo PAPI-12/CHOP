@@ -153,12 +153,24 @@
   .matrix-guide-caret { animation: none; }
 }
 
-/* ── Hero: fogged shower glass ──────────────────────────────────────────
+/* ── Hero: rain-glass vapor ────────────────────────────────────────────
    Pointer-driven visitors get the real thing on a canvas (see Hero.tsx): a
-   defocused, beaded pane that the cursor and the letters squeegee clear, and
-   that mists over again afterwards. Touch and reduced-motion visitors — who
-   have nothing to wipe with — get this static equivalent instead. It is pure
-   CSS, so it costs one composited layer and never repaints. */
+   dark blue-grey vapor pane with dense small beads and near-vertical
+   runnels, lit from the top-left, which the cursor and the letters squeegee
+   clear, and which stays cleared for the visit. It plays only on the first
+   visit to `/` in a browser session. Touch and reduced-motion visitors — who
+   have nothing to wipe with — land on the clean hero image. */
+/* ── Reserve the scrollbar's lane, permanently ─────────────────────────
+   Every modal on this site locks the page with `overflow: hidden`, which on
+   any platform drawing a classic scrollbar reclaims ~15px of width — and the
+   whole layout behind the modal slides sideways at the instant it opens. That
+   was the Audi case study's displaced content. Holding the gutter open means
+   hiding the scrollbar changes no geometry at all. useScrollLock covers the
+   browsers that predate this property. */
+html {
+  scrollbar-gutter: stable;
+}
+
 /* One hero plate for every viewport, re-framed per shape.
    On a wide screen, centred, a hair above true centre. On a phone the crop is
    brutal — a 390px window into a ~1250px-wide plate — and dead centre slices
@@ -166,7 +178,10 @@
    the headline sitting in the clear space to its left. Verified against the
    real asset at 390x700, 390x600 and 430x780. */
 .hero-photo {
-  object-position: 62% 42%;
+  /* The plate was re-cropped so the subject is centred IN THE IMAGE, so the
+     same 50% position holds on every viewport — a phone keeps his head in
+     frame because the plate itself, not object-position, does the framing. */
+  object-position: 50% 42%;
 }
 @media (min-width: 768px) {
   .hero-photo {
@@ -174,22 +189,10 @@
   }
 }
 
-/* ── The lens ──────────────────────────────────────────────────────────
-   CULTURE LED CREATIVE orbits a real magnifying glass. The canvas inside it
-   is redrawn each frame with the photograph enlarged; these rules are only
-   the glass furniture around it. */
-.hero-lens {
-  box-shadow:
-    inset 0 2px 10px rgba(255, 255, 255, 0.14),
-    inset 0 -6px 18px rgba(8, 12, 14, 0.4),
-    0 14px 34px rgba(0, 0, 0, 0.45);
-}
-.hero-lens-rim {
-  border: 3px solid #d7ff4f;
-  box-shadow:
-    0 0 0 1px rgba(23, 25, 24, 0.6),
-    0 0 20px rgba(215, 255, 79, 0.32);
-}
+/* ── The CULTURE LED CREATIVE ring ────────────────────────────────────
+   The ring IS the label: CULTURE LED CREATIVE loops around the size of the O
+   in AWESOMENESS. There is no lime rim and no second circle — the site's
+   small lime cursor reads inside the loop. */
 
 /* ── The earring ───────────────────────────────────────────────────────
    A lime cross on the subject's ear. It belongs to the photograph, so it is
@@ -205,16 +208,11 @@
   filter: drop-shadow(0 0 6px rgba(215, 255, 79, 0.55)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
 }
 
-/* ── The site cursor stands down over the hero ─────────────────────────
-   The magnifier IS the cursor there, and its lime rim is the one lime circle
-   the CULTURE LED CREATIVE ring should contain. Toggled from Hero.tsx on
-   pointer enter/leave rather than by hover, so it survives the ring being
-   pointer-events: none. */
+/* ── The site cursor is the hero's lime circle ─────────────────────────
+   CULTURE LED CREATIVE no longer owns a lime rim, so the site's own lime
+   cursor stays up over the hero and reads inside the orbiting label. */
 .custom-cursor {
   transition: opacity 180ms ease;
-}
-body[data-hero-cursor='1'] .custom-cursor {
-  opacity: 0 !important;
 }
 
 /* ── The matrix strike ─────────────────────────────────────────────────
@@ -234,22 +232,25 @@ body[data-hero-cursor='1'] .custom-cursor {
   transition: opacity 90ms linear;
 }
 
-/* The incoming page is revealed THROUGH the panel: held at zero until the
-   contraction begins, then lifted into place. Large typography therefore
-   reads as being uncovered rather than as popping in. */
+/* The incoming page is revealed through a quick, subtle lift. It deliberately
+   starts at a near-visible opacity rather than zero — a fully invisible page
+   for 140ms is what read as "blank space" after clicking a work card. It also
+   uses no transform, so `fixed` modal layers inside the route (LV lightbox,
+   Audi viewer) are never trapped by a transformed containing block. */
 @keyframes page-enter {
-  from { opacity: 0; transform: translate3d(0, 26px, 0); }
-  to   { opacity: 1; transform: none; }
+  from { opacity: 0.82; }
+  to   { opacity: 1; }
 }
 .page-enter {
-  animation: page-enter 620ms cubic-bezier(0.22, 1, 0.36, 1) 140ms both;
+  animation: page-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 @media (prefers-reduced-motion: reduce) {
-  .page-enter { animation: none; opacity: 1; transform: none; }
+  .page-enter { animation: none; opacity: 1; }
 }
 
-/* Cursor ring carrying CULTURE LED CREATIVE. Its size and position are set
-   from JS each frame; this only establishes the compositor layer. */
+/* Cursor ring carrying CULTURE LED CREATIVE. No lime rim and no SVG circle:
+   the label is the only visible body. Its size and position are set from JS
+   each frame; this only establishes the compositor layer. */
 .hero-ring {
   will-change: transform, opacity;
   transition: opacity 260ms ease;
@@ -259,8 +260,9 @@ body[data-hero-cursor='1'] .custom-cursor {
 }
 .hero-ring text {
   text-transform: uppercase;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  paint-order: stroke fill;
 }
 
 .will-change-transform {

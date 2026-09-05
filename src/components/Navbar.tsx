@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
-import { resetMachineAct } from './WhatIDo';
+
+import { useScrollLock } from '../hooks/useScrollLock';
 
 const Navbar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -28,12 +29,8 @@ const Navbar: React.FC = () => {
 
   // Lock body scroll while the fullscreen mobile menu is open, otherwise the
   // page behind it scrolls under the overlay and the menu appears to "jump".
-  useEffect(() => {
-    if (!isMobileMenuOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, [isMobileMenuOpen]);
+  // Via the shared hook, so it also compensates for the vanishing scrollbar.
+  useScrollLock(isMobileMenuOpen);
 
   /**
    * The wordmark has exactly one job: put the visitor on the hero. Nowhere
@@ -48,7 +45,6 @@ const Navbar: React.FC = () => {
   const goToHero = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsMobileMenuOpen(false);
-    resetMachineAct();
 
     const atHero = () => {
       window.scrollTo(0, 0);

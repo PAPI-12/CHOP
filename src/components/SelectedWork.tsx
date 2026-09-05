@@ -35,6 +35,15 @@ const CARD_STAGGER_MS = 260;
 /** How long a title takes to resolve out of noise. */
 const DECODE_MS = 620;
 
+/**
+ * The matrix hand-off is a once-per-page-load signature. The first time this
+ * section arrives the code rains over it and cuts the cards out; any later
+ * visit in the same SPA session (or a return after navigating) shows the work
+ * already landed, with no code. A full reload re-initialises the module and
+ * the signature plays again.
+ */
+let handoffRainSpent = false;
+
 const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
   const rootRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -57,6 +66,20 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
       if (canvas) canvas.style.display = 'none';
       return;
     }
+
+    /* ── Already handed over in this page load ────────────────────────
+       The code is a once-only signature. If it already played, land the
+       cards open and resolved — no rain, no cut-out, no decode. */
+
+    if (handoffRainSpent) {
+      cardRefs.current.forEach((c) => c?.setAttribute('data-open', '1'));
+      titleRefs.current.forEach((t, i) => {
+        if (t) t.textContent = projects[i]?.title ?? '';
+      });
+      if (canvas) canvas.style.display = 'none';
+      return;
+    }
+    handoffRainSpent = true;
 
     /* ── The title decode ───────────────────────────────────────────── */
 
@@ -130,8 +153,13 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
     let tick = 0;
     let drawn = false;
 
-    /** Rain is at full strength on arrival, then rains itself out. */
-    const RAIN_IN = 420;
+    /**
+     * Rain is at FULL strength the instant the section's edge arrives — the
+     * code is the same rain What I Do pulled down over this section, not a
+     * new shower fading in. It holds while the cards are cut out, then rains
+     * itself out.
+     */
+    const RAIN_IN = 0;
     const RAIN_HOLD = 1500;
     const RAIN_OUT = 1400;
 

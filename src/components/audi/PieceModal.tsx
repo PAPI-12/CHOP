@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import VideoEmbed from "../VideoEmbed";
+import { useScrollLock } from "../../hooks/useScrollLock";
 
 type Item = {
   id: string;
@@ -18,14 +19,13 @@ type Props = {
 };
 
 export default function PieceModal({ item, ytId, onClose }: Props) {
+  // Locks the page without letting it slide sideways as the scrollbar goes.
+  useScrollLock();
+
   useEffect(() => {
     const h = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", h);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", h);
-      document.body.style.overflow = "";
-    };
+    return () => window.removeEventListener("keydown", h);
   }, [onClose]);
 
   return (
@@ -37,7 +37,10 @@ export default function PieceModal({ item, ytId, onClose }: Props) {
         style={{ maxHeight: "90svh" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative flex-1 overflow-hidden bg-black" style={{ minHeight: 260 }}>
+        {/* min-h-0 so this pane may actually shrink inside the flex row —
+            without it a flex item refuses to go below its content size and
+            pushes the panel past its own max-height. */}
+        <div className="relative min-h-0 flex-1 overflow-hidden bg-black" style={{ minHeight: 260 }}>
           {item.kind === "video" ? (
             <div className="aspect-video w-full" style={{ minHeight: 260 }}>
               <VideoEmbed id={ytId} title="Audi — A Curated Collection, campaign film" autoPlay />
@@ -51,7 +54,10 @@ export default function PieceModal({ item, ytId, onClose }: Props) {
           )}
         </div>
 
-        <div className="flex shrink-0 flex-col justify-between border-t border-[#f2e8dc]/10 p-7 sm:w-72 sm:border-l sm:border-t-0 sm:p-9">
+        {/* Caption, prompt, technique and credits together run taller than a
+            laptop viewport allows the panel to be, and the panel clips. Let
+            the column scroll rather than silently swallowing the end of it. */}
+        <div className="flex min-h-0 shrink-0 flex-col justify-between overflow-y-auto overscroll-contain border-t border-[#f2e8dc]/10 p-7 sm:w-72 sm:border-l sm:border-t-0 sm:p-9">
           <div className="mb-7 flex items-start justify-between">
             <span className="font-audi-sans text-[10px] uppercase tracking-widest text-[#d0a36f]">
               {item.label}

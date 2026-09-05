@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import {
   TopHatIcon,
   ShoeIcon,
@@ -590,10 +590,13 @@ const Footer = () => (
 /* ------------------------------------------------------------------ */
 
 export default function App() {
-  // Small nicety — scroll behaviour + set doc bg
-  useEffect(() => {
-    document.documentElement.style.scrollBehavior = "smooth";
-  }, []);
+  // NOTE: this used to set `document.documentElement.style.scrollBehavior =
+  // "smooth"` on mount and never undo it. That is a global, permanent change
+  // to the whole site made by one case study: from then on every route change
+  // animated `scrollTo(0, 0)` instead of jumping, and because the incoming
+  // route is a Suspense fallback for a frame or two, the animation was
+  // interrupted and left you part-way down a page you had just opened. It is
+  // gone; eased scrolling is the site's own useSmoothScroll, globally.
 
   return (
     <div className="min-h-screen bg-[#F4EBDC] text-[#1B1210] font-sans">
