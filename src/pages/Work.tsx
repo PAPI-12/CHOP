@@ -87,7 +87,7 @@ const projects: Project[] = [
     title: 'JOSHUA THE IAM',
     subtitle: 'OTR Special — Cinematography',
     category: 'CINEMATOGRAPHY',
-    image: 'https://img.youtube.com/vi/VUCKP8Z2frQ/maxresdefault.jpg',
+    image: 'https://i.ytimg.com/vi/VUCKP8Z2frQ/maxresdefault.jpg',
     link: '/work/joshua',
     year: '2022',
     tags: ['CINEMATOGRAPHY'],
@@ -108,6 +108,25 @@ const projects: Project[] = [
 
 const filters = ['ALL', 'UX/UI', 'UI/UX', 'ART DIRECTION', 'ILLUSTRATION', 'AI', 'AI ADVERTISING', 'CINEMATOGRAPHY'];
 
+/**
+ * YouTube does not publish a maxres still for every upload, and a 404 there
+ * used to leave the Joshua tile as a broken rectangle. Step down the ladder
+ * until a still actually resolves.
+ */
+const posterFallback = (e: React.SyntheticEvent<HTMLImageElement>) => {
+  const el = e.currentTarget;
+  const match = el.src.match(/i\.ytimg\.com\/vi\/([^/]+)\//);
+  if (!match) return;
+  const id = match[1];
+  const ladder = [
+    `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`,
+    `https://i.ytimg.com/vi/${id}/sddefault.jpg`,
+    `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+  ];
+  const next = ladder[ladder.indexOf(el.src) + 1];
+  if (next) el.src = next;
+};
+
 const FeaturedProject: React.FC<{ project: Project; reverse?: boolean }> = ({ project, reverse = false }) => {
   const isInternal = project.link.startsWith('/');
   const Wrapper: any = isInternal ? Link : 'a';
@@ -124,7 +143,7 @@ const FeaturedProject: React.FC<{ project: Project; reverse?: boolean }> = ({ pr
         {...linkProps}
         className={`col-span-1 lg:col-span-7 ${reverse ? 'lg:order-2' : ''} block relative aspect-[16/10] md:aspect-[16/9] overflow-hidden rounded-2xl md:rounded-[2.5rem]`}
       >
-        <img loading="lazy" decoding="async" src={project.image} alt={project.title} className="w-full h-full object-cover grayscale brightness-[0.5] group-hover:grayscale-0 group-hover:brightness-[0.65] group-hover:scale-[1.04] transition-all duration-[900ms]" />
+        <img loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={posterFallback} src={project.image} alt={project.title} className="w-full h-full object-cover grayscale brightness-[0.5] group-hover:grayscale-0 group-hover:brightness-[0.65] group-hover:scale-[1.04] transition-all duration-[900ms]" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#171715]/80 via-transparent to-transparent" />
         <div className="absolute bottom-4 right-4 md:bottom-5 md:right-5 text-[9px] md:text-[10px] font-black tracking-[0.3em] text-white/50 uppercase">{project.year}</div>
       </Wrapper>

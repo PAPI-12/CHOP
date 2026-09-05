@@ -128,6 +128,18 @@ const Hero: React.FC = () => {
     let ctx: CanvasRenderingContext2D | null = null;
     const strokes = new Map<number, { x: number; y: number }>();
 
+    /**
+     * Humidity. The room never dries out: whatever gets wiped slowly mists
+     * over again. One low-alpha composite of the fog tile every REFOG_MS is
+     * all it takes — and the credit counter stops the work entirely once the
+     * pane has fully recovered, so an idle hero costs nothing.
+     */
+    const REFOG_MS = 120;
+    const REFOG_TICKS = 110;
+    const REFOG_ALPHA = 0.02;
+    let refogTicks = 0;
+    let lastRefog = 0;
+
     let raf = 0;
     let lastT = 0;
     let spin = 0;
@@ -199,42 +211,45 @@ const Hero: React.FC = () => {
     };
 
     /**
-     * Repaint the darkening overlay onto the canvas at full strength. The hero
-     * image sits underneath in full colour; erasing punches holes in this layer.
+     * ── The humid glass ────────────────────────────────────────────────
+     *
+     * The hero is no longer a flat dark scrim. It is a pane of fogged
+     * shower glass sitting in front of the photograph: the same image
+     * blurred out of focus, cooled, and beaded with condensation. Wiping it
+     * (cursor ring, displaced letters) squeegees the steam away and the
+     * sharp, full-colour portrait shows through — and, because the room is
+     * humid, the mist slowly creeps back over whatever was wiped.
+     *
+     * The fog is rendered ONCE into an offscreen tile. Every subsequent
+     * operation is a single drawImage, so nothing here re-filters or
+     * re-blurs per frame — that is what keeps the hero at a steady 60fps.
      */
-    const paintOverlay = () => {
-      syncBox();
+    let fog: HTMLCanvasElement | null = null;
+
+    /** Deterministic noise so the condensation pattern is stable per size. */
+    const seeded = (s: number) => () => {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
+
+    const buildFog = () => {
       if (boxW < 8 || boxH < 8) return;
-      // The overlay is visible across the entire first impression, so it must
-      // retain the photograph's detail on Retina displays. The erase path no
-      // longer uses costly per-stroke canvas filters, making a 2x cap a safe
-      // quality/performance balance instead of the visibly soft 1x buffer.
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.floor(boxW * dpr);
-      canvas.height = Math.floor(boxH * dpr);
-      canvas.style.width = `${boxW}px`;
-      canvas.style.height = `${boxH}px`;
-
-      ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.clearRect(0, 0, boxW, boxH);
-
-      // Already seen this session: leave the canvas fully transparent so the
-      // hero image reads at its original quality, and never re-darken it.
-      if (overlaySpent) {
-        strokes.clear();
-        return;
-      }
+      if (!fog) fog = document.createElement('canvas');
+      fog.width = Math.max(1, Math.floor(boxW * dpr));
+      fog.height = Math.max(1, Math.floor(boxH * dpr));
+      const f = fog.getContext('2d');
+      if (!f) return;
+      f.setTransform(dpr, 0, 0, dpr, 0, 0);
+      f.globalCompositeOperation = 'source-over';
+      f.globalAlpha = 1;
+      f.clearRect(0, 0, boxW, boxH);
 
       const src = overlayImgRef.current;
       if (src && src.complete && src.naturalWidth > 0) {
-        // Draw the SAME image, graded down. Erasing this layer is what exposes
-        // the full-colour original sitting underneath. Mirror the <img>'s
-        // actual object-fit/object-position computed values so the erased
-        // holes always line up with the pixels beneath, whatever the CSS says.
-        ctx.filter = 'grayscale(100%) contrast(1.3) brightness(0.35) saturate(0.3)';
+        // The SAME photograph, thrown far out of focus — that defocus is what
+        // reads as glass rather than as a filter. Mirror the <img>'s computed
+        // object-fit / object-position so the wiped holes line up exactly with
+        // the crisp pixels beneath.
         const scale = Math.max(boxW / src.naturalWidth, boxH / src.naturalHeight);
         const dw = src.naturalWidth * scale;
         const dh = src.naturalHeight * scale;
@@ -247,28 +262,153 @@ const Hero: React.FC = () => {
           if (Number.isFinite(parsedX)) posX = parsedX;
           if (Number.isFinite(parsedY)) posY = parsedY;
         }
-        ctx.drawImage(src, (boxW - dw) * (posX / 100), (boxH - dh) * (posY / 100), dw, dh);
-        ctx.filter = 'none';
+        const ox = (boxW - dw) * (posX / 100);
+        const oy = (boxH - dh) * (posY / 100);
+        // Overscan past the canvas so the blur kernel never samples the
+        // transparent edge and leaves a bright rim around the pane.
+        const pad = 72;
+        f.filter = 'blur(20px) saturate(0.6) brightness(0.66) contrast(1.02)';
+        f.drawImage(src, ox - pad, oy - pad, dw + pad * 2, dh + pad * 2);
+        f.filter = 'none';
       } else {
-        ctx.fillStyle = '#171715';
-        ctx.fillRect(0, 0, boxW, boxH);
+        f.fillStyle = '#1b1b18';
+        f.fillRect(0, 0, boxW, boxH);
       }
 
-      // The original vertical grade, kept so the composition reads the same.
-      const g = ctx.createLinearGradient(0, 0, 0, boxH);
-      g.addColorStop(0, 'rgba(23,23,21,0.50)');
-      g.addColorStop(0.3, 'rgba(23,23,21,0.30)');
-      g.addColorStop(1, 'rgba(23,23,21,0.88)');
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, boxW, boxH);
+      // Cold steam sitting on the pane. Cool at the top where the mist
+      // gathers, deepening to near-black at the foot so the headline and the
+      // bottom furniture keep their contrast.
+      const steam = f.createLinearGradient(0, 0, 0, boxH);
+      steam.addColorStop(0, 'rgba(214,231,236,0.16)');
+      steam.addColorStop(0.34, 'rgba(198,216,222,0.10)');
+      steam.addColorStop(1, 'rgba(214,231,236,0.03)');
+      f.fillStyle = steam;
+      f.fillRect(0, 0, boxW, boxH);
 
+      const grade = f.createLinearGradient(0, 0, 0, boxH);
+      grade.addColorStop(0, 'rgba(23,23,21,0.44)');
+      grade.addColorStop(0.32, 'rgba(23,23,21,0.30)');
+      grade.addColorStop(1, 'rgba(23,23,21,0.86)');
+      f.fillStyle = grade;
+      f.fillRect(0, 0, boxW, boxH);
+
+      // A soft breath of light across the pane — the sheen that tells the eye
+      // it is looking AT a surface, not through it.
+      const sheen = f.createLinearGradient(0, boxH, boxW, 0);
+      sheen.addColorStop(0, 'rgba(255,255,255,0)');
+      sheen.addColorStop(0.5, 'rgba(226,242,247,0.05)');
+      sheen.addColorStop(1, 'rgba(255,255,255,0)');
+      f.fillStyle = sheen;
+      f.fillRect(0, 0, boxW, boxH);
+
+      /* Condensation. Baked once: thousands of beads cost nothing at runtime
+         because they never get re-drawn, only re-composited. */
+      const rnd = seeded(9187 + Math.round(boxW) * 31 + Math.round(boxH));
+      const beads = Math.min(1400, Math.round((boxW * boxH) / 2200));
+      for (let i = 0; i < beads; i++) {
+        const x = rnd() * boxW;
+        const y = rnd() * boxH;
+        const bias = rnd();
+        const r = 0.5 + bias * bias * 3.6;
+        f.globalAlpha = 0.16 + rnd() * 0.3;
+        // Body: a slightly clearer, slightly cooler lens of water.
+        f.fillStyle = 'rgba(233,246,250,0.34)';
+        f.beginPath();
+        f.arc(x, y, r, 0, Math.PI * 2);
+        f.fill();
+        // Specular pin-light, up and to the left, like the key light.
+        f.globalAlpha = 0.5 + rnd() * 0.45;
+        f.fillStyle = 'rgba(255,255,255,0.9)';
+        f.beginPath();
+        f.arc(x - r * 0.3, y - r * 0.34, Math.max(0.35, r * 0.3), 0, Math.PI * 2);
+        f.fill();
+        // Shadowed underside gives the bead volume.
+        f.globalAlpha = 0.24;
+        f.fillStyle = 'rgba(10,12,12,0.75)';
+        f.beginPath();
+        f.arc(x + r * 0.26, y + r * 0.34, Math.max(0.3, r * 0.34), 0, Math.PI * 2);
+        f.fill();
+      }
+      f.globalAlpha = 1;
+
+      /* Runnels: drips that have already tracked down the glass, cutting
+         part-clear channels. Cut with destination-out so the sharp image
+         genuinely reads through them. */
+      f.globalCompositeOperation = 'destination-out';
+      f.lineCap = 'round';
+      const runs = Math.max(5, Math.round(boxW / 190));
+      for (let i = 0; i < runs; i++) {
+        const x = rnd() * boxW;
+        const top = rnd() * boxH * 0.5;
+        const len = boxH * (0.16 + rnd() * 0.44);
+        const w = 1.2 + rnd() * 3.4;
+        f.globalAlpha = 0.2 + rnd() * 0.36;
+        f.lineWidth = w;
+        f.beginPath();
+        f.moveTo(x, top);
+        const steps = 5;
+        for (let s = 1; s <= steps; s++) {
+          const t = s / steps;
+          f.lineTo(x + Math.sin(t * 6 + i) * (2 + w), top + len * t);
+        }
+        f.stroke();
+        // The bead that stopped at the end of the run.
+        f.globalAlpha = 0.42 + rnd() * 0.3;
+        f.beginPath();
+        f.arc(x + Math.sin(6 + i) * (2 + w), top + len, w * 1.25, 0, Math.PI * 2);
+        f.fill();
+      }
+      f.globalAlpha = 1;
+      f.globalCompositeOperation = 'source-over';
+    };
+
+    /**
+     * Lay the fogged pane onto the visible canvas. The hero image sits
+     * underneath in full colour; wiping punches holes in this layer.
+     */
+    const paintOverlay = () => {
+      syncBox();
+      if (boxW < 8 || boxH < 8) return;
+      // The pane is a defocused blur, so it carries no fine detail worth
+      // retina pixels. Capping the buffer well under devicePixelRatio cuts the
+      // per-wipe fill cost by ~2.5x on a Retina display and is invisible.
+      dpr = Math.min(window.devicePixelRatio || 1, 1.25);
+      const pxW = Math.floor(boxW * dpr);
+      const pxH = Math.floor(boxH * dpr);
+      if (canvas.width !== pxW || canvas.height !== pxH) {
+        canvas.width = pxW;
+        canvas.height = pxH;
+      }
+      canvas.style.width = `${boxW}px`;
+      canvas.style.height = `${boxH}px`;
+
+      ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      ctx.clearRect(0, 0, boxW, boxH);
+
+      // Already seen this session: leave the pane clear so the hero image
+      // reads at its full quality, and never re-fog it.
+      if (overlaySpent) {
+        strokes.clear();
+        return;
+      }
+
+      buildFog();
+      if (fog) ctx.drawImage(fog, 0, 0, boxW, boxH);
+      refogTicks = 0;
       strokes.clear();
     };
 
     /**
-     * Carve a capsule from the emitter's previous point to (x, y). Drawing the
-     * connecting segment (not just a dot) is what makes a fast sweep leave one
-     * continuous clean trail instead of a dotted line.
+     * The squeegee. Carve a capsule from the emitter's previous point to
+     * (x, y) — drawing the connecting segment, not just a dot, is what makes a
+     * fast sweep leave one continuous clean trail instead of a dotted line.
+     *
+     * A faint wet rim is laid down just outside the wipe first, so the water
+     * reads as being pushed aside rather than deleted.
      */
     const erase = (key: number, x: number, y: number, r: number) => {
       if (!ctx) return;
@@ -276,16 +416,37 @@ const Hero: React.FC = () => {
       // Nothing meaningful moved: skip the composite op entirely.
       if (prev && Math.hypot(x - prev.x, y - prev.y) < 0.6) return;
 
+      // Humidity has something to reclaim again.
+      refogTicks = REFOG_TICKS;
+
+      const moved = prev ? Math.hypot(x - prev.x, y - prev.y) : 0;
+
+      // 1 — moisture shouldered out to the edge of the stroke. Only on real
+      // travel: stamping this every frame while the cursor barely moves would
+      // pile alpha up in one spot and burn a white blob into the pane.
+      if (prev && moved > r * 0.35) {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = 'rgba(228,244,248,1)';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalAlpha = 0.045;
+        ctx.lineWidth = r * 0.5;
+        ctx.beginPath();
+        ctx.arc(x, y, r * 1.1, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // 2 — the wipe itself.
       ctx.globalCompositeOperation = 'destination-out';
       // NOTE: no ctx.filter blur here. A blurred stroke per segment is a
       // full-canvas filter repaint — the main source of hero lag while the
       // cursor sweeps. Two alpha passes fake the feather for nearly free.
       ctx.fillStyle = '#000';
       ctx.strokeStyle = '#000';
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
 
       if (prev) {
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
         ctx.globalAlpha = 0.4;
         ctx.lineWidth = r * 2;
         ctx.beginPath();
@@ -294,6 +455,7 @@ const Hero: React.FC = () => {
         ctx.stroke();
       }
 
+      ctx.globalAlpha = 0.55;
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
@@ -303,6 +465,7 @@ const Hero: React.FC = () => {
       ctx.fill();
 
       ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
 
       if (prev) { prev.x = x; prev.y = y; }
       else strokes.set(key, { x, y });
@@ -425,6 +588,17 @@ const Hero: React.FC = () => {
       ring.style.transform = `translate3d(${(cx - r).toFixed(2)}px, ${(cy - r).toFixed(2)}px, 0)`;
       ring.style.opacity = primed ? '1' : '0';
 
+      // The steam creeps back over anything that was wiped. Throttled hard,
+      // and switched off completely once the pane has recovered.
+      if (!overlaySpent && ctx && fog && refogTicks > 0 && now - lastRefog >= REFOG_MS) {
+        lastRefog = now;
+        refogTicks--;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = REFOG_ALPHA;
+        ctx.drawImage(fog, 0, 0, boxW, boxH);
+        ctx.globalAlpha = 1;
+      }
+
       if (pointerSeen) {
         erase(RING_STROKE, cx, cy, radius);
         // Gentle continuous rotation of the label. Rotating the group (one
@@ -468,23 +642,28 @@ const Hero: React.FC = () => {
       <div className="absolute inset-0 z-0">
         {/* Full-colour source image. Wide screens receive a seamless 16:9,
             high-density outpaint so the complete portrait can fill the hero
-            without the old side blocks. The picture itself must own the hero
-            bounds; otherwise percentage sizing on its child can collapse. */}
+            without the old side blocks. Each orientation ships three widths so
+            a phone never downloads a 2560px plate. The picture itself must own
+            the hero bounds; otherwise percentage sizing on its child can
+            collapse. */}
         <picture className="absolute inset-0 block h-full w-full">
           <source
-            srcSet="/images/hero-landscape.webp"
+            srcSet="/images/hero-landscape-1280.webp 1280w, /images/hero-landscape-1920.webp 1920w, /images/hero-landscape-2560.webp 2560w"
+            sizes="100vw"
             media="(min-width: 1024px) and (min-aspect-ratio: 5/4)"
             type="image/webp"
-            width="3200"
-            height="1800"
+            width="2560"
+            height="1429"
           />
           <img
             ref={overlayImgRef}
-            src="/images/Hero image.webp"
+            src="/images/hero-portrait-1300.webp"
+            srcSet="/images/hero-portrait-900.webp 900w, /images/hero-portrait-1300.webp 1300w, /images/hero-portrait-1700.webp 1700w"
+            sizes="100vw"
             alt="Papi Raborife"
             className="absolute inset-0 h-full w-full object-cover object-center"
-            width="2778"
-            height="2264"
+            width="1700"
+            height="2277"
             fetchPriority="high"
             decoding="async"
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
@@ -493,8 +672,9 @@ const Hero: React.FC = () => {
         {interactive ? (
           <canvas ref={eraserRef} className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden />
         ) : (
-          // No cursor to erase with — keep the original static treatment.
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(23,23,21,0.5),rgba(23,23,21,0.3)30%,rgba(23,23,21,0.88))]" />
+          // No cursor to wipe with — present the pane already fogged, in CSS,
+          // so touch and reduced-motion visitors still get the glass.
+          <div className="hero-glass-static absolute inset-0" aria-hidden />
         )}
       </div>
 

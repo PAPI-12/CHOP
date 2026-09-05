@@ -6,3 +6,8 @@ venv/
 node_modules/
 dist/
 .DS_Store
+tools/smoke/bundle.js
+
+# Python bytecode
+__pycache__/
+*.pyc

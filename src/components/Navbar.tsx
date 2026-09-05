@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { resetMachineAct } from './WhatIDo';
+import { usePageTransition } from './PageTransition';
 
 const Navbar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
+  const { transitionTo } = usePageTransition();
 
   useEffect(() => {
     let ticking = false;
@@ -55,18 +56,21 @@ const Navbar: React.FC = () => {
     // Coming from another route the hero does not exist yet. A fixed timeout
     // was a guess and missed whenever the lazy chunk resolved slowly, which is
     // why the wordmark sometimes did nothing. Poll for the element instead and
-    // give up cleanly after a bounded window.
-    navigate('/');
-    let tries = 0;
-    const findHero = () => {
-      if (document.getElementById('hero')) {
-        scrollHero();
-        return;
-      }
-      if (tries++ < 40) requestAnimationFrame(findHero);
-      else window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-    requestAnimationFrame(findHero);
+    // give up cleanly after a bounded window. The navigation itself goes
+    // through the matrix panel like every other link on the site.
+    transitionTo('/', () => {
+      let tries = 0;
+      const findHero = () => {
+        if (document.getElementById('hero')) {
+          // Already at the top under the panel — no need to animate a scroll.
+          window.scrollTo({ top: 0 });
+          return;
+        }
+        if (tries++ < 40) requestAnimationFrame(findHero);
+        else window.scrollTo({ top: 0 });
+      };
+      requestAnimationFrame(findHero);
+    });
   };
 
   const navLinks = [
@@ -82,7 +86,7 @@ const Navbar: React.FC = () => {
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 flex justify-between items-center">
           {/* Clicking the brand also re-arms the What I Do machine act — it is
               the explicit "play it again" affordance besides a page reload. */}
-          <Link to="/" onClick={(e) => { resetMachineAct(); goToHero(e); }} className="flex items-center gap-3 group" aria-label="Papi Raborife — back to top">
+          <Link to="/" data-no-transition onClick={(e) => { resetMachineAct(); goToHero(e); }} className="flex items-center gap-3 group" aria-label="Papi Raborife — back to top">
             <svg width="40" height="40" viewBox="0 0 40 40" fill="none" className="transition-transform group-hover:rotate-12">
               <rect x="2" y="2" width="36" height="36" rx="18" stroke="#D7FF4F" strokeWidth="1.5" />
               <path d="M20 8L25 18H15L20 8Z" fill="#F5F3EE" />

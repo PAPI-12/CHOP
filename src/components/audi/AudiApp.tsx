@@ -1,6 +1,21 @@
 import { useState } from "react";
 import PieceModal from './PieceModal';
 import RoleModal from './RoleModal';
+import { thumbLadder } from '../VideoEmbed';
+
+/**
+ * Not every upload publishes a maxres still — the campaign film's tile used
+ * to render as a broken rectangle because of it. Walk YouTube's ladder down
+ * until something actually resolves.
+ */
+const ytPosterFallback = (e: React.SyntheticEvent<HTMLImageElement>) => {
+  const el = e.currentTarget;
+  const match = el.src.match(/\/vi\/([^/]+)\//);
+  if (!match) return;
+  const ladder = thumbLadder(match[1]);
+  const next = ladder[ladder.indexOf(el.src) + 1];
+  if (next) el.src = next;
+};
 
 const YT_ID = "Bb47k78sqvw";
 
@@ -17,91 +32,113 @@ type Item = {
 const items: Item[] = [
   {
     id: "film",   kind: "video",
-    src: `https://img.youtube.com/vi/${YT_ID}/maxresdefault.jpg`,
+    src: `https://i.ytimg.com/vi/${YT_ID}/maxresdefault.jpg`,
     label: "Campaign Film",
-    caption: "AI-generated environments meet the Black & Urban Edition models.",
-    prompt: "Cinematic film. Black Audi emerging from darkness, glowing matrix LED signature, avant-garde attire, atmospheric haze.",
+    caption:
+      "The whole collection in motion — grille geometry migrating from the car into fashion, furniture, architecture and planting, then back again.",
+    prompt:
+      "Cinematic sequence. Singleframe honeycomb geometry morphing between a car grille, a woven gown, a garden screen and a lit pavilion. Low key, patient camera.",
     technique: "AI Video Synthesis & Iterative Multimodal Prompting",
   },
   {
     id: "p01",   kind: "image",
     src: "/images/audi-01.webp",
-    label: "Black Edition",
-    caption: "Signature silhouette curated in shadow.",
-    prompt: "Ultra dark cinematic Audi, wet asphalt, matrix LED headlights, fine-art fashion aesthetic.",
-    technique: "Midjourney v6 + Custom Lighting LoRA",
+    label: "The Bench",
+    caption:
+      "The Singleframe, drawn once in polished steel and left to stand on its own. No car, no badge \u2014 just the outline everyone already recognises, holding up a bench against a wall of black glass.",
+    prompt:
+      "Minimal chrome bench whose backrest is the outline of an Audi Singleframe grille, black glass curtain wall behind, hard afternoon sun across pale stone.",
+    technique: "Form Reduction & Product Concepting",
   },
   {
     id: "p02",   kind: "image",
     src: "/images/audi-02.webp",
-    label: "Detail",
-    caption: "Chrome, honeycomb grille and matrix LED. Every surface deliberate.",
-    prompt: "Macro black honeycomb grille, matrix LED glass optics, cold specular highlights, dark moody backdrop.",
+    label: "The Source",
+    caption:
+      "Where every other piece in this collection comes from: gloss black honeycomb, a chrome-edged quattro badge, and the cold segmented glass of the Matrix LED cluster.",
+    prompt:
+      "Macro three-quarter of a black Audi nose. Honeycomb Singleframe, quattro badge, Matrix LED optics, cool specular highlights, dark studio haze.",
     technique: "Macro Generative Texture Synthesis",
   },
   {
     id: "p03",   kind: "image",
     src: "/images/audi-03.webp",
-    label: "Fashion",
-    caption: "For those who meticulously craft their own image.",
-    prompt: "3D geometric mesh dress inspired by Audi grille patterns, high contrast key light, editorial dark studio.",
+    label: "Woven",
+    caption:
+      "The grille rewoven as cloth. A hand-linked honeycomb gown on a runway flanked by chrome fins \u2014 the same lattice, this time cut for a body.",
+    prompt:
+      "Editorial runway. Model in a black honeycomb mesh gown, oversized chrome grille-fin sculptures lining the walk, warm rim light, shallow depth of field.",
     technique: "Parametric AI Fashion Generation",
   },
   {
     id: "p04",   kind: "image",
     src: "/images/audi-04.webp",
-    label: "Architecture",
-    caption: "Environments as curated as the cars that move through them.",
-    prompt: "Dark brutalist matte-black concrete, glass cantilever, LED strip accents, minimalist luxury urban.",
+    label: "The Plinth",
+    caption:
+      "A parametric hall built from one repeating cell, daylight falling through a woven oculus onto an empty stone plinth. The room is the exhibit; the car never arrives.",
+    prompt:
+      "Vast pale parametric interior, ribbed vault, woven skylight oculus, empty circular stone plinth, soft daylight, polished concrete floor.",
     technique: "AI Architectural Concepting",
   },
   {
     id: "p05",   kind: "image",
     src: "/images/audi-05.webp",
-    label: "Nature",
-    caption: "Raw and organic, juxtaposed against precision engineering.",
-    prompt: "Dark volcanic basalt columns, moody mist, paint-depth texture, dramatic low-key landscape.",
+    label: "Planted",
+    caption:
+      "Honeycomb as a garden wall. Gloss black cells turned into planters, filled with indigenous growth and caught in low golden light \u2014 engineering handing itself over to something living.",
+    prompt:
+      "Gloss black honeycomb garden screen with plants growing through the cells, concrete edging, late golden hour, warm backlight through foliage.",
     technique: "Natural Organic AI Texture Synthesis",
   },
   {
     id: "p06",   kind: "image",
     src: "/images/audi-06.webp",
-    label: "Urban Edition",
-    caption: "A quiet glow at the edge of the city, where night finally stands still.",
-    prompt: "Rear ¾ black Audi coupe, glowing LED bar, rain-slicked boulevard, cinematic city bokeh.",
-    technique: "Generative Atmosphere & Wet Surface Rendering",
+    label: "Light Signature",
+    caption:
+      "A pavilion drawn as one continuous daytime running light. The house wears the car\u2019s signature at dusk, doubled in still water and warm from the inside out.",
+    prompt:
+      "Forest pavilion wrapped in a single continuous glowing LED frame, floor-to-ceiling glass, warm interior, dusk sky, reflecting pool.",
+    technique: "Generative Atmosphere & Light Architecture",
   },
   {
     id: "p07",   kind: "image",
     src: "/images/audi-07.webp",
-    label: "Interior",
-    caption: "The thoughtful selection of every detail. Curation is human.",
-    prompt: "Dark stitched leather steering wheel, ambient light piping, aluminium trim, minimal shadows.",
-    technique: "Interior Material Prompt Engineering",
+    label: "Carried",
+    caption:
+      "Quilted in the grille\u2019s own pattern. High-gloss hexagon padding on structured black leather, photographed against the panelling it borrows from.",
+    prompt:
+      "Black patent leather tote quilted in glossy hexagonal cells, hexagon wall panelling behind, single hard key light, luxury product still life.",
+    technique: "Material & Product Prompt Engineering",
   },
   {
     id: "p08",   kind: "image",
     src: "/images/audi-08.webp",
     label: "Innovation",
-    caption: "By harnessing AI, we are reaffirming our commitment to innovation.",
-    prompt: "Minimal black ribbon sculpture, overhead hard spotlight, geometric shadow, dark museum space.",
-    technique: "3D Form Generative Prompting",
+    caption:
+      "Half resolved, half still computing. The body assembles itself out of a point cloud under a single overhead light \u2014 the campaign showing its own working.",
+    prompt:
+      "Dark hall. Executive coupe half solid gloss black, half dissolving into a glowing white wireframe point cloud, volumetric spotlight, wet reflective floor.",
+    technique: "Generative Mesh & Point-Cloud Synthesis",
   },
   {
     id: "p09",   kind: "image",
     src: "/images/audi-09.webp",
-    label: "Fashion",
-    caption: "Identity shaped by precision and choice.",
-    prompt: "Structured black coat, tinted glasses, cold city light, cinematic attitude.",
+    label: "Black Edition",
+    caption:
+      "Shot from below against concrete punched with the same hexagon. Scaled black bodysuit, white frames, full daylight \u2014 the Black Edition wearing itself in public.",
+    prompt:
+      "Low-angle fashion portrait, model in a scaled black honeycomb bodysuit and white sunglasses, brutalist concrete facade with hexagonal voids, hard midday sun.",
     technique: "Character & Fashion Style Tuning",
   },
   {
     id: "p10",   kind: "image",
     src: "/images/audi-10.webp",
-    label: "Black Edition",
-    caption: "Pioneer of progress. Light cutting cleanly through the dark.",
-    prompt: "Front-on black Audi, matrix LED blazing through volumetric fog, dark asphalt, rim light.",
-    technique: "Volumetric Fog AI Render",
+    label: "Seating",
+    caption:
+      "Two moulded shells in a shaft of afternoon light. Nothing left but the line the car is known for \u2014 one in bone white, one in graphite.",
+    prompt:
+      "Two sculptural moulded chairs, one white one charcoal, against a concrete panel wall, hard diagonal shaft of daylight, long shadows.",
+    technique: "3D Form Generative Prompting",
   },
 ];
 
@@ -127,6 +164,9 @@ function Tile({
         alt={item.label}
         className="w-full h-full object-cover"
         loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        onError={ytPosterFallback}
       />
       {/* subtle darkening on hover */}
       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors duration-500 pointer-events-none" />
@@ -201,7 +241,7 @@ export default function App() {
               </h1>
             </div>
             <p className="font-audi-serif-body max-w-sm text-base leading-relaxed text-white/65 sm:text-right sm:text-lg">
-              An AI-powered campaign imagining the worlds of Audi's Black and Urban Editions.
+              An AI-powered campaign that lifts one shape \u2014 the Singleframe honeycomb \u2014 out of the car and lets it furnish an entire world.
             </p>
           </div>
         </Tile>
@@ -231,7 +271,7 @@ export default function App() {
             Audi South Africa / March 2024
           </p>
           <p className="font-audi-serif-body text-xl leading-relaxed text-[#f2e8dc]/80 sm:text-2xl">
-            A ground-breaking AI-powered campaign for the Urban and Black Editions, tailored exclusively for South Africa.
+            A ground-breaking AI-powered campaign for the Urban and Black Editions, tailored exclusively for South Africa: eleven pieces, one piece of geometry.
           </p>
         </div>
 
@@ -267,18 +307,18 @@ export default function App() {
         <Tile item={p03} onClick={() => open(p03)} className="h-full">
           <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/65 via-transparent to-transparent p-7 sm:p-9">
             <h2 className="font-audi-serif text-2xl font-bold leading-none tracking-[-0.02em] text-white sm:text-4xl">
-              Crafted<br />Identity
+              The Grille,<br />Rewoven
             </h2>
             <p className="font-audi-sans mt-2 text-[10px] uppercase tracking-widest text-white/50">
-              Fashion / Urban Edition
+              Fashion / Honeycomb Couture
             </p>
           </div>
         </Tile>
         <Tile item={p04} onClick={() => open(p04)} className="h-full">
           <div className="absolute inset-0 flex items-end justify-between bg-gradient-to-t from-black/60 via-transparent to-transparent p-7 sm:p-9">
             <div>
-              <h2 className="font-audi-serif text-2xl font-bold tracking-[-0.02em] text-white sm:text-4xl">Monolithic</h2>
-              <p className="font-audi-sans mt-2 text-[10px] uppercase tracking-widest text-white/50">Architecture / Urban Edition</p>
+              <h2 className="font-audi-serif text-2xl font-bold tracking-[-0.02em] text-white sm:text-4xl">The Empty Plinth</h2>
+              <p className="font-audi-sans mt-2 text-[10px] uppercase tracking-widest text-white/50">Architecture / One Repeating Cell</p>
             </div>
           </div>
         </Tile>
@@ -298,9 +338,9 @@ export default function App() {
         <Tile item={p06} onClick={() => open(p06)} className="h-full">
           <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/70 via-transparent to-transparent p-7 sm:p-9">
             <h2 className="font-audi-serif text-2xl font-bold leading-none tracking-[-0.02em] text-white sm:text-4xl">
-              Urban<br />Night Drive
+              A House Wearing<br />Its Own Lights
             </h2>
-            <p className="font-audi-sans mt-2 text-[10px] uppercase tracking-widest text-white/50">Urban Edition</p>
+            <p className="font-audi-sans mt-2 text-[10px] uppercase tracking-widest text-white/50">Architecture / Dusk</p>
           </div>
         </Tile>
         <Tile item={p07} onClick={() => open(p07)} className="h-full">
@@ -326,7 +366,7 @@ export default function App() {
         <Tile item={p09} onClick={() => open(p09)} className="h-full">
           <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 via-transparent to-transparent p-7 sm:p-9">
             <div>
-              <h2 className="font-audi-serif text-2xl font-bold tracking-[-0.02em] text-white sm:text-4xl">Avant-Garde</h2>
+              <h2 className="font-audi-serif text-2xl font-bold tracking-[-0.02em] text-white sm:text-4xl">Scaled &amp; Sunlit</h2>
               <p className="font-audi-sans mt-2 text-[10px] uppercase tracking-widest text-white/50">Fashion / Black Edition</p>
             </div>
           </div>
@@ -350,8 +390,8 @@ export default function App() {
               ))}
             </svg>
             <h2 className="font-audi-serif text-2xl font-bold leading-tight tracking-[-0.02em] text-[#f2e8dc] sm:text-4xl">
-              AI-generated art,<br />architecture, fashion<br />and nature,<br />
-              <em className="font-medium">curated for you.</em>
+              One grille, rebuilt as<br />furniture, couture,<br />architecture and<br />
+              <em className="font-medium">a planted wall.</em>
             </h2>
           </div>
           <div className="flex flex-col gap-3">

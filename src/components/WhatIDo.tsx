@@ -140,7 +140,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
   const initRef = useRef<HTMLParagraphElement>(null);
   const barRef = useRef<HTMLSpanElement>(null);
   const bootTagRef = useRef<HTMLParagraphElement>(null);
-  const lineRefs = useRef<Array<HTMLParagraphElement | null>>([]);
+  const lineRefs = useRef<Array<HTMLElement | null>>([]);
   const guideRef = useRef<HTMLDivElement>(null);
 
   /**
@@ -179,6 +179,11 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
     let rainBoost = 0;
     /** 0 = no spill, 1 = full spill over the following section. */
     let spillAlpha = 0;
+    /**
+     * True once the machine has finished saying its piece. Nothing rains —
+     * not in the section, not over the section below — until this flips.
+     */
+    let humanSpoken = machineActSpent;
 
     /**
      * The pin's height is measured and written in pixels. Pure-CSS svh
@@ -280,6 +285,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
     /** Full reset — called when the section leaves the viewport either way. */
     const resetAct = () => {
       actStart = -1;
+      humanSpoken = machineActSpent;
       disarmLock();
       if (initRef.current) { initRef.current.dataset.txt = ''; initRef.current.style.opacity = '0'; }
       lineRefs.current.forEach((el) => { if (el) { el.dataset.txt = ''; el.style.visibility = 'hidden'; } });
@@ -325,7 +331,14 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       const initT = actT > 0 ? clamp01(actT / T_BOOT) : 0;
       const speakT = actT > T_BOOT + 0.35 ? 1 : 0; // arm flag; lines use their schedules
       const releaseT = actT > SPEAK_END ? smoothstep((actT - SPEAK_END) / 0.9) : 0;
-      const surgeT = actT > SPEAK_END - 0.5 ? smoothstep((actT - (SPEAK_END - 0.5)) / 2.0) : 0;
+      /**
+       * The rain is the machine's ANSWER, so it may not start a frame before
+       * the human-readable transmission has finished being typed. Everything
+       * up to that point — the encode, the brownout, INITIALIZING, the three
+       * spoken lines — plays on a clean stage.
+       */
+      const surgeT = actT > SPEAK_END ? smoothstep((actT - SPEAK_END) / 1.5) : 0;
+      if (machineMode && actT > SPEAK_END) humanSpoken = true;
       if (machineMode && actStart > 0 && actT > ACT_DONE) {
         // Transmission complete: release any hold and remember — the machine
         // plays once per visit, then the section belongs to scroll again.
@@ -344,12 +357,9 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       // About exit: furniture fades as "continue" takes over the stage.
       const outT = machineMode ? 0 : smoothstep((p - 0.84) / 0.14);
 
-      rainAlpha = Math.max(
-        codeT * 0.85,
-        vanishT,
-        initT * 0.9,
-        machineMode ? Math.max(surgeT, (actT > 0 && acting) ? 0.35 : 0, spentZone * 0.45) : 0,
-      );
+      rainAlpha = machineMode
+        ? Math.max(surgeT, humanSpoken || machineActSpent ? spentZone * 0.5 : 0)
+        : 0;
       rainBoost = surgeT;
 
       const idx = Math.min(LAST, Math.round(Math.min(front, LAST)));
@@ -707,7 +717,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
 
       // Spill: fades in with the hand-off, then rains out over ~1 screen of
       // travel past the section. Scroll back up and it is gone with the pin.
-      if (machineMode && sctx) {
+      if (machineMode && sctx && humanSpoken) {
         const past = vh - rect.bottom; // px travelled beyond the pin's end
         const fadeIn = smoothstep((p - T_SPILL_START) / (1 - T_SPILL_START));
         const fadeOut = 1 - smoothstep((past - vh * 0.1) / vh);
@@ -1089,21 +1099,30 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
             </span>
           </div>
 
-          <div className="flex flex-col items-center gap-3 md:gap-4">
+          <div className="flex w-full max-w-[min(56rem,92vw)] flex-col items-center gap-4 md:gap-5">
             {ROBOT_LINES.map((line, i) => (
+              /* The <p> is sized by an invisible copy of the FULL line, and the
+                 typed characters are painted over it. Without that the box
+                 grew character by character and, at this weight and size, the
+                 whole transmission shuffled around while it was being typed. */
               <p
                 key={line}
-                ref={(el) => { lineRefs.current[i] = el; }}
-                data-caret="false"
-                className={`robot-line text-center whitespace-nowrap ${
+                className={`relative w-full text-center ${
                   i === 0
-                    ? 'font-display text-[#f5f3ee] text-[7vw] sm:text-[5vw] md:text-[3.4vw] lg:text-[2.9vw] leading-none tracking-[-0.02em]'
+                    ? 'font-display font-black text-[#f5f3ee] text-[13vw] sm:text-[9.5vw] md:text-[6.2vw] lg:text-[5.2vw] leading-[0.95] tracking-[-0.03em]'
                     : i === 1
-                      ? 'font-display text-[#d7ff4f] text-[3.1vw] sm:text-[2.7vw] md:text-[2.1vw] lg:text-[1.75vw] leading-none tracking-[0.01em]'
-                      : 'font-mono text-[#d7ff4f] text-[2.4vw] sm:text-[1.7vw] md:text-[1.05vw] lg:text-[0.9vw] tracking-[0.4em]'
+                      ? 'font-display font-black text-[#d7ff4f] text-[6.6vw] sm:text-[5.2vw] md:text-[3.6vw] lg:text-[3vw] leading-[1.05] tracking-[-0.01em]'
+                      : 'font-mono font-bold text-[#d7ff4f] text-[4.2vw] sm:text-[3vw] md:text-[1.8vw] lg:text-[1.5vw] leading-[1.3] tracking-[0.26em]'
                 }`}
-                style={{ visibility: 'hidden' }}
-              />
+              >
+                <span aria-hidden className="invisible">{line}</span>
+                <span
+                  ref={(el) => { lineRefs.current[i] = el; }}
+                  data-caret="false"
+                  className="robot-line absolute inset-0 block"
+                  style={{ visibility: 'hidden' }}
+                />
+              </p>
             ))}
           </div>
         </div>

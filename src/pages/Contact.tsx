@@ -27,7 +27,19 @@ const Contact: React.FC = () => {
     setStatus('sending');
     setStatusMessage('Sending your enquiry…');
 
-    const apiUrl = ((import.meta as any).env?.VITE_API_URL as string | undefined) || 'http://localhost:8000';
+    /**
+     * On a deployed static build there is no Python service unless one is
+     * configured. Falling back to `http://localhost:8000` from an HTTPS page
+     * is a guaranteed mixed-content failure — the browser blocks it, the
+     * visitor is shown a connection error and the enquiry is lost. So the
+     * API path is only taken when an API is actually configured, or when we
+     * are genuinely developing against the local one.
+     */
+    const configuredApi = ((import.meta as any).env?.VITE_API_URL as string | undefined)?.trim();
+    const isLocalHost =
+      typeof window !== 'undefined' &&
+      /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
+    const apiUrl = configuredApi || (isLocalHost ? 'http://localhost:8000' : '');
     const openEmailFallback = () => {
       window.location.href = emailFallbackHref;
       setStatus('email');

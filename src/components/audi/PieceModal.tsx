@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import VideoEmbed from "../VideoEmbed";
 
 type Item = {
   id: string;
@@ -38,14 +39,9 @@ export default function PieceModal({ item, ytId, onClose }: Props) {
       >
         <div className="relative flex-1 overflow-hidden bg-black" style={{ minHeight: 260 }}>
           {item.kind === "video" ? (
-            <iframe
-              className="aspect-video w-full"
-              style={{ minHeight: 260, height: "100%" }}
-              src={`https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0&modestbranding=1`}
-              title="Campaign Film"
-              allow="autoplay; encrypted-media; picture-in-picture"
-              allowFullScreen
-            />
+            <div className="aspect-video w-full" style={{ minHeight: 260 }}>
+              <VideoEmbed id={ytId} title="Audi — A Curated Collection, campaign film" autoPlay />
+            </div>
           ) : (
             <img loading="lazy" decoding="async"
               src={item.src}

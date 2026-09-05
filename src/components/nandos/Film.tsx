@@ -1,3 +1,5 @@
+import VideoEmbed from '../VideoEmbed';
+
 export default function Film() {
   return (
     <section id="nandos-film" className="relative bg-[#171412] py-20 md:py-28 text-[#f5efe4]">
@@ -13,12 +15,10 @@ export default function Film() {
 
         <div className="reveal overflow-hidden rounded-3xl border border-[#f5efe4]/15 shadow-[0_40px_80px_-40px_rgba(0,0,0,0.9)]">
           <div className="relative aspect-video w-full bg-[#1f1a16]">
-            <iframe
-              className="absolute inset-0 h-full w-full"
-              src="https://www.youtube.com/embed/s2Z6m6Om0Pg"
+            <VideoEmbed
+              id="s2Z6m6Om0Pg"
               title="Nando's Boujee Bowl — TV Commercial"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
+              hint="Play the film — 00:35"
             />
           </div>
         </div>

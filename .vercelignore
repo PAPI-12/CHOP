@@ -1,0 +1,22 @@
+# Everything the Vercel static build does not need.
+#
+# The Python service in backend/ is deployed separately (see backend/README.md);
+# leaving it in the upload makes Vercel's build step slower and can confuse
+# framework detection, since pyproject.toml lives at the repository root.
+
+backend/
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+pyproject.toml
+docker-compose.yml
+FULL_STACK_AUDIT.md
+TECH_STACK_AUDIT.md
+SECURITY.md
+.git/
+.github/
+node_modules/
+dist/
+.DS_Store
