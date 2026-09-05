@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
-import { resetMachineAct } from './WhatIDo';
+
 import { useScrollLock } from '../hooks/useScrollLock';
 
 const Navbar: React.FC = () => {
@@ -45,7 +45,6 @@ const Navbar: React.FC = () => {
   const goToHero = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsMobileMenuOpen(false);
-    resetMachineAct();
 
     const atHero = () => {
       window.scrollTo(0, 0);

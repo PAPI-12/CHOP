@@ -41,8 +41,17 @@ const coverOf = (img: HTMLImageElement, boxW: number, boxH: number): Cover | nul
 const EAR_U = 740 / 1920;
 const EAR_V = 680 / 1353;
 
-/** The looping label that makes the hero ring. */
-const RING_TEXT = 'CULTURE LED CREATIVE · ';
+const RING_WORD = 'CULTURE LED CREATIVE';
+/**
+ * One label laid around the FULL circumference. Word spacing is real: each
+ * letter keeps its own advance and the leftover arc is distributed between
+ * words only, so CULTURE, LED and CREATIVE each read as a continuous word and
+ * the gaps between them close the ring — never a half-circle of letters that
+ * ends mid-word. The trailing space is the seam; the word gap there is what
+ * hides the wrap. Rotating the group is one transform, so the loop costs no
+ * SVG text re-layout per frame.
+ */
+const RING_TEXT = `${RING_WORD} `;
 
 /** Eraser stroke key reserved for the cursor ring; bodies use their own keys. */
 const RING_STROKE = -1;
@@ -266,9 +275,8 @@ const Hero: React.FC = () => {
     };
 
     /**
-     * Ring diameter tracks the "O" of AWESOMENESS — the hero ring is the size
-     * of that counter, a small looping label, not a big stamp. The site's
-     * small lime cursor circle sits inside it.
+     * Ring diameter tracks the "O" of AWESOMENESS, a touch smaller so it reads
+     * as nested inside the counter rather than covering it.
      */
     const measureRing = () => {
       const o = hero.querySelector<HTMLElement>('[data-ring-gauge="O"]');
@@ -292,27 +300,37 @@ const Hero: React.FC = () => {
       const glyphs = Array.from(ring.querySelectorAll<SVGTextElement>('.hero-ring-glyph'));
       if (svg) svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
 
-      const px = Math.max(10, Math.min(20, radius * 0.34));
-      // The label loops around the invisible eraser centre — it is the ring,
-      // and there is no visible rim circle.
-      const pr = radius + px * 1.15;
+      const px = Math.max(12, Math.min(24, radius * 0.42));
+      // The label orbits the invisible eraser centre, but there is no lime
+      // rim any more: the label is the ring's only visible body, and the
+      // site's own lime cursor circle reads inside the orbit.
+      const pr = radius + px * 0.95;
       const c = size / 2;
       ringC = c;
       if (glyphs.length) {
         const circumference = 2 * Math.PI * pr;
-        const widths = glyphs.map((g) => {
+        // Real per-glyph advances where the browser can measure them; a
+        // proportional fallback for jsdom so the smoke harness still lays the
+        // label around a full circle.
+        const widths = glyphs.map((g, i) => {
           g.setAttribute('font-size', String(px));
           g.style.fontSize = `${px}px`;
-          // jsdom does not implement getComputedTextLength; browsers do. The
-          // zero-width fallback distributes glyphs evenly.
-          const len = typeof g.getComputedTextLength === 'function' ? g.getComputedTextLength() : 0;
-          return len || 0;
+          const measured = typeof g.getComputedTextLength === 'function' ? g.getComputedTextLength() : 0;
+          if (measured) return measured;
+          const chn = RING_TEXT[i] || '';
+          return chn === ' ' ? px * 0.32 : chn === '\u00B7' ? px * 0.5 : px * 0.62;
         });
         const total = widths.reduce((a, b) => a + b, 0);
-        const gap = glyphs.length > 1 ? (circumference - total) / glyphs.length : 0;
+        // Distribute the leftover circumference between the WORD SEAMS only,
+        // never inside a word. The trailing space is the seam between the last
+        // word and the first, so the wrap is invisible and the circle reads
+        // CULTURE · LED · CREATIVE around the full 360 degrees.
+        const seamCount = Array.from(RING_TEXT).filter((ch) => ch === ' ' || ch === '\u00B7').length;
+        const seamGap = seamCount > 0 ? (circumference - total) / seamCount : 0;
         let arc = 0;
         glyphs.forEach((g, i) => {
-          const mid = arc + widths[i] / 2 + gap / 2;
+          const w = widths[i];
+          const mid = arc + w / 2;
           const theta = (mid / circumference) * Math.PI * 2 - Math.PI / 2;
           const gx = c + pr * Math.cos(theta);
           const gy = c + pr * Math.sin(theta);
@@ -320,7 +338,8 @@ const Hero: React.FC = () => {
             'transform',
             `translate(${gx.toFixed(3)} ${gy.toFixed(3)}) rotate(${(theta * 180 / Math.PI + 90).toFixed(3)})`,
           );
-          arc += widths[i];
+          arc += w;
+          if (RING_TEXT[i] === ' ' || RING_TEXT[i] === '\u00B7') arc += seamGap;
         });
       }
     };
@@ -328,7 +347,7 @@ const Hero: React.FC = () => {
     /**
      * ── The vapour / rain-glass pane ───────────────────────────────────
      *
-     * A sheet of dark blue-grey glass after rain: dense small beads, narrow
+     * A sheet of dark graphite glass after rain: dense small beads, narrow
      * vertical runnels, the whole sheet lit softly from the top-left. The
      * cursor ring and every displaced letter squeegee it away, and the sharp
      * portrait shows through where you have wiped.
@@ -362,7 +381,7 @@ const Hero: React.FC = () => {
     let vaporDetailed = false;
     /** True once the blurred photograph has been baked into the tile. The
         detail pass may need to run twice: once before the image finished
-        loading, then again when it fires `load`. */
+        loading, then again when the image fires `load`. */
     let vaporPhoto = false;
     /** True the moment the visitor clears any glass at all. */
     let wiped = false;
@@ -373,24 +392,26 @@ const Hero: React.FC = () => {
      * average density — it is on screen for one idle callback at most.
      */
     const paneGradient = (f: CanvasRenderingContext2D) => {
-      // A cool, translucent blue-grey pane, not a solid sheet. It is darker
-      // than the old breath-mist (real rain glass), and lit diagonally so the
-      // top-left reads brightest while the lower-right falls into shadow.
-      // The photograph stays legible behind it from the first frame; the
-      // dense detail is added by buildVapor() a moment later.
+      // A translucent graphite pane after rain, NOT the blue sheet of the
+      // iStock reference — the hero photograph must read through it in its
+      // own colour, only softened and darkened. A whisper of cool remains
+      // (water is cold), but the blue-grey tint has been neutralised. It is
+      // lit so the top-left reads brightest while the lower-right falls into
+      // shadow. The photograph stays legible behind it from the first frame;
+      // the dense detail is added by buildVapor() a moment later.
       const sheet = f.createLinearGradient(0, 0, boxW, boxH);
-      sheet.addColorStop(0, 'rgba(70, 86, 104, 0.34)');
-      sheet.addColorStop(0.45, 'rgba(40, 52, 66, 0.42)');
-      sheet.addColorStop(1, 'rgba(18, 25, 34, 0.50)');
+      sheet.addColorStop(0, 'rgba(78, 82, 88, 0.33)');
+      sheet.addColorStop(0.45, 'rgba(48, 52, 58, 0.42)');
+      sheet.addColorStop(1, 'rgba(22, 25, 29, 0.50)');
       f.fillStyle = sheet;
       f.fillRect(0, 0, boxW, boxH);
 
       // Keeps the cream type legible without flattening the pane, and makes
       // the lower-right read as the shadowed side of the glass.
       const grade = f.createLinearGradient(0, 0, boxW, boxH);
-      grade.addColorStop(0, 'rgba(10, 15, 22, 0.07)');
-      grade.addColorStop(0.55, 'rgba(8, 13, 20, 0.17)');
-      grade.addColorStop(1, 'rgba(4, 7, 12, 0.26)');
+      grade.addColorStop(0, 'rgba(8, 11, 14, 0.07)');
+      grade.addColorStop(0.55, 'rgba(7, 10, 13, 0.17)');
+      grade.addColorStop(1, 'rgba(4, 6, 8, 0.26)');
       f.fillStyle = grade;
       f.fillRect(0, 0, boxW, boxH);
     };
@@ -437,7 +458,9 @@ const Hero: React.FC = () => {
          glass, with a big soft shaft of light crossing it. Density is four
          octaves of smoothstep value noise; soft blooms open where the glass
          is thinner, including the large bright wash over the subject.
-         Cool blue-grey: thin is slate, thick is cold silver. */
+         Neutral graphite: thin is slate, thick is a soft silver that still leans
+   only a hair cool — the reference's blue-grey has been neutralised so the
+   photograph behind keeps its own colour. */
       const FIELD = 4;
       const fw = Math.max(2, Math.ceil(boxW / FIELD));
       const fh = Math.max(2, Math.ceil(boxH / FIELD));
@@ -521,15 +544,19 @@ const Hero: React.FC = () => {
           n = Math.min(1, Math.max(0, (n - 0.5) * 1.9 + 0.5));
 
           const x = fx * FIELD;
-          let a = (0.24 + n * 0.30) * vert;
+          // The pane darkens and refracts but never becomes a wall: you are
+          // always looking THROUGH it at the hero. A touch lighter than the
+          // old blue sheet, with the water doing the "after rain" work.
+          let a = (0.20 + n * 0.26) * vert;
           a *= 1 - Math.min(0.85, cleared(x, y) * 1.1);
-          a = Math.min(0.68, Math.max(0.16, a));
+          a = Math.min(0.60, Math.max(0.12, a));
 
-          const k = (a - 0.16) / 0.52;
-          // Slate → cold silver. Roughly dense small glass, not a smooth sheet.
-          const r = Math.round(32 + 116 * k);
-          const g = Math.round(42 + 122 * k);
-          const b = Math.round(58 + 128 * k);
+          const k = (a - 0.12) / 0.48;
+          // Slate → soft silver, essentially neutral so what is behind the
+          // glass keeps its own colour (only a hair cool remains).
+          const r = Math.round(36 + 104 * k);
+          const g = Math.round(39 + 108 * k);
+          const b = Math.round(43 + 112 * k);
           const o4 = (fy * fw + fx) * 4;
           px32[o4] = r;
           px32[o4 + 1] = g;
@@ -550,9 +577,9 @@ const Hero: React.FC = () => {
       const bloomCy = boxH * 0.52;
       const bloomR = Math.max(boxW, boxH) * 0.62;
       const wash = f.createRadialGradient(bloomCx, bloomCy, 0, bloomCx, bloomCy, bloomR);
-      wash.addColorStop(0, 'rgba(224, 234, 244, 0.30)');
-      wash.addColorStop(0.38, 'rgba(168, 188, 206, 0.14)');
-      wash.addColorStop(0.72, 'rgba(72, 92, 112, 0)');
+      wash.addColorStop(0, 'rgba(230, 234, 238, 0.28)');
+      wash.addColorStop(0.38, 'rgba(174, 180, 187, 0.13)');
+      wash.addColorStop(0.72, 'rgba(76, 82, 88, 0)');
       wash.addColorStop(1, 'rgba(0, 0, 0, 0)');
       f.fillStyle = wash;
       f.fillRect(0, 0, boxW, boxH);
@@ -561,9 +588,9 @@ const Hero: React.FC = () => {
         boxW * 0.38, boxH * 0.44, 0,
         boxW * 0.38, boxH * 0.44, Math.min(boxW, boxH) * 0.34,
       );
-      core.addColorStop(0, 'rgba(242, 248, 252, 0.20)');
-      core.addColorStop(0.45, 'rgba(200, 216, 228, 0.08)');
-      core.addColorStop(1, 'rgba(160, 184, 202, 0)');
+      core.addColorStop(0, 'rgba(246, 248, 250, 0.18)');
+      core.addColorStop(0.45, 'rgba(206, 212, 218, 0.08)');
+      core.addColorStop(1, 'rgba(166, 172, 178, 0)');
       f.fillStyle = core;
       f.fillRect(0, 0, boxW, boxH);
 
@@ -582,9 +609,9 @@ const Hero: React.FC = () => {
       /* ── 2. Water ──────────────────────────────────────────────────
          A drop of water on glass is a LENS, not a hole. Punch a hole and you
          show whatever is behind; water refracts light away from the viewer,
-         so every bead thins the mist a little, tints what is left toward
-         blue-grey, and — when it sits in the light shaft — picks up a bright
-         silver rim. The tint keeps them neutral over skin or wall. */
+         so every bead thins the mist a little, tints what is left toward a
+         neutral graphite, and — when it sits in the light shaft — picks up a
+         bright silver rim. The tint keeps them neutral over skin or wall. */
 
       /** How strongly the light shaft is lighting a point, 0-1. */
       const litAt = (x: number, y: number) => {
@@ -658,23 +685,23 @@ const Hero: React.FC = () => {
         f.globalAlpha = 0.14;
         along(pts, w, w * 0.5, disc);
 
-        // ...tinted cold blue-grey, so it holds its own over skin or wall.
+        // ...tinted graphite, so it holds its own over skin or wall.
         const dark = Math.round(36 + rnd() * 20);
         f.globalCompositeOperation = 'source-atop';
-        f.fillStyle = `rgb(${dark},${dark + 5},${dark + 14})`;
+        f.fillStyle = `rgb(${dark},${dark + 2},${dark + 4})`;
         f.globalAlpha = 0.52 + rnd() * 0.14;
         along(pts, w * 0.9, w * 0.45, disc);
 
         // Lit shoulders.
         f.globalCompositeOperation = 'source-over';
-        f.fillStyle = 'rgb(214,232,246)';
+        f.fillStyle = 'rgb(216,220,225)';
         f.globalAlpha = 0.03 + rnd() * 0.03;
         along(pts, w * 1.6, w * 0.8, disc);
       }
 
-      /* Droplets. Dense, packed, tiny — the references are a rough pane
-         covered in thousands of beads, not a clean field of a few big
-         circles. Baked once, so the count is free per frame. */
+      /* Droplets. Water obeys gravity and warmth: more of it low down, far
+         less across the patch his face has cleared. Macro-reference density
+         on a full-figure hero is not condensation, it is spatter. */
       const drop = (x: number, y: number, r: number, el: number) => {
         const ry = r * el;
         const lit = litAt(x, y);
@@ -682,58 +709,61 @@ const Hero: React.FC = () => {
 
         f.globalCompositeOperation = 'destination-out';
         f.fillStyle = '#000';
-        f.globalAlpha = 0.12 + rnd() * 0.16;
+        f.globalAlpha = 0.14 + rnd() * 0.18;
         f.beginPath();
         f.ellipse(x, y, r, ry, 0, 0, Math.PI * 2);
         f.fill();
 
         const dark = Math.round(30 + rnd() * 26);
         f.globalCompositeOperation = 'source-atop';
-        f.fillStyle = `rgb(${dark + lift},${dark + lift + 8},${dark + lift + 18})`;
-        f.globalAlpha = 0.28 + lit * 0.26 + rnd() * 0.16;
+        f.fillStyle = `rgb(${dark + lift},${dark + lift + 3},${dark + lift + 6})`;
+        f.globalAlpha = 0.30 + lit * 0.26 + rnd() * 0.18;
         f.beginPath();
         f.ellipse(x, y, r, ry, 0, 0, Math.PI * 2);
         f.fill();
 
         f.globalCompositeOperation = 'source-over';
-        // Larger beads carry a rim; in the light shaft it is bright silver,
-        // in the dark corners a faint cool grey.
-        if (r > 1.7) {
+        // Only the larger beads carry a rim; in the light shaft the rim is
+        // bright silver, in the dark corners a faint soft grey.
+        if (r > 1.8) {
           f.strokeStyle = 'rgba(255,255,255,0.72)';
-          f.lineWidth = Math.max(0.32, r * 0.21);
-          f.globalAlpha = 0.06 + lit * 0.12 + rnd() * 0.06;
+          f.lineWidth = Math.max(0.35, r * 0.22);
+          f.globalAlpha = 0.07 + lit * 0.12 + rnd() * 0.07;
           f.beginPath();
           f.ellipse(x, y, r * 1.02, ry * 1.02, 0, Math.PI * 0.05, Math.PI * 0.65);
           f.stroke();
         }
-        if (r > 2.3) {
+        if (r > 2.4) {
           f.fillStyle = 'rgba(255,255,255,0.88)';
-          f.globalAlpha = (0.12 + lit * 0.18) + rnd() * 0.1;
-          disc(x - r * 0.3, y - ry * 0.34, Math.max(0.28, r * 0.15));
+          f.globalAlpha = (0.14 + lit * 0.18) + rnd() * 0.1;
+          disc(x - r * 0.3, y - ry * 0.34, Math.max(0.3, r * 0.16));
         }
       };
 
-      const scattered = Math.min(20000, Math.round((boxW * boxH) / 110));
+      // Dense small beads, the way a pane looks in the macro reference: many
+      // tiny beads, few large ones. Baked once, so density costs nothing per
+      // frame — only the offscreen tile gets bigger.
+      const scattered = Math.min(4200, Math.round((boxW * boxH) / 430));
       for (let i = 0; i < scattered; i++) {
         const x = rnd() * boxW;
         const y = boxH * Math.pow(rnd(), 0.74);
         if (rnd() < cleared(x, y) * 3.2) continue;
         const b = rnd();
-        const r = 0.24 + b * b * b * 2.9;
-        drop(x, y, r, 1 + (r > 1.3 ? rnd() * 1.0 : rnd() * 0.3));
+        const r = 0.3 + b * b * b * 3.4;
+        drop(x, y, r, 1 + (r > 1.4 ? rnd() * 1.1 : rnd() * 0.3));
       }
 
       // And crowded along every track, the way real ones bead on a wet path.
       for (let t = 0; t < tracks.length; t++) {
         const { pts, w, len } = tracks[t];
-        const n = Math.round(len / 6);
+        const n = Math.round(len / 8);
         for (let i = 0; i < n; i++) {
           const p = pts[Math.min(pts.length - 1, Math.floor(rnd() * pts.length))];
           const b = rnd();
           drop(
             p.x + (rnd() - 0.5) * w * 4.5,
             p.y + (rnd() - 0.5) * 10,
-            0.24 + b * b * 2.1,
+            0.3 + b * b * 2.4,
             1 + rnd() * 1,
           );
         }
@@ -945,9 +975,10 @@ const Hero: React.FC = () => {
     window.addEventListener('scroll', onScroll, { passive: true });
 
     /**
-     * The ring's lime rim is the hero circle, and the site's own tiny lime
-     * cursor stays visible inside the filled word block — no hidden-cursor
-     * state needed.
+     * The hero ring no longer carries a lime rim, so the site's own lime
+     * cursor circle is the circle the user sees. It stays visible over the
+     * hero and reads inside the orbiting CULTURE LED CREATIVE label. Nothing
+     * needs to step aside.
      */
     const onPointerMove = (e: PointerEvent) => {
       if (e.pointerType === 'touch') return;
@@ -1036,9 +1067,10 @@ const Hero: React.FC = () => {
 
       if (!show) return;
 
-      // Gentle continuous rotation of the looping label. Rotating the group
-      // (one transform) instead of relaying out the text keeps every frame
-      // free of SVG text layout — the big lag source while sweeping.
+      // Gentle continuous rotation of the label. Rotating the group (one
+      // transform) instead of shifting text along the path keeps every frame
+      // free of SVG text re-layout — the big lag source while sweeping. The
+      // circumference-pinned label makes the loop seamless.
       spin = (spin + dt * 14) % 360;
       ringSpinRef.current?.setAttribute(
         'transform',
@@ -1060,8 +1092,6 @@ const Hero: React.FC = () => {
       img?.removeEventListener('load', onImgLoad);
     };
   }, [interactive, firstVaporVisit]);
-
-  const frozen = introComplete && interactive;
 
   return (
     <section
@@ -1108,23 +1138,23 @@ const Hero: React.FC = () => {
       </div>
 
       {/* Ambient floating crosses */}
-      <FloatingCross className="absolute top-[12%] left-[7%] z-20 hidden sm:block" size={38} duration={6.5} delay={0} frozen={frozen} />
-      <FloatingCross className="absolute top-[18%] right-[11%] z-20 hidden md:block" size={24} duration={5.5} delay={0.5} frozen={frozen} />
-      <FloatingCross className="absolute top-[32%] left-[15%] z-20 hidden md:block" size={28} duration={7} delay={0.3} frozen={frozen} />
-      <FloatingCross className="absolute top-[8%] right-[26%] z-20 hidden lg:block" size={18} duration={6} delay={0.9} frozen={frozen} />
-      <FloatingCross className="absolute bottom-[24%] right-[8%] z-20 hidden sm:block" size={30} duration={7.5} delay={0.2} frozen={frozen} />
-      <FloatingCross className="absolute bottom-[16%] left-[11%] z-20 hidden sm:block" size={22} duration={5.8} delay={1} frozen={frozen} />
-      <FloatingCross className="absolute top-[48%] left-[4%] z-20 hidden lg:block" size={16} duration={6.2} delay={1.2} frozen={frozen} />
-      <FloatingCross className="absolute top-[58%] right-[17%] z-20 hidden md:block" size={20} duration={6.4} delay={0.8} frozen={frozen} />
-      <FloatingCross className="absolute bottom-[38%] left-[22%] z-20 hidden lg:block" size={14} duration={5.2} delay={1.4} frozen={frozen} />
-      <FloatingCross className="absolute top-[70%] left-[40%] z-20 hidden xl:block" size={16} duration={6.8} delay={0.6} frozen={frozen} />
+      <FloatingCross className="absolute top-[12%] left-[7%] z-20 hidden sm:block" size={38} duration={6.5} delay={0} />
+      <FloatingCross className="absolute top-[18%] right-[11%] z-20 hidden md:block" size={24} duration={5.5} delay={0.5} />
+      <FloatingCross className="absolute top-[32%] left-[15%] z-20 hidden md:block" size={28} duration={7} delay={0.3} />
+      <FloatingCross className="absolute top-[8%] right-[26%] z-20 hidden lg:block" size={18} duration={6} delay={0.9} />
+      <FloatingCross className="absolute bottom-[24%] right-[8%] z-20 hidden sm:block" size={30} duration={7.5} delay={0.2} />
+      <FloatingCross className="absolute bottom-[16%] left-[11%] z-20 hidden sm:block" size={22} duration={5.8} delay={1} />
+      <FloatingCross className="absolute top-[48%] left-[4%] z-20 hidden lg:block" size={16} duration={6.2} delay={1.2} />
+      <FloatingCross className="absolute top-[58%] right-[17%] z-20 hidden md:block" size={20} duration={6.4} delay={0.8} />
+      <FloatingCross className="absolute bottom-[38%] left-[22%] z-20 hidden lg:block" size={14} duration={5.2} delay={1.4} />
+      <FloatingCross className="absolute top-[70%] left-[40%] z-20 hidden xl:block" size={16} duration={6.8} delay={0.6} />
 
       {/* Ambient floating waves */}
-      <FloatingWave className="absolute top-[24%] right-[15%] z-20 hidden md:block" width={140} duration={7.5} delay={0} frozen={frozen} />
-      <FloatingWave className="absolute top-[44%] left-[3%] z-20 hidden lg:block" width={110} duration={8.5} delay={0.4} frozen={frozen} />
-      <FloatingWave className="absolute bottom-[32%] right-[5%] z-20 hidden md:block" width={130} duration={7} delay={0.9} frozen={frozen} />
-      <FloatingWave className="absolute bottom-[14%] left-[17%] z-20 hidden sm:block" width={100} duration={8} delay={0.6} frozen={frozen} />
-      <FloatingWave className="absolute top-[62%] right-[23%] z-20 hidden lg:block" width={90} duration={6.5} delay={1.1} frozen={frozen} />
+      <FloatingWave className="absolute top-[24%] right-[15%] z-20 hidden md:block" width={140} duration={7.5} delay={0} />
+      <FloatingWave className="absolute top-[44%] left-[3%] z-20 hidden lg:block" width={110} duration={8.5} delay={0.4} />
+      <FloatingWave className="absolute bottom-[32%] right-[5%] z-20 hidden md:block" width={130} duration={7} delay={0.9} />
+      <FloatingWave className="absolute bottom-[14%] left-[17%] z-20 hidden sm:block" width={100} duration={8} delay={0.6} />
+      <FloatingWave className="absolute top-[62%] right-[23%] z-20 hidden lg:block" width={90} duration={6.5} delay={1.1} />
 
       {/* Static scribbles for depth */}
       <ScribbleX data-hero-physics="deco" className="absolute top-[20%] left-[28%] w-6 h-6 z-20 opacity-50 rotate-12 hidden md:block" />
@@ -1166,11 +1196,12 @@ const Hero: React.FC = () => {
         </div>
       </div>
 
-      {/* CULTURE LED CREATIVE. The ring IS the label: a looping ring of the
-          words, sized to the counter of the O in AWESOMENESS, with no lime rim
-          and no second circle — the site's small lime cursor reads inside the
-          loop. The ring is still the squeegee; what it passes over it clears.
-          Only rendered where there is a real cursor. */}
+      {/* CULTURE LED CREATIVE. No lime rim, no SVG path, no second circle:
+          the label itself is the only body of the ring, orbiting the eraser
+          centre, and the site's own lime cursor circle reads inside the
+          orbit. The ring is still the squeegee — what its path crosses, it
+          clears. No lens, no magnification: the glass wipes clean, it does
+          not enlarge. Only rendered where there is a real cursor. */}
       {interactive && (
         <div
           ref={ringRef}
@@ -1179,11 +1210,17 @@ const Hero: React.FC = () => {
           aria-hidden
         >
           <svg width="100%" height="100%" className="absolute inset-0 overflow-visible block">
+            {/* The label rides a circle around the invisible eraser centre. */}
             <g ref={ringSpinRef}>
-              {/* Inter Black: JetBrains Mono's 700 is too narrow for a looping
-                  label. Each glyph is placed individually around the circle
-                  (no <path> element), so the loop is seamless and rotates as
-                  one group. */}
+              {/* Inter Black, not the mono. JetBrains Mono's bold is a
+                  narrow-stemmed 700 and at this size it simply does not read
+                  as bold — the label kept looking light however the weight
+                  was declared. Inter ships a real 900, and a hairline stroke
+                  in the same lime under the fill thickens the stems further
+                  without touching the letterforms. Each glyph is placed
+                  individually along the orbit (no <path>), so the loop is
+                  seamless and the label can grow large without an SVG path
+                  element in the DOM. */}
               {RING_TEXT.split('').map((ch, i) => (
                 <text
                   key={i}

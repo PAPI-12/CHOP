@@ -230,7 +230,8 @@ const click = (window, el) =>
   check('the field has soft blooms where the vapor has cleared', /blooms/.test(vapor));
   check('water is a dark lens, not a hole in the glass',
     /source-atop/.test(vapor) && /destination-out/.test(vapor));
-  check('the vapor is the dark blue-grey rain glass', /blue-grey/.test(vapor));
+  check('the vapor is neutral rain glass over the photograph',
+    /graphite/.test(vapor) || /blue-grey/.test(vapor));
 }
 
 /* ── 2g. The vapor is a once-per-session first impression only ──────── */
@@ -358,6 +359,29 @@ const click = (window, el) =>
   check('the hand-off rain is scoped inside a section, not the body',
     !!section && section.parentElement?.tagName !== 'BODY');
   window.close();
+}
+
+/* ── 6. The hero decorations run forever, the ring is a full circle,
+       and the matrix hand-off is once per page load ─────────────────── */
+{
+  const hero = fs.readFileSync(new URL('../../src/components/Hero.tsx', import.meta.url), 'utf8');
+  const what = fs.readFileSync(new URL('../../src/components/WhatIDo.tsx', import.meta.url), 'utf8');
+  const sw = fs.readFileSync(new URL('../../src/components/SelectedWork.tsx', import.meta.url), 'utf8');
+  const nav = fs.readFileSync(new URL('../../src/components/Navbar.tsx', import.meta.url), 'utf8');
+
+  check('the floating crosses and waves never freeze',
+    !/frozen=\{frozen\}/.test(hero) && !/const frozen/.test(hero));
+
+  check('the ring lays the label around the full circle with real word seams',
+    /seamGap/.test(hero) && /FULL circumference/.test(hero) && /seam/.test(hero));
+
+  check('the machine and its rain are once per page load',
+    /machineActSpent/.test(what) && /rainConsumed/.test(what) && /handoffActive/.test(what));
+  check('the wordmark does not re-arm the matrix',
+    !/resetMachineAct/.test(nav) && !/resetMachineAct/.test(what));
+
+  check('the incoming work rain hands over once per page load',
+    /handoffRainSpent/.test(sw) && /RAIN_IN = 0/.test(sw) && /at FULL strength the instant/i.test(sw));
 }
 
 console.log(`\n${failures === 0 ? 'ALL REGRESSION GUARDS PASS' : failures + ' FAILED'}`);

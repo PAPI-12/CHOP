@@ -27,8 +27,6 @@ const MATRIX_GLYPHS =
   'CRAFTINGAWESOMENESS2015CULTRLDVIXPAPI·0123456789<>*+-=/\\|#$%&@';
 
 const clamp01 = (t: number) => (t < 0 ? 0 : t > 1 ? 1 : t);
-/** Fast off the mark, settling — the page transition's own curve. */
-const expoOut = (t: number) => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t));
 
 /* ── The matrix arrives the way a page does ────────────────────────────
    Once the machine has finished speaking, the code does not fade up. A
@@ -38,8 +36,9 @@ const expoOut = (t: number) => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t));
    same gesture. The code exists here and nowhere else on the site. */
 /** The hairline is drawn for this long before the rectangle opens. */
 const STRIKE_S = 0.22;
-/** How long the rectangle takes to open to the full stage. */
-const OPEN_S = 0.46;
+/** How long the thin line takes to grow into the full matrix panel.
+    Fast initial expansion, then a slightly slower settle — no bounce. */
+const PANEL_S = 0.85;
 /** Thickness of the struck line, in CSS pixels. */
 const LINE_PX = 2;
 const smoothstep = (t: number) => {
@@ -100,13 +99,12 @@ const INIT_WORD = 'INITIALIZING';
 const BOOT_TAG = 'WHAT I DO';
 
 /**
- * One-shot, module-level: the robot transmission is experienced ONCE per
- * visit. After it plays, revisiting the section shows the skills and the code
- * rain (and "continue") — never the machine again. A full reload resets it,
- * and the Navbar re-arms it when the PAPI RABORIFE brand mark is clicked.
+ * One-shot, module-level: the machine transmission is experienced ONCE per
+ * page load. After it plays, revisiting the section shows the skills only —
+ * never the matrix again. Only a full reload re-initialises this module state,
+ * which is the one way the signature comes back.
  */
 let machineActSpent = false;
-export const resetMachineAct = () => { machineActSpent = false; };
 
 /* Robot schedule (seconds). The decrypt, the typing, the pauses. */
 const T_BOOT = 1.35;
@@ -180,6 +178,16 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
      * not in the section, not over the section below — until this flips.
      */
     let humanSpoken = machineActSpent;
+    /**
+     * True once THIS page load has handed over to Selected Work. The hand-off
+     * rain is a once-per-load signature: it plays while the section is pulled
+     * up, but a revisit later in the same visit shows the work without
+     * re-tripping the matrix. A reload starts a fresh page, so it plays again.
+     */
+    let rainConsumed = false;
+    /** True only during the single hand-off pass that actually carries the
+        visitor into the next section. */
+    let handoffActive = false;
 
     /**
      * The pin's height is measured and written in pixels. Pure-CSS svh
@@ -196,9 +204,13 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
 
     /* ── The machine act: triggered by scroll, played by a clock ─────── */
 
+    // The panel must physically cover the viewport before the human-readable
+    // part can appear in the same space, so INITIALIZING waits for the line
+    // to finish growing.
+    const INIT_AT = PANEL_S + 0.12;
     // Robot line schedules: human typing rhythm with breaths between lines.
     const lineSchedules = (() => {
-      let t = T_BOOT + 0.35;
+      let t = INIT_AT + T_BOOT + 0.35;
       return ROBOT_LINES.map((line) => {
         const s = buildLineSchedule(line, t);
         t = s.end + LINE_GAP;
@@ -328,15 +340,11 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       const actT = machineMode && actStart > 0 ? (nowMs - actStart) / 1000 : 0;
       const acting = machineMode && actStart > 0 && actT <= ACT_DONE + 0.5;
 
-      const initT = actT > 0 ? clamp01(actT / T_BOOT) : 0;
-      const speakT = actT > T_BOOT + 0.35 ? 1 : 0; // arm flag; lines use their schedules
+      // INITIALIZING and the human words wait until the matrix panel has
+      // physically swallowed the viewport.
+      const initT = actT > INIT_AT ? clamp01((actT - INIT_AT) / T_BOOT) : 0;
+      const speakT = actT > INIT_AT + T_BOOT + 0.35 ? 1 : 0; // arm flag; lines use their schedules
       const releaseT = actT > SPEAK_END ? smoothstep((actT - SPEAK_END) / 0.9) : 0;
-      /**
-       * The rain is the machine's ANSWER, so it may not start a frame before
-       * the human-readable transmission has finished being typed. Everything
-       * up to that point — the encode, the brownout, INITIALIZING, the three
-       * spoken lines — plays on a clean stage.
-       */
       const surgeT = actT > SPEAK_END ? smoothstep((actT - SPEAK_END) / 1.5) : 0;
       if (machineMode && actT > SPEAK_END) humanSpoken = true;
       if (machineMode && actStart > 0 && actT > ACT_DONE) {
@@ -347,28 +355,53 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
         machineActSpent = true;
         disarmLock();
       }
+      // The hand-off rain is once per page load. The first time the machine
+      // hands the visitor into the deep end, hold the rain at full strength
+      // for that pull; once they have either been carried through (deep end)
+      // or backed away from it, remember it and never re-trip the matrix for
+      // the rest of this visit (a reload resets this module state).
+      if (
+        machineMode &&
+        !handoffActive &&
+        !rainConsumed &&
+        machineActSpent &&
+        actStart < 0 &&
+        p >= T_VANISH_END
+      ) {
+        handoffActive = true;
+      }
+      if (machineMode && handoffActive) {
+        // The hand-off stays live all the way to the bottom of the pin so the
+        // code hands straight over to Selected Work, then is consumed.
+        if (p > 0.999 || p < T_VANISH_END - 0.08) {
+          handoffActive = false;
+          rainConsumed = true;
+        }
+      }
+
       // After the transmission (or after a breakout), the deep end of the pin
-      // still carries the code rain and the continue guide — scroll-driven now.
-      const spentZone =
-        machineMode && machineActSpent && actStart < 0 && p >= T_VANISH_END
-          ? smoothstep((p - T_VANISH_END) / 0.08)
-          : 0;
+      // still carries the code rain and the continue guide — scroll-driven now,
+      // but only during the single pass that actually handed over.
+      const spentZone = machineMode && handoffActive ? 1 : 0;
 
       // About exit: furniture fades as "continue" takes over the stage.
       const outT = machineMode ? 0 : smoothstep((p - 0.84) / 0.14);
 
       /**
-       * The rain is the machine's ANSWER, and it is introduced the same way
-       * a new page is: a struck hairline that opens into a rectangle. So the
-       * canvas is CLIPPED open rather than faded in — clipping reveals the
-       * code at its true size, where a fade would just dissolve it into
-       * view and lose the architecture of the gesture entirely.
+       * The architectural transition: a struck hairline → thick rectangle →
+       * full matrix panel. The canvas is CLIPPED open rather than faded in —
+       * clipping reveals the code at its true size while the height grows
+       * symmetrically out of the centre, so it reads as one line physically
+       * taking over the screen. The page behind it stays untouched until the
+       * panel covers it; then INITIALIZING + the human words appear on top.
        */
-      const revealT = machineMode && actStart > 0 && actT > SPEAK_END
-        ? clamp01((actT - SPEAK_END) / OPEN_S)
-        : 0;
+      const revealT = machineMode && actStart > 0 ? clamp01(actT / PANEL_S) : 0;
+      // Ease-in-out for the panel: fast initial expansion, a slightly slower
+      // settle. The clip is symmetric because the inset is measured from the
+      // stage centre in both directions.
+      const eased = smoothstep(revealT);
       // Revisiting after the act has played: the section is already open.
-      const opened = revealT > 0 ? expoOut(revealT) : (spentZone > 0 ? 1 : 0);
+      const opened = revealT > 0 ? eased : (spentZone > 0 ? 1 : 0);
 
       const rainEl = rainRef.current;
       if (rainEl) {
@@ -384,11 +417,9 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
         }
       }
 
-      // The line itself: struck just before the opening, gone once the
-      // rectangle has anywhere near enough height to speak for itself.
-      const strikeT = machineMode && actStart > 0
-        ? clamp01((actT - (SPEAK_END - STRIKE_S)) / STRIKE_S)
-        : 0;
+      // The line strikes through the centre at the moment the act begins,
+      // then dissolves as the rectangle grows around it.
+      const strikeT = machineMode && actStart > 0 ? clamp01(actT / STRIKE_S) : 0;
       const lineEl = rainLineRef.current;
       if (lineEl) {
         lineEl.style.opacity = String(
@@ -396,11 +427,12 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
         );
       }
 
-      // Behind the clip the code is at full strength almost immediately —
+      // Behind the clip the panel is at full strength almost immediately —
       // the reveal is the clip's job, not the alpha's.
+      const panelA = actT > 0 ? clamp01(actT / 0.25) : 0;
       const surgeA = actT > SPEAK_END ? smoothstep((actT - SPEAK_END) / 0.5) : 0;
       rainAlpha = machineMode
-        ? Math.max(surgeA, humanSpoken || machineActSpent ? spentZone * 0.5 : 0)
+        ? Math.max(panelA, surgeA, humanSpoken || machineActSpent ? spentZone * 0.5 : 0)
         : 0;
       rainBoost = surgeT;
 
@@ -548,9 +580,12 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
 
       const term = termRef.current;
       if (term) {
-        const live = actT > 0 && acting;
+        // The terminal only exists once the matrix panel has almost entirely
+        // covered the stage — it is the human face of the transition, not an
+        // element floating over ART COMES 1ST.
+        const live = actT > INIT_AT - 0.08 && acting;
         term.style.visibility = live ? 'visible' : 'hidden';
-        term.style.opacity = actT > 0 ? (1 - releaseT).toFixed(3) : '0';
+        term.style.opacity = actT > INIT_AT - 0.08 ? (1 - releaseT).toFixed(3) : '0';
       }
 
       if (bootTagRef.current) {
@@ -559,7 +594,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       }
 
       if (initRef.current) {
-        if (actT > 0 && speakT <= 0) {
+        if (actT > INIT_AT - 0.08 && speakT <= 0) {
           // The word decrypts out of nowhere, left to right, letters settling
           // out of glyph noise; then the dots accrue while the bar fills.
           const decodeT = clamp01(initT / 0.55);
@@ -729,6 +764,17 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
             const speedMul = 1 + rainBoost * 1.35;
             const alpha = Math.min(1, rainAlpha * (1 + rainBoost * 0.2));
             rctx.clearRect(0, 0, cw, ch);
+            // The panel is a physical blue-grey surface, not bare glyphs
+            // floating over the page. It is the reference's cold blue glass
+            // carrying the site's matrix code.
+            rctx.globalAlpha = alpha;
+            const panel = rctx.createLinearGradient(0, 0, 0, ch);
+            panel.addColorStop(0, 'rgba(8, 17, 29, 0.97)');
+            panel.addColorStop(0.5, 'rgba(17, 35, 52, 0.97)');
+            panel.addColorStop(1, 'rgba(9, 21, 36, 0.97)');
+            rctx.fillStyle = panel;
+            rctx.fillRect(0, 0, cw, ch);
+            rctx.globalAlpha = 1;
             rctx.font = `${FONT_SIZE}px "JetBrains Mono", ui-monospace, monospace`;
             rctx.textBaseline = 'top';
 
