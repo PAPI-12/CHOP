@@ -41,8 +41,8 @@ const coverOf = (img: HTMLImageElement, boxW: number, boxH: number): Cover | nul
 const EAR_U = 740 / 1920;
 const EAR_V = 680 / 1353;
 
-/** The words that fill the inside of the hero ring, big and evenly spread. */
-const RING_LINES = ['CULTURE', 'LED', 'CREATIVE'];
+/** The looping label that makes the hero ring. */
+const RING_TEXT = 'CULTURE LED CREATIVE · ';
 
 /** Eraser stroke key reserved for the cursor ring; bodies use their own keys. */
 const RING_STROKE = -1;
@@ -64,6 +64,7 @@ const HeroLetters: React.FC<{ text: string }> = ({ text }) => (
 const Hero: React.FC = () => {
   const heroRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
+  const ringSpinRef = useRef<SVGGElement>(null);
   const earringRef = useRef<HTMLDivElement>(null);
   const eraserRef = useRef<HTMLCanvasElement>(null);
   const overlayImgRef = useRef<HTMLImageElement>(null);
@@ -253,6 +254,8 @@ const Hero: React.FC = () => {
 
     let raf = 0;
     let lastT = 0;
+    let spin = 0;
+    let ringC = 0;
 
     const syncBox = () => {
       const r = hero.getBoundingClientRect();
@@ -263,38 +266,61 @@ const Hero: React.FC = () => {
     };
 
     /**
-     * The ring is sized to hold the words, not to nest inside one glyph.
+     * Ring diameter tracks the "O" of AWESOMENESS — the hero ring is the size
+     * of that counter, a small looping label, not a big stamp. The site's
+     * small lime cursor circle sits inside it.
      */
     const measureRing = () => {
-      // The ring is deliberately big now: it exists to be FILLED with the
-      // words, so it tracks the hero's scale rather than the height of one
-      // glyph. This also makes it a wider squeegee — fewer sweeps to dry the
-      // glass.
-      const size = Math.max(190, Math.min(250, Math.min(boxW, boxH) * 0.30));
-      radius = size / 2;
+      const o = hero.querySelector<HTMLElement>('[data-ring-gauge="O"]');
+      if (o) {
+        // Cap height of Inter Black is ~0.73em; that is the visual diameter of
+        // an uppercase O. Deriving it from font-size is exact, whereas the
+        // element box includes line-height leading.
+        const fs = parseFloat(getComputedStyle(o).fontSize) || 0;
+        const glyphDiameter = fs * 0.73;
+        radius = Math.max((glyphDiameter * 0.92) / 2, 26);
+      } else {
+        radius = Math.max(Math.min(boxW, boxH) * 0.045, 30);
+      }
       cursorRef.current.r = radius;
 
+      const size = Math.ceil(radius * 2);
       ring.style.width = `${size}px`;
       ring.style.height = `${size}px`;
 
       const svg = ring.querySelector('svg');
-      const words = Array.from(ring.querySelectorAll<SVGTextElement>('.hero-ring-word'));
+      const glyphs = Array.from(ring.querySelectorAll<SVGTextElement>('.hero-ring-glyph'));
       if (svg) svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
 
+      const px = Math.max(10, Math.min(20, radius * 0.34));
+      // The label loops around the invisible eraser centre — it is the ring,
+      // and there is no visible rim circle.
+      const pr = radius + px * 1.15;
       const c = size / 2;
-      if (words.length) {
-        // Three rows, each pinned to the same inner width so the block reads
-        // as one even spread inside the rim rather than an orbit.
-        const inner = radius * 1.42;
-        const fontSizes = [radius * 0.32, radius * 0.40, radius * 0.28];
-        const yOffsets = [-radius * 0.38, 0, radius * 0.38];
-        words.forEach((t, i) => {
-          const fs = fontSizes[i] || radius * 0.3;
-          t.setAttribute('font-size', String(fs));
-          t.style.fontSize = `${fs}px`;
-          t.setAttribute('y', String(c + yOffsets[i]));
-          t.setAttribute('textLength', String(inner));
-          t.setAttribute('lengthAdjust', 'spacing');
+      ringC = c;
+      if (glyphs.length) {
+        const circumference = 2 * Math.PI * pr;
+        const widths = glyphs.map((g) => {
+          g.setAttribute('font-size', String(px));
+          g.style.fontSize = `${px}px`;
+          // jsdom does not implement getComputedTextLength; browsers do. The
+          // zero-width fallback distributes glyphs evenly.
+          const len = typeof g.getComputedTextLength === 'function' ? g.getComputedTextLength() : 0;
+          return len || 0;
+        });
+        const total = widths.reduce((a, b) => a + b, 0);
+        const gap = glyphs.length > 1 ? (circumference - total) / glyphs.length : 0;
+        let arc = 0;
+        glyphs.forEach((g, i) => {
+          const mid = arc + widths[i] / 2 + gap / 2;
+          const theta = (mid / circumference) * Math.PI * 2 - Math.PI / 2;
+          const gx = c + pr * Math.cos(theta);
+          const gy = c + pr * Math.sin(theta);
+          g.setAttribute(
+            'transform',
+            `translate(${gx.toFixed(3)} ${gy.toFixed(3)}) rotate(${(theta * 180 / Math.PI + 90).toFixed(3)})`,
+          );
+          arc += widths[i];
         });
       }
     };
@@ -646,9 +672,9 @@ const Hero: React.FC = () => {
         along(pts, w * 1.6, w * 0.8, disc);
       }
 
-      /* Droplets. Dense, packed, small — the reference is covered in rough
-         beading, not a clean field of a few big circles. Baked once, so a
-         high count costs nothing per frame. */
+      /* Droplets. Dense, packed, tiny — the references are a rough pane
+         covered in thousands of beads, not a clean field of a few big
+         circles. Baked once, so the count is free per frame. */
       const drop = (x: number, y: number, r: number, el: number) => {
         const ry = r * el;
         const lit = litAt(x, y);
@@ -656,7 +682,7 @@ const Hero: React.FC = () => {
 
         f.globalCompositeOperation = 'destination-out';
         f.fillStyle = '#000';
-        f.globalAlpha = 0.14 + rnd() * 0.18;
+        f.globalAlpha = 0.12 + rnd() * 0.16;
         f.beginPath();
         f.ellipse(x, y, r, ry, 0, 0, Math.PI * 2);
         f.fill();
@@ -664,50 +690,50 @@ const Hero: React.FC = () => {
         const dark = Math.round(30 + rnd() * 26);
         f.globalCompositeOperation = 'source-atop';
         f.fillStyle = `rgb(${dark + lift},${dark + lift + 8},${dark + lift + 18})`;
-        f.globalAlpha = 0.30 + lit * 0.26 + rnd() * 0.18;
+        f.globalAlpha = 0.28 + lit * 0.26 + rnd() * 0.16;
         f.beginPath();
         f.ellipse(x, y, r, ry, 0, 0, Math.PI * 2);
         f.fill();
 
         f.globalCompositeOperation = 'source-over';
-        // Only the larger beads carry a rim; in the light shaft the rim is
-        // bright silver, in the dark corners a faint cool grey.
-        if (r > 1.8) {
+        // Larger beads carry a rim; in the light shaft it is bright silver,
+        // in the dark corners a faint cool grey.
+        if (r > 1.7) {
           f.strokeStyle = 'rgba(255,255,255,0.72)';
-          f.lineWidth = Math.max(0.35, r * 0.22);
-          f.globalAlpha = 0.07 + lit * 0.12 + rnd() * 0.07;
+          f.lineWidth = Math.max(0.32, r * 0.21);
+          f.globalAlpha = 0.06 + lit * 0.12 + rnd() * 0.06;
           f.beginPath();
           f.ellipse(x, y, r * 1.02, ry * 1.02, 0, Math.PI * 0.05, Math.PI * 0.65);
           f.stroke();
         }
-        if (r > 2.4) {
+        if (r > 2.3) {
           f.fillStyle = 'rgba(255,255,255,0.88)';
-          f.globalAlpha = (0.14 + lit * 0.18) + rnd() * 0.1;
-          disc(x - r * 0.3, y - ry * 0.34, Math.max(0.3, r * 0.16));
+          f.globalAlpha = (0.12 + lit * 0.18) + rnd() * 0.1;
+          disc(x - r * 0.3, y - ry * 0.34, Math.max(0.28, r * 0.15));
         }
       };
 
-      const scattered = Math.min(4200, Math.round((boxW * boxH) / 430));
+      const scattered = Math.min(20000, Math.round((boxW * boxH) / 110));
       for (let i = 0; i < scattered; i++) {
         const x = rnd() * boxW;
         const y = boxH * Math.pow(rnd(), 0.74);
         if (rnd() < cleared(x, y) * 3.2) continue;
         const b = rnd();
-        const r = 0.3 + b * b * b * 3.4;
-        drop(x, y, r, 1 + (r > 1.4 ? rnd() * 1.1 : rnd() * 0.3));
+        const r = 0.24 + b * b * b * 2.9;
+        drop(x, y, r, 1 + (r > 1.3 ? rnd() * 1.0 : rnd() * 0.3));
       }
 
       // And crowded along every track, the way real ones bead on a wet path.
       for (let t = 0; t < tracks.length; t++) {
         const { pts, w, len } = tracks[t];
-        const n = Math.round(len / 8);
+        const n = Math.round(len / 6);
         for (let i = 0; i < n; i++) {
           const p = pts[Math.min(pts.length - 1, Math.floor(rnd() * pts.length))];
           const b = rnd();
           drop(
             p.x + (rnd() - 0.5) * w * 4.5,
             p.y + (rnd() - 0.5) * 10,
-            0.3 + b * b * 2.4,
+            0.24 + b * b * 2.1,
             1 + rnd() * 1,
           );
         }
@@ -1010,6 +1036,15 @@ const Hero: React.FC = () => {
 
       if (!show) return;
 
+      // Gentle continuous rotation of the looping label. Rotating the group
+      // (one transform) instead of relaying out the text keeps every frame
+      // free of SVG text layout — the big lag source while sweeping.
+      spin = (spin + dt * 14) % 360;
+      ringSpinRef.current?.setAttribute(
+        'transform',
+        `rotate(${spin.toFixed(2)} ${ringC} ${ringC})`,
+      );
+
       if (pointerSeen) erase(RING_STROKE, cx, cy, radius);
     };
     raf = requestAnimationFrame(frame);
@@ -1131,12 +1166,11 @@ const Hero: React.FC = () => {
         </div>
       </div>
 
-      {/* CULTURE LED CREATIVE. One lime rim, no SVG circle/path element, and
-          the words BIG inside it, evenly spread — the ring is filled with the
-          words. The ring is still the squeegee: what it passes over it
-          clears, and since it is bigger now it dries more pane per sweep.
-          The site's own small lime cursor circle reads inside too. Only
-          rendered where there is a real cursor. */}
+      {/* CULTURE LED CREATIVE. The ring IS the label: a looping ring of the
+          words, sized to the counter of the O in AWESOMENESS, with no lime rim
+          and no second circle — the site's small lime cursor reads inside the
+          loop. The ring is still the squeegee; what it passes over it clears.
+          Only rendered where there is a real cursor. */}
       {interactive && (
         <div
           ref={ringRef}
@@ -1144,19 +1178,16 @@ const Hero: React.FC = () => {
           style={{ opacity: 0 }}
           aria-hidden
         >
-          {/* Exactly one lime rim, and the words live inside it. */}
-          <div className="hero-ring-circle absolute inset-0 rounded-full" />
           <svg width="100%" height="100%" className="absolute inset-0 overflow-visible block">
-            <g>
-              {/* Inter Black. JetBrains Mono's 700 is too narrow; Inter's 900
-                  plus the same-lime hairline stroke reads properly bold at
-                  this size. Each line is pinned to the same inner width in
-                  measureRing(), so the three rows fill the ring evenly. */}
-              {RING_LINES.map((line) => (
+            <g ref={ringSpinRef}>
+              {/* Inter Black: JetBrains Mono's 700 is too narrow for a looping
+                  label. Each glyph is placed individually around the circle
+                  (no <path> element), so the loop is seamless and rotates as
+                  one group. */}
+              {RING_TEXT.split('').map((ch, i) => (
                 <text
-                  key={line}
-                  className="hero-ring-word"
-                  x="50%"
+                  key={i}
+                  className="hero-ring-glyph"
                   fill="#d7ff4f"
                   stroke="#d7ff4f"
                   strokeWidth="0.7"
@@ -1166,7 +1197,7 @@ const Hero: React.FC = () => {
                   fontFamily="Inter, system-ui, sans-serif"
                   fontWeight="900"
                 >
-                  {line}
+                  {ch}
                 </text>
               ))}
             </g>

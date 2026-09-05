@@ -57,18 +57,19 @@ const rand = (i: number) => {
 };
 
 /* ── Timeline ══════════════════════════════════════════════════════════
-   HOME — scroll-driven, no pausing:
-     0.00 → 0.60  the five skills glide past CONTINUOUSLY (no dwell — the
-                  stack always moves with the scroll, at a deliberate pace);
-                  the motto ART COMES 1ST rises behind them and parks front
-     0.62 → 0.72  the motto encodes into brand glyphs, left to right
-     0.72 → 0.80  brownout: the power gutters and the motto dies mid-air
-     0.80         TRIGGER — from here the machine acts by itself, on a clock:
-                  INITIALIZING decrypts (1.4s), then the robot types its three
-                  lines like a person (jittered cadence, breaths between
-                  lines). Scrolling is held until the transmission is over,
-                  then the surge rains down, "continue" lights, and the pin
-                  hands off to Featured Work.
+   HOME — the boot sequence opens the section:
+     entry        the stage enters and the machine arms immediately — no skill
+                  glide first. The very first thing on the pinned stage is:
+                  WHAT I DO · INITIALIZING decrypting (1.4s)
+     T_BOOT       INITIALIZING vanishes.
+     typing       the human lines read in the same place, one after another:
+                  OH, HELLO / YOU CAN NOW CONTINUE TO FEATURED WORK /
+                  FOLLOW THE MATRIX CODE — jittered cadence, breaths between
+                  lines. Scrolling is held until the transmission is over.
+     SPEAK_END    transition: a hairline strikes, the matrix rectangle opens
+                  out of it and the surge rains down; "continue" lights, and
+                  the pin hands off to Selected Work, where the cards are cut
+                  out of the same code.
      The code never leaves this section. Whatever the matrix does, it does
      inside the stage and nowhere else on the page.
    ABOUT — never blank:
@@ -96,7 +97,7 @@ const ROBOT_LINES = [
 ];
 
 const INIT_WORD = 'INITIALIZING';
-const BOOT_TAG = 'PAPI.SYS · BOOT SEQUENCE';
+const BOOT_TAG = 'WHAT I DO';
 
 /**
  * One-shot, module-level: the robot transmission is experienced ONCE per
@@ -128,8 +129,9 @@ const buildLineSchedule = (line: string, startAt: number) => {
 
 const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' }) => {
   /**
-   * home  — skills glide → ART COMES 1ST encodes → machine wakes (auto-played,
-   *         scroll-held) → surge hands off to Featured Work, and the code
+   * home  — WHAT I DO · INITIALIZING boots first (auto-played, scroll-held),
+   *         vanishes, the human lines read in the same place, then the surge
+   *         reveals the matrix and hands off to Selected Work.
    * about — the practice only: the same glide, AI CREATIVE exits in white,
    *         then "continue" lights and Experience is pulled up. No machine.
    */
@@ -293,9 +295,11 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       // About glides through the skills and lets AI CREATIVE sail off.
       // About runs a hair past the last card so AI CREATIVE finishes its exit
       // instead of freezing half-faded for the rest of the pin.
-      const glideEnd = machineMode ? T_SKILLS_END : 0.86;
-      const glideSpan = machineMode ? N + 0.15 : N + 0.6;
-      const front = clamp01(p / glideEnd) * glideSpan;
+      const glideEnd = machineMode ? 1 : 0.86;
+      const glideSpan = machineMode ? N + 0.2 : N + 0.6;
+      // Home opens straight on the boot sequence; the skill stack is already
+      // past the front card so the stage belongs entirely to the terminal.
+      const front = machineMode ? glideSpan : clamp01(p / glideEnd) * glideSpan;
 
       const codeT =
         machineMode && p > T_CODE_START ? smoothstep((p - T_CODE_START) / (T_CODE_END - T_CODE_START)) : 0;
@@ -309,14 +313,16 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       // Fire only while the pin genuinely holds the stage (past-travel p≈1
       // means the stage is already leaving — never re-arm there), and only
       // once per visit: the transmission is never replayed on re-entry.
-      if (machineMode && actStart < 0 && !machineActSpent && p >= T_VANISH_END && p <= 0.995) {
+      // INITIALIZING is the very first thing Home shows: the act arms as soon
+      // as the pinned stage is entered, not after a skills glide.
+      if (machineMode && actStart < 0 && !machineActSpent && p >= 0.03 && p <= 0.998) {
         actStart = nowMs;
         armLock();
       }
       // Scrolled back above the trigger (or past the end) while the machine
-      // was mid-act: reset to the skills state so the section never shows a
-      // spent matrix when revisited.
-      if (machineMode && actStart > 0 && (p < T_VANISH_END - 0.05 || p > 0.995)) {
+      // was mid-act: reset so the section never shows a spent terminal when
+      // revisited mid-sequence.
+      if (machineMode && actStart > 0 && (p < 0.02 || p > 0.998)) {
         resetAct();
       }
       const actT = machineMode && actStart > 0 ? (nowMs - actStart) / 1000 : 0;
@@ -411,9 +417,9 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
 
         // Depth: > 0 means still stacked behind, 0 = front, < 0 = passed.
         let depth = i - front;
-        const isMotto = machineMode && i === N;
-        // The motto parks at the front to be encoded; it never flies past.
-        if (isMotto) depth = Math.max(depth, 0);
+        // Home no longer uses the skill glide or the motto card — the stack
+        // stays fully passed and only the boot terminal occupies the stage.
+        const isMotto = false;
 
         let scale: number;
         let opacity: number;
@@ -516,7 +522,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
         const on = i === idx;
         dot.style.transform = `scaleY(${on ? 1 : 0.25})`;
         dot.style.backgroundColor = on ? '#d7ff4f' : 'rgba(245,243,238,0.25)';
-        dot.style.opacity = String(1 - (machineMode ? vanishT : outT));
+        dot.style.opacity = machineMode ? '0' : String(1 - outT);
       }
 
       if (headerRef.current) {
@@ -529,7 +535,9 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       // now, balancing the caption below, and it melts away once the practice
       // has been walked through.
       if (cueRef.current) {
-        const o = 1 - smoothstep(
+        // The boot sequence is automatic on Home; no "scroll to move through
+        // the practice" hint while the machine is doing its first read.
+        const o = machineMode ? 0 : 1 - smoothstep(
           (p - T_CUE_FADE_START) / (T_CUE_FADE_END - T_CUE_FADE_START),
         );
         cueRef.current.style.opacity = o.toFixed(3);
@@ -571,11 +579,13 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
           }
           initRef.current.style.opacity = '1';
         } else if (actT > 0) {
-          if (initRef.current.dataset.txt !== 'BOOT_OK') {
-            initRef.current.dataset.txt = 'BOOT_OK';
-            initRef.current.textContent = `${INIT_WORD}..... OK`;
+          // Boot complete — the INITIALIZING word vanishes before the human
+          // lines read, exactly as the sequence calls for.
+          if (initRef.current.dataset.txt !== '') {
+            initRef.current.dataset.txt = '';
+            initRef.current.textContent = '';
           }
-          initRef.current.style.opacity = '0.45';
+          initRef.current.style.opacity = '0';
         } else {
           initRef.current.style.opacity = '0';
           initRef.current.dataset.txt = '';
@@ -584,7 +594,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
 
       if (barRef.current) {
         barRef.current.style.transform = `scaleX(${(speakT > 0 ? 1 : initT).toFixed(3)})`;
-        barRef.current.style.opacity = actT > 0 ? (speakT > 0 ? '0.35' : '1') : '0';
+        barRef.current.style.opacity = actT > 0 ? (speakT > 0 ? '0' : '1') : '0';
       }
 
       // Three lines, typed by their own human-rhythm schedules. The caret sits

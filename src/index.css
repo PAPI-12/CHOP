@@ -190,15 +190,9 @@ html {
 }
 
 /* ── The CULTURE LED CREATIVE ring ────────────────────────────────────
-   One lime rim, and the words are FILLED inside it — three bold lines pinned
-   to the same inner width so they read as one even block, not an orbit. The
-   site's own small lime cursor circle also reads inside the ring. */
-.hero-ring-circle {
-  border: 3px solid #d7ff4f;
-  box-shadow:
-    0 0 0 1px rgba(23, 25, 24, 0.45),
-    0 0 22px rgba(215, 255, 79, 0.3);
-}
+   The ring IS the label: CULTURE LED CREATIVE loops around the size of the O
+   in AWESOMENESS. There is no lime rim and no second circle — the site's
+   small lime cursor reads inside the loop. */
 
 /* ── The earring ───────────────────────────────────────────────────────
    A lime cross on the subject's ear. It belongs to the photograph, so it is

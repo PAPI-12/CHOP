@@ -74,26 +74,24 @@ const click = (window, el) =>
   check('lime cursor circle is above everything', (limeRing?.className || '').includes('z-[9999]'));
 
   const hero = doc.getElementById('hero');
-  const ringText = [...(hero.querySelectorAll('.hero-ring .hero-ring-word') || [])]
+  const ringText = [...(hero.querySelectorAll('.hero-ring .hero-ring-glyph') || [])]
     .map((n) => n.textContent || '').join('');
-  check('CULTURE LED CREATIVE ring is present',
-    ringText.includes('CULTURE') && ringText.includes('LED') && ringText.includes('CREATIVE'));
+  check('CULTURE LED CREATIVE ring is present', ringText.includes('CULTURE LED CREATIVE'));
   check('the magnifying glass is gone', !hero.querySelector('.hero-lens, canvas.hero-lens'));
-  check('the ring is filled with the words', ringText.replace(/\s/g, '').length >= 18);
-  check('the ring has one lime rim', !!hero.querySelector('.hero-ring .hero-ring-circle'));
+  check('the ring has no lime rim of its own', !hero.querySelector('.hero-ring .hero-ring-circle'));
   check('there is no SVG circle/path left in the ring',
     !hero.querySelector('.hero-ring circle') && !hero.querySelector('.hero-ring path'));
   check('the earring is on the photograph', !!hero.querySelector('.hero-earring'));
   window.close();
 }
 
-/* ── 2b. The ring is one lime rim filled with the words; no SVG path ── */
+/* ── 2b. The ring is a looping CULTURE LED CREATIVE label; no rim, no path ─ */
 {
   const { window } = await boot('/');
   const ring = window.document.querySelector('.hero-ring');
   const lime = /#d7ff4f|rgb\(215,\s*255,\s*79\)/i;
 
-  // Exactly one round-and-lime element: the rim. No second circle, no SVG circle.
+  // Any round-and-lime element living inside the ring, by any mechanism.
   const circles = [...ring.querySelectorAll('*')].filter((el) => {
     if (el.tagName === 'circle') return true;
     const cls = el.getAttribute('class') || '';
@@ -102,12 +100,13 @@ const click = (window, el) =>
     const isLime = lime.test(cls) || lime.test(style) || cls.includes('hero-ring-circle');
     return round && isLime;
   });
-  check('the ring contains exactly one lime circle', circles.length === 1,
+  check('the ring has no lime circle of its own', circles.length === 0,
     circles.map((c) => c.getAttribute('class') || c.tagName).join(' | ') || 'none');
   check('there is no SVG path left in the ring', !ring.querySelector('path'));
-  const words = [...ring.querySelectorAll('.hero-ring-word')];
-  check('the words fill the ring on three rows', words.length === 3,
-    words.map((w) => w.textContent).join(' / '));
+  const glyphs = [...ring.querySelectorAll('.hero-ring-glyph')];
+  const ringText = glyphs.map((g) => g.textContent || '').join('');
+  check('the ring is a looping CULTURE LED CREATIVE label',
+    ringText.includes('CULTURE LED CREATIVE'));
   check('the site lime cursor is shown over the hero',
     !!window.document.querySelector('.custom-cursor'));
 
