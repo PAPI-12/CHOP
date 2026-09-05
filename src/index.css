@@ -189,11 +189,16 @@ html {
   }
 }
 
-/* ── The CULTURE LED CREATIVE label ────────────────────────────────────
-   The ring has no lime rim, no SVG circle and no `<path>` any more: the bold
-   label is the ring's only visible body, orbiting the eraser centre. The
-   site's own lime cursor circle (see .custom-cursor) reads inside the orbit
-   and is the lime circle the hero now shows. */
+/* ── The CULTURE LED CREATIVE ring ────────────────────────────────────
+   One lime rim, and the words are FILLED inside it — three bold lines pinned
+   to the same inner width so they read as one even block, not an orbit. The
+   site's own small lime cursor circle also reads inside the ring. */
+.hero-ring-circle {
+  border: 3px solid #d7ff4f;
+  box-shadow:
+    0 0 0 1px rgba(23, 25, 24, 0.45),
+    0 0 22px rgba(215, 255, 79, 0.3);
+}
 
 /* ── The earring ───────────────────────────────────────────────────────
    A lime cross on the subject's ear. It belongs to the photograph, so it is

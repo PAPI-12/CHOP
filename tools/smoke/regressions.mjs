@@ -74,25 +74,26 @@ const click = (window, el) =>
   check('lime cursor circle is above everything', (limeRing?.className || '').includes('z-[9999]'));
 
   const hero = doc.getElementById('hero');
-  const ringText = [...(hero.querySelectorAll('.hero-ring .hero-ring-glyph') || [])]
+  const ringText = [...(hero.querySelectorAll('.hero-ring .hero-ring-word') || [])]
     .map((n) => n.textContent || '').join('');
-  check('CULTURE LED CREATIVE ring is present', ringText.includes('CULTURE LED CREATIVE'));
+  check('CULTURE LED CREATIVE ring is present',
+    ringText.includes('CULTURE') && ringText.includes('LED') && ringText.includes('CREATIVE'));
   check('the magnifying glass is gone', !hero.querySelector('.hero-lens, canvas.hero-lens'));
-  check('the ring no longer carries its own lime circle',
-    !hero.querySelector('.hero-ring .hero-ring-circle') &&
-    !hero.querySelector('.hero-ring circle') &&
-    !hero.querySelector('.hero-ring path'));
+  check('the ring is filled with the words', ringText.replace(/\s/g, '').length >= 18);
+  check('the ring has one lime rim', !!hero.querySelector('.hero-ring .hero-ring-circle'));
+  check('there is no SVG circle/path left in the ring',
+    !hero.querySelector('.hero-ring circle') && !hero.querySelector('.hero-ring path'));
   check('the earring is on the photograph', !!hero.querySelector('.hero-earring'));
   window.close();
 }
 
-/* ── 2b. The ring now has no lime circle and no SVG path; label is bold ─ */
+/* ── 2b. The ring is one lime rim filled with the words; no SVG path ── */
 {
   const { window } = await boot('/');
   const ring = window.document.querySelector('.hero-ring');
   const lime = /#d7ff4f|rgb\(215,\s*255,\s*79\)/i;
 
-  // Anything round-and-lime living inside the ring, by any mechanism.
+  // Exactly one round-and-lime element: the rim. No second circle, no SVG circle.
   const circles = [...ring.querySelectorAll('*')].filter((el) => {
     if (el.tagName === 'circle') return true;
     const cls = el.getAttribute('class') || '';
@@ -101,10 +102,13 @@ const click = (window, el) =>
     const isLime = lime.test(cls) || lime.test(style) || cls.includes('hero-ring-circle');
     return round && isLime;
   });
-  check('the ring contains no lime circle', circles.length === 0,
+  check('the ring contains exactly one lime circle', circles.length === 1,
     circles.map((c) => c.getAttribute('class') || c.tagName).join(' | ') || 'none');
   check('there is no SVG path left in the ring', !ring.querySelector('path'));
-  check('the lime cursor circle is the site cursor, shown over the hero',
+  const words = [...ring.querySelectorAll('.hero-ring-word')];
+  check('the words fill the ring on three rows', words.length === 3,
+    words.map((w) => w.textContent).join(' / '));
+  check('the site lime cursor is shown over the hero',
     !!window.document.querySelector('.custom-cursor'));
 
   const text = ring.querySelector('text');
