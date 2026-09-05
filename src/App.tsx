@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useEffect, useLayoutEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Link } from 'react-router-dom';
 import { MouseProvider } from './context/MouseContext';
 import { useSmoothScroll } from './hooks/useSmoothScroll';
@@ -22,9 +22,53 @@ const Resume = lazy(() => import('./pages/Resume'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 
+/**
+ * Open a page at the top of it. Every time, on every route.
+ *
+ * A single `scrollTo(0, 0)` in an effect is not enough, and the failure is
+ * quiet: you click Louis Vuitton, and land half way down it.
+ *
+ *  - The browser's own `scrollRestoration` is "auto" by default and will put
+ *    the offset back after our effect has run.
+ *  - Route chunks are lazy. At the moment the pathname changes the incoming
+ *    page is still a short Suspense fallback; the real, tall page mounts a
+ *    frame or two later, and the offset has to be re-asserted once it has.
+ *  - Any stray `scroll-behavior: smooth` on the document turns the jump into
+ *    an animation that the very next render interrupts. We force `auto` for
+ *    the duration of the jump rather than trusting no one has set it.
+ */
 const ScrollToTop: React.FC = () => {
   const { pathname } = useLocation();
-  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+
+  useLayoutEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    const jump = () => {
+      const root = document.documentElement;
+      const prev = root.style.scrollBehavior;
+      root.style.scrollBehavior = 'auto';
+      window.scrollTo(0, 0);
+      root.style.scrollBehavior = prev;
+    };
+    // Immediately, and then re-asserted across the lazy route's mount so a
+    // page that lengthens after the first jump can never leave you mid-page.
+    jump();
+    const raf = requestAnimationFrame(jump);
+    const settle = window.setTimeout(jump, 140);
+    const late = window.setTimeout(jump, 520);
+    const later = window.setTimeout(jump, 1100);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(settle);
+      window.clearTimeout(late);
+      window.clearTimeout(later);
+    };
+  }, [pathname]);
+
   return null;
 };
 

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useScrollLock } from "../../hooks/useScrollLock";
 
 type Props = {
   isOpen: boolean;
@@ -25,15 +26,13 @@ const responsibilities = [
 ];
 
 export default function RoleModal({ isOpen, onClose }: Props) {
+  useScrollLock(isOpen);
+
   useEffect(() => {
     if (!isOpen) return;
     const h = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", h);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", h);
-      document.body.style.overflow = "";
-    };
+    return () => window.removeEventListener("keydown", h);
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { gallery } from "./data/gallery";
+import { useScrollLock } from "../../hooks/useScrollLock";
 
 const LV = ({ className = "" }: { className?: string }) => (
   <span
@@ -74,6 +75,10 @@ const Hero = () => {
 
 const Lookbook = () => {
   const [active, setActive] = useState<number | null>(null);
+  // While the lightbox is open the page behind must not scroll or move under
+  // it — that movement is what used to make the viewer feel like it had
+  // jumped somewhere you then have to scroll back to.
+  useScrollLock(active !== null);
 
   return (
     <section id="lv-lookbook" className="bg-[#0e0c0a] py-10 md:py-14">

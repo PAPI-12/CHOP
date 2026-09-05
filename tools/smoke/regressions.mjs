@@ -63,7 +63,8 @@ const click = (window, el) =>
   window.close();
 }
 
-/* ── 2. The lime cursor, the lens and the earring all exist ────────── */
+/* ── 2. The limes CULTURE LED CREATIVE ring, the one circle and the
+       earring all exist; the magnifying glass is gone ───────────────── */
 {
   const { window } = await boot('/');
   const doc = window.document;
@@ -75,8 +76,8 @@ const click = (window, el) =>
   const hero = doc.getElementById('hero');
   check('CULTURE LED CREATIVE ring is present',
     (hero.querySelector('.hero-ring textPath')?.textContent || '').includes('CULTURE LED CREATIVE'));
-  check('the ring has a magnifier lens', !!hero.querySelector('.hero-ring canvas.hero-lens'));
-  check('the lens has a lime rim', !!hero.querySelector('.hero-ring .hero-lens-rim'));
+  check('the magnifying glass is gone', !hero.querySelector('.hero-lens, canvas.hero-lens'));
+  check('the ring carries one lime circle', !!hero.querySelector('.hero-ring .hero-ring-circle'));
   check('the earring is on the photograph', !!hero.querySelector('.hero-earring'));
   window.close();
 }
@@ -93,7 +94,7 @@ const click = (window, el) =>
     const cls = el.getAttribute('class') || '';
     const style = el.getAttribute('style') || '';
     const round = /rounded-full/.test(cls) || /border-radius:\s*(50%|9999px)/.test(style);
-    const isLime = lime.test(cls) || lime.test(style) || cls.includes('hero-lens-rim');
+    const isLime = lime.test(cls) || lime.test(style) || cls.includes('hero-ring-circle');
     return round && isLime;
   });
   check('the ring contains exactly one lime circle', circles.length === 1,
@@ -102,8 +103,11 @@ const click = (window, el) =>
     !!window.document.querySelector('.custom-cursor'));
 
   const text = ring.querySelector('text');
-  check('CULTURE LED CREATIVE is bold', text?.getAttribute('font-weight') === '700',
-    text?.getAttribute('font-weight') || 'unset');
+  const weight = Number(text?.getAttribute('font-weight'));
+  check('CULTURE LED CREATIVE is bold', weight >= 700, String(weight || 'unset'));
+  check('the label is set in a family that has a real heavy weight',
+    /Inter/.test(text?.getAttribute('font-family') || ''),
+    text?.getAttribute('font-family') || 'unset');
   window.close();
 }
 
@@ -115,10 +119,109 @@ const click = (window, el) =>
   check('mobile has no steam overlay at all',
     !hero.querySelector('.hero-glass-static') && hero.querySelectorAll('canvas').length === 0,
     `${hero.querySelectorAll('canvas').length} canvas`);
-  check('mobile has no magnifier ring', !hero.querySelector('.hero-ring'));
+  check('mobile has no CULTURE LED CREATIVE ring', !hero.querySelector('.hero-ring'));
   check('mobile still wears the earring', !!hero.querySelector('.hero-earring'));
   check('mobile hero throws nothing', errors.length === 0, errors[0] || '');
   window.close();
+}
+
+/* ── 2d. The Audi case study does not shift when a piece is opened ─── */
+{
+  const { window, errors } = await boot('/work/audi');
+  const doc = window.document;
+  const body = doc.body;
+  const padBefore = body.style.paddingRight;
+  const tiles = [...doc.querySelectorAll('.audi-img-zoom')];
+  check('the Audi grid renders clickable pieces', tiles.length >= 10, `${tiles.length} tiles`);
+  check('a piece is reachable by keyboard',
+    tiles.every((t) => t.getAttribute('role') === 'button' && t.getAttribute('tabindex') === '0'));
+  const tile = tiles[1];
+
+  click(window, tile);
+  await wait(300);
+  const modal = doc.querySelector('.audi-slide-up');
+  check('clicking a piece opens the viewer', !!modal);
+  check('the page behind is locked while it is open', body.style.overflow === 'hidden',
+    body.style.overflow || 'unset');
+
+  const column = modal?.querySelector('.overflow-y-auto');
+  check('the caption column scrolls instead of being clipped', !!column);
+
+  const closeBtn = [...(modal?.querySelectorAll('button') || [])]
+    .find((b) => /close/i.test(b.textContent || ''));
+  click(window, closeBtn);
+  await wait(300);
+  check('closing restores the page exactly as it was',
+    body.style.overflow === '' && body.style.paddingRight === padBefore,
+    `overflow=${JSON.stringify(body.style.overflow)} pad=${JSON.stringify(body.style.paddingRight)}`);
+  check('opening and closing a piece throws nothing', errors.length === 0, errors[0] || '');
+  window.close();
+}
+
+/* ── 2da. The LV lightbox opens in-place and never scrolls the page ── */
+{
+  const { window, errors, scrolledTo } = await boot('/work/louis-vuitton');
+  const doc = window.document;
+  const body = doc.body;
+  const tiles = [...doc.querySelectorAll('button')].filter((b) => /frame|lookbook|outlaw|estate|pass/i.test(b.textContent || ''));
+  const tile = tiles[0] || [...doc.querySelectorAll('button')][3];
+  const scrollBefore = scrolledTo();
+  click(window, tile);
+  await wait(300);
+  const lightbox = doc.querySelector('.fixed.inset-0');
+  check('clicking an LV frame opens the lightbox', !!lightbox);
+  check('the page behind the LV lightbox is locked',
+    body.style.overflow === 'hidden', body.style.overflow || 'unset');
+  check('opening the LV lightbox leaves the route at the top',
+    scrolledTo() === 0 && window.location.pathname === '/work/louis-vuitton',
+    `path=${window.location.pathname} scrollY=${scrolledTo()}`);
+  check('opening the LV lightbox throws nothing', errors.length === 0, errors[0] || '');
+  window.close();
+}
+
+/* ── 2db. The route reveal never leaves a blank screen ─────────────── */
+{
+  const css = fs.readFileSync(new URL('../../src/index.css', import.meta.url), 'utf8');
+  check('the route reveal starts near-visible, never blank',
+    /page-enter[\s\S]{0,120}opacity:\s*0\.8/.test(css));
+  check('the route reveal does not create a transformed containing block',
+    !/@keyframes page-enter[\s\S]{0,180}transform:/.test(css));
+}
+
+/* ── 2e. The scrollbar can never take the layout with it ───────────── */
+{
+  const css = fs.readFileSync(new URL('../../src/index.css', import.meta.url), 'utf8');
+  check('the scrollbar gutter is reserved permanently',
+    /html\s*\{[^}]*scrollbar-gutter:\s*stable/.test(css));
+
+  const dir = new URL('../../src/', import.meta.url);
+  const walk = (u) => fs.readdirSync(u, { withFileTypes: true }).flatMap((d) =>
+    d.isDirectory() ? walk(new URL(d.name + '/', u)) : [new URL(d.name, u)]);
+  const offenders = walk(dir)
+    .filter((u) => /\.tsx?$/.test(u.pathname) && !/useScrollLock/.test(u.pathname))
+    .filter((u) => /body\.style\.overflow/.test(fs.readFileSync(u, 'utf8')))
+    .map((u) => u.pathname.split('/src/')[1]);
+  check('every scroll lock goes through the compensating hook',
+    offenders.length === 0, offenders.join(', '));
+}
+
+/* ── 2f. The pane is a field, and there is no flour in it ──────────── */
+{
+  const hero = fs.readFileSync(new URL('../../src/components/Hero.tsx', import.meta.url), 'utf8');
+  const fog = hero.slice(hero.indexOf('const buildFog'), hero.indexOf('const paintOverlay'));
+
+  // The single-pixel frost pass. It is what read as flour, and nothing on a
+  // real pane looks like it.
+  check('no single-pixel frost speckle',
+    !/fillRect\([^)]*rnd\(\)[^)]*,\s*1,\s*1\)/.test(hero) && !/flecks/.test(hero));
+
+  // A constant alpha is what makes an overlay feel like a solid panel, so the
+  // density has to come from a computed field, not a gradient stop.
+  check('the pane density is a computed field',
+    /createImageData/.test(fog) && /octaves/.test(fog));
+  check('the field has soft blooms where the fog has cleared', /blooms/.test(fog));
+  check('water is a dark lens, not a hole in the glass',
+    /source-atop/.test(fog) && /destination-out/.test(fog));
 }
 
 /* ── 3. The wordmark goes to the hero and nowhere else ─────────────── */
@@ -142,6 +245,51 @@ const click = (window, el) =>
     window.location.pathname === '/' && scrolledTo() === 0,
     `path=${window.location.pathname} scrollY=${scrolledTo()}`);
   window.close();
+}
+
+/* ── 3b. A case study opens at the top of itself ───────────────────── */
+{
+  const { window, scrolledTo } = await boot('/work');
+  const doc = window.document;
+  // Deep down the Work index, the way anyone actually is when they click.
+  Object.defineProperty(window, 'scrollY', { value: 3200, configurable: true, writable: true });
+
+  const targets = ['/work/louis-vuitton', '/work/audi'];
+  for (const href of targets) {
+    const link = [...doc.querySelectorAll('a')].find((a) => a.getAttribute('href') === href);
+    if (!link) { check(`link to ${href} exists`, false); continue; }
+    click(window, link);
+    await wait(400);
+    check(`${href} opens at the top, not mid-page`,
+      window.location.pathname === href && scrolledTo() === 0,
+      `path=${window.location.pathname} scrollY=${scrolledTo()}`);
+    Object.defineProperty(window, 'scrollY', { value: 2400, configurable: true, writable: true });
+    window.history.back();
+    await wait(300);
+  }
+  window.close();
+}
+
+/* ── 3c. No case study may change scrolling for the whole site ─────── */
+{
+  const dir = new URL('../../src/', import.meta.url);
+  const walk = (u) => fs.readdirSync(u, { withFileTypes: true }).flatMap((d) =>
+    d.isDirectory() ? walk(new URL(d.name + '/', u)) : [new URL(d.name, u)]);
+  const offenders = walk(dir)
+    .filter((u) => /\.tsx?$/.test(u.pathname))
+    .filter((u) => fs.readFileSync(u, 'utf8')
+      .split('\n')
+      .some((l) => /documentElement\.style\.scrollBehavior/.test(l)
+        && !/^\s*(\/\/|\*|\/\*)/.test(l)))
+    .map((u) => u.pathname.split('/src/')[1]);
+  check('no page sets scroll-behavior on the document', offenders.length === 0,
+    offenders.join(', '));
+
+  const app = fs.readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+  check('scroll restoration is taken off the browser',
+    /scrollRestoration\s*=\s*'manual'/.test(app));
+  check('the jump is re-asserted after the lazy chunk paints',
+    /requestAnimationFrame\(jump\)/.test(app));
 }
 
 /* ── 4. The matrix lives in exactly two places ─────────────────────── */

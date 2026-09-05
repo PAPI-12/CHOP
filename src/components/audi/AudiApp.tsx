@@ -155,9 +155,21 @@ function Tile({
   children?: React.ReactNode;
 }) {
   return (
+    // A tile is a control, so it answers to the keyboard as well as the
+    // mouse. role + tabIndex rather than a real <button> so the grid's
+    // sizing is untouched.
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`View ${item.label}`}
       className={`relative overflow-hidden cursor-pointer audi-img-zoom group ${className}`}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
     >
       <img
         src={item.src}

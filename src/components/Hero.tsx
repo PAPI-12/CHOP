@@ -7,10 +7,10 @@ import { useHeroPhysics, type HeroCursor } from '../hooks/useHeroPhysics';
 /**
  * Where `object-fit: cover` has actually put the photograph inside a box.
  *
- * Both the magnifier and the earring need to convert a point on the
- * photograph into a point on screen, and the answer depends on the crop. Read
- * `object-position` rather than assuming centre, so the CSS stays the single
- * source of truth — including the mobile override.
+ * The earring needs to convert a point on the photograph into a point on
+ * screen, and the answer depends on the crop. Read `object-position` rather
+ * than assuming centre, so the CSS stays the single source of truth —
+ * including the mobile override.
  */
 type Cover = { ox: number; oy: number; dw: number; dh: number; scale: number };
 const coverOf = (img: HTMLImageElement, boxW: number, boxH: number): Cover | null => {
@@ -30,8 +30,10 @@ const coverOf = (img: HTMLImageElement, boxW: number, boxH: number): Cover | nul
   return { ox: (boxW - dw) * (posX / 100), oy: (boxH - dh) * (posY / 100), dw, dh, scale };
 };
 
-/** The stud, in normalised photograph coordinates: the centre of his lobe. */
-const EAR_U = 0.51;
+/** The stud, in normalised photograph coordinates: the centre of his lobe.
+    Re-derived when the plate was re-cropped to centre him — the old 0.51 was
+    measured against a frame that started 600px further left. */
+const EAR_U = 0.38;
 const EAR_V = 0.4875;
 
 const RING_WORD = 'CULTURE LED CREATIVE';
@@ -65,7 +67,6 @@ const Hero: React.FC = () => {
   const heroRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
   const ringSpinRef = useRef<SVGGElement>(null);
-  const lensRef = useRef<HTMLCanvasElement>(null);
   const earringRef = useRef<HTMLDivElement>(null);
   const eraserRef = useRef<HTMLCanvasElement>(null);
   const overlayImgRef = useRef<HTMLImageElement>(null);
@@ -94,10 +95,10 @@ const Hero: React.FC = () => {
   /**
    * Is this the web version?
    *
-   * The steam, the magnifier and the wipe are one desktop feature, gated
-   * together. A fine pointer that can hover, no reduced-motion preference,
-   * and a viewport wide enough to be a computer. Anything else — every
-   * phone, every tablet — gets the photograph, clean, on landing.
+   * The steam and the wipe are one desktop feature, gated together. A fine
+   * pointer that can hover, no reduced-motion preference, and a viewport wide
+   * enough to be a computer. Anything else — every phone, every tablet — gets
+   * the photograph, clean, on landing.
    *
    * This re-evaluates, because a desktop browser dragged narrow and back is
    * the cheapest way to end up with a fogged pane and no way to clear it.
@@ -270,20 +271,6 @@ const Hero: React.FC = () => {
       ring.style.width = `${size}px`;
       ring.style.height = `${size}px`;
 
-      // The lens buffer. This one DOES want real pixels — it is showing the
-      // photograph magnified, so softness here would defeat the whole point.
-      const lens = lensRef.current;
-      if (lens) {
-        const ldpr = Math.min(window.devicePixelRatio || 1, 2);
-        const px = Math.max(1, Math.floor(size * ldpr));
-        if (lens.width !== px || lens.height !== px) {
-          lens.width = px;
-          lens.height = px;
-        }
-        lens.style.width = `${size}px`;
-        lens.style.height = `${size}px`;
-      }
-
       const svg = ring.querySelector('svg');
       const path = ring.querySelector('path');
       const text = ring.querySelector('text');
@@ -294,9 +281,9 @@ const Hero: React.FC = () => {
       if (svg) svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
       if (path) {
         const px = Math.max(10, Math.min(20, radius * 0.34));
-        // The label now orbits OUTSIDE the lens rather than inside it —
-        // the glass needs its whole diameter to magnify with, and the words
-        // reading around the rim is what makes it a lens and not a hole.
+        // The label now orbits OUTSIDE the circle rather than inside it —
+        // the glass needs its whole diameter to live in, and the words
+        // reading around the rim is what makes it a cursor and not a hole.
         const pr = radius + px * 1.15;
         const c = size / 2;
         ringC = c;
@@ -325,7 +312,7 @@ const Hero: React.FC = () => {
      *
      * A sheet of cold glass someone has been breathing on: milky, beaded
      * with condensation, and cut through by runnels where water has already
-     * tracked down it. The cursor lens and every displaced letter squeegee
+     * tracked down it. The cursor ring and every displaced letter squeegee
      * it away, and the sharp portrait shows through where you have wiped.
      *
      * The whole pane is rendered ONCE into an offscreen tile. Every later
@@ -343,33 +330,42 @@ const Hero: React.FC = () => {
     /**
      * The pane is built in two stages, and the reason is the first paint.
      *
-     * The detailed tile is roughly fourteen thousand draw operations — every
-     * fleck, bead and runnel. That is nothing per frame (it is baked ONCE and
-     * only ever composited afterwards) but it is very much something to run
-     * inside the first frame of the site, which is the one frame that must
-     * not stutter.
+     * A constant alpha is what makes an overlay feel like a solid panel laid
+     * over a photograph — so the detailed tile is a computed *field*, not a
+     * gradient. That is nothing per frame (it is baked ONCE and only ever
+     * composited afterwards) but it is very much something to run inside the
+     * first frame of the site.
      *
-     * So: `paintOverlay` lays down the flat misted pane synchronously — one
-     * gradient, instant, and visually almost identical — and the beads and
-     * runnels are rendered on the next idle callback and swapped in. Nobody
-     * can tell, and the hero opens clean.
+     * So: `paintOverlay` lays down a flat misted pane synchronously — one
+     * gradient at roughly the field's average density, instant — and the real
+     * field, the beads and the runnels are rendered on the next idle callback
+     * and swapped in. Nobody can tell, and the hero opens clean.
      */
     let fogDetailed = false;
     /** True the moment the visitor clears any glass at all. */
     let wiped = false;
 
+    /**
+     * The stand-in pane, drawn synchronously so the hero is never briefly
+     * unfogged. Deliberately a plain gradient at roughly the field's average
+     * density — it is on screen for one idle callback at most.
+     */
     const paneGradient = (f: CanvasRenderingContext2D) => {
+      // A thin, translucent haze — not a solid sheet. The photograph must stay
+      // legible behind it from the first frame, and the dense detail is added
+      // by buildFog() a moment later.
       const sheet = f.createLinearGradient(0, 0, 0, boxH);
-      sheet.addColorStop(0, 'rgba(108,116,119,0.93)');
-      sheet.addColorStop(0.45, 'rgba(90,97,100,0.94)');
-      sheet.addColorStop(1, 'rgba(60,66,68,0.95)');
+      sheet.addColorStop(0, 'rgba(246,247,246,0.25)');
+      sheet.addColorStop(0.45, 'rgba(242,243,242,0.30)');
+      sheet.addColorStop(1, 'rgba(234,236,235,0.36)');
       f.fillStyle = sheet;
       f.fillRect(0, 0, boxW, boxH);
 
+      // Keeps the cream type legible without flattening the pane.
       const grade = f.createLinearGradient(0, 0, 0, boxH);
-      grade.addColorStop(0, 'rgba(23,25,24,0.26)');
-      grade.addColorStop(0.36, 'rgba(23,25,24,0.18)');
-      grade.addColorStop(1, 'rgba(23,25,24,0.62)');
+      grade.addColorStop(0, 'rgba(20,22,21,0.08)');
+      grade.addColorStop(0.36, 'rgba(20,22,21,0.05)');
+      grade.addColorStop(1, 'rgba(20,22,21,0.16)');
       f.fillStyle = grade;
       f.fillRect(0, 0, boxW, boxH);
     };
@@ -386,186 +382,288 @@ const Hero: React.FC = () => {
       f.globalAlpha = 1;
       f.clearRect(0, 0, boxW, boxH);
 
-      const rnd = seeded(9187 + Math.round(boxW) * 31 + Math.round(boxH));
+      const rnd = seeded(20259 + Math.round(boxW) * 31 + Math.round(boxH));
       fogDetailed = true;
 
-      /* ── 1. The pane ────────────────────────────────────────────────
-         Cold misted glass. There is no photograph baked in here: the
-         steam is its own material, so what you are looking at before you
-         wipe is a genuinely fogged window rather than a filter over the
-         portrait. */
-      const sheet = f.createLinearGradient(0, 0, 0, boxH);
-      sheet.addColorStop(0, 'rgba(108,116,119,0.93)');
-      sheet.addColorStop(0.45, 'rgba(90,97,100,0.94)');
-      sheet.addColorStop(1, 'rgba(60,66,68,0.95)');
-      f.fillStyle = sheet;
-      f.fillRect(0, 0, boxW, boxH);
+      /* ── 1. The condensation field ─────────────────────────────────
+         Not a sheet. A constant alpha is what makes an overlay feel like a
+         solid panel laid over a photograph, and no amount of texture on top
+         of it repairs that.
 
-      // Where the mist gathered thickest. Broad, soft, deliberately uneven.
-      for (let i = 0; i < 9; i++) {
-        const px = (0.06 + rnd() * 0.88) * boxW;
-        const py = (0.04 + rnd() * 0.9) * boxH;
-        const rad = Math.max(boxW, boxH) * (0.16 + rnd() * 0.3);
-        const g = f.createRadialGradient(px, py, 0, px, py, rad);
-        const a = 0.05 + rnd() * 0.07;
-        g.addColorStop(0, `rgba(214,230,236,${a.toFixed(3)})`);
-        g.addColorStop(0.55, `rgba(214,230,236,${(a * 0.42).toFixed(3)})`);
-        g.addColorStop(1, 'rgba(214,230,236,0)');
-        f.fillStyle = g;
-        f.fillRect(0, 0, boxW, boxH);
-      }
+         Real breath-fog is thick where the air was wettest and thin where
+         warmth has eaten it away. Density is four octaves of smoothstep
+         value noise, curved to push the midtones apart, minus soft blooms
+         where the fog has cleared — including a deliberate one over the
+         subject's face, because a face radiates heat and the glass in front
+         of a face is always the first thing to go.
 
-      /* ── 2. Frost ──────────────────────────────────────────────────
-         The tooth of the mist: single-pixel flecks, baked once, which is
-         what stops the pane reading as a flat grey rectangle. */
-      const flecks = Math.min(9000, Math.round((boxW * boxH) / 240));
-      for (let i = 0; i < flecks; i++) {
-        f.globalAlpha = 0.012 + rnd() * 0.05;
-        f.fillStyle = rnd() > 0.4 ? '#ecf6fa' : '#96a6ac';
-        f.fillRect(rnd() * boxW, rnd() * boxH, 1, 1);
-      }
-      f.globalAlpha = 1;
+         Strictly neutral: thick condensation is white, thin is a pale grey.
+         The glass tints nothing. */
+      const FIELD = 4;
+      const fw = Math.max(2, Math.ceil(boxW / FIELD));
+      const fh = Math.max(2, Math.ceil(boxH / FIELD));
 
-      /* ── 3. Runnels ────────────────────────────────────────────────
-         Water that has already tracked down the pane.
-
-         The important discovery here: a runnel must NOT punch a hole
-         through the mist. Clearing it right down to the photograph makes
-         the channel pick up whatever is behind — over the subject's face
-         that is skin tone, and the pane instantly reads as grime rather
-         than water. So a runnel only THINS the mist, and what makes it
-         legible as water is a pair of lit shoulders either side of it.
-         Water on glass is a lens, not a window. */
-      type Pt = { x: number; y: number };
-
-      const tapered = (
-        pts: Pt[], w0: number, w1: number, alpha: number, erase2: boolean, offset = 0,
+      const smooth = (t: number) => t * t * (3 - 2 * t);
+      const lattice = (cols: number, rows: number) => {
+        const g = new Float32Array((cols + 1) * (rows + 1));
+        for (let i = 0; i < g.length; i++) g[i] = rnd();
+        return g;
+      };
+      const sampleAt = (
+        g: Float32Array, cols: number, rows: number, u: number, v: number,
       ) => {
-        f.globalCompositeOperation = erase2 ? 'destination-out' : 'source-over';
-        f.globalAlpha = alpha;
-        f.strokeStyle = erase2 ? '#000' : 'rgba(242,250,252,1)';
-        f.lineCap = 'round';
-        f.lineJoin = 'round';
-        // Canvas cannot taper a single stroke, so the run is drawn as a
-        // chain of short segments whose width narrows toward the tail —
-        // which is how a real trickle thins out as it loses water.
+        const x = u * cols;
+        const y = v * rows;
+        const x0 = Math.min(Math.floor(x), cols - 1);
+        const y0 = Math.min(Math.floor(y), rows - 1);
+        const sx = smooth(x - x0);
+        const sy = smooth(y - y0);
+        const row = cols + 1;
+        const a = g[y0 * row + x0];
+        const b = g[y0 * row + x0 + 1];
+        const c = g[(y0 + 1) * row + x0];
+        const d = g[(y0 + 1) * row + x0 + 1];
+        return (a + (b - a) * sx) * (1 - sy) + (c + (d - c) * sx) * sy;
+      };
+
+      const octaves: Array<[number, number, number, Float32Array]> = [
+        [2, 2, 0.58, lattice(2, 2)],
+        [5, 3, 0.25, lattice(5, 3)],
+        [11, 7, 0.12, lattice(11, 7)],
+        [23, 15, 0.05, lattice(23, 15)],
+      ];
+
+      const blooms: Array<[number, number, number, number]> = [];
+      for (let i = 0; i < 5; i++) {
+        blooms.push([
+          rnd() * boxW,
+          boxH * (0.15 + rnd() * 0.7),
+          Math.max(boxW, boxH) * (0.13 + rnd() * 0.18),
+          0.12 + rnd() * 0.16,
+        ]);
+      }
+      blooms.push([boxW * 0.5, boxH * 0.33, Math.max(boxW, boxH) * 0.44, 0.34]);
+
+      /** How much the blooms have cleared the glass at a point, 0-1. */
+      const cleared = (x: number, y: number) => {
+        let c = 0;
+        for (let b = 0; b < blooms.length; b++) {
+          const [bx, by, brad, bstr] = blooms[b];
+          const dx = x - bx;
+          const dy = (y - by) * 1.35;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < brad * brad) {
+            const k = 1 - Math.sqrt(d2) / brad;
+            c += bstr * k * k;
+          }
+        }
+        return c;
+      };
+
+      const small = document.createElement('canvas');
+      small.width = fw;
+      small.height = fh;
+      const sctx = small.getContext('2d');
+      if (!sctx) return;
+      const buf = sctx.createImageData(fw, fh);
+      const px32 = buf.data;
+
+      for (let fy = 0; fy < fh; fy++) {
+        const v = fy / (fh - 1);
+        const y = fy * FIELD;
+        const vert = 1.05 - 0.13 * smooth(Math.min(1, Math.max(0, (v - 0.25) / 0.6)));
+        for (let fx = 0; fx < fw; fx++) {
+          const u = fx / (fw - 1);
+          let n = 0;
+          for (let o = 0; o < octaves.length; o++) {
+            const [c, r, amp, g] = octaves[o];
+            n += sampleAt(g, c, r, u, v) * amp;
+          }
+          n = Math.min(1, Math.max(0, (n - 0.5) * 1.9 + 0.5));
+
+          const x = fx * FIELD;
+          let a = (0.16 + n * 0.30) * vert;
+          a *= 1 - Math.min(0.9, cleared(x, y) * 1.15);
+          a = Math.min(0.62, Math.max(0.07, a));
+
+          const k = (a - 0.07) / 0.55;
+          const tone = 224 + 26 * k;
+          const o4 = (fy * fw + fx) * 4;
+          px32[o4] = tone;
+          px32[o4 + 1] = tone;
+          px32[o4 + 2] = tone;
+          px32[o4 + 3] = a * 255;
+        }
+      }
+      sctx.putImageData(buf, 0, 0);
+      f.imageSmoothingEnabled = true;
+      f.imageSmoothingQuality = 'high';
+      f.drawImage(small, 0, 0, boxW, boxH);
+
+      /* ── 2. Water ──────────────────────────────────────────────────
+         A drop of water on glass is a LENS, not a hole.
+
+         That distinction decides everything here. Punch a hole and you show
+         whatever is behind — over a pale wall the drop vanishes, over a face
+         it shows skin and reads as a stain. Water refracts light away from
+         the viewer, which is why the water in the reference photograph is
+         DARK against a bright misted pane whatever is behind it. So every
+         drop and every runnel does three things: it thins the mist a little,
+         it tints what is left toward neutral graphite, and it catches a rim
+         of light. The tint is what keeps them neutral wherever they fall. */
+
+      /** Walk a point list as short segments of interpolated width. */
+      type Pt = { x: number; y: number };
+      const along = (
+        pts: Pt[], w0: number, w1: number,
+        paint: (x: number, y: number, r: number) => void,
+      ) => {
         for (let i = 0; i < pts.length - 1; i++) {
-          const t = i / (pts.length - 1);
-          f.lineWidth = Math.max(0.4, w0 + (w1 - w0) * t);
-          f.beginPath();
-          f.moveTo(pts[i].x + offset, pts[i].y);
-          f.lineTo(pts[i + 1].x + offset, pts[i + 1].y);
-          f.stroke();
+          const a = pts[i];
+          const b = pts[i + 1];
+          const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 2));
+          for (let s = 0; s <= steps; s++) {
+            const t = (i + s / steps) / (pts.length - 1);
+            paint(
+              a.x + (b.x - a.x) * (s / steps),
+              a.y + (b.y - a.y) * (s / steps),
+              (w0 + (w1 - w0) * t) / 2,
+            );
+          }
         }
       };
 
-      const tracks: { pts: Pt[]; w: number }[] = [];
-      const runs = Math.max(5, Math.round(boxW / 115));
+      const disc = (x: number, y: number, r: number) => {
+        f.beginPath();
+        f.arc(x, y, r, 0, Math.PI * 2);
+        f.fill();
+      };
+
+      /* Runnels — wide bands, because a wide dark channel reads as water and
+         a thin one reads as a stain on the glass. */
+      const tracks: Array<{ pts: Pt[]; w: number; len: number }> = [];
+      const runs = Math.max(6, Math.round(boxW / 125));
       for (let i = 0; i < runs; i++) {
-        const x = rnd() * boxW;
-        const top = rnd() * boxH * 0.3;
-        const len = boxH * (0.22 + rnd() * 0.78);
-        const w = 1.4 + rnd() * 3.2;
-        const wob = 2 + rnd() * 6;
+        let x = rnd() * boxW;
+        // Never straight down his face.
+        if (x > 0.36 * boxW && x < 0.64 * boxW) {
+          const k = (x - 0.36 * boxW) / (0.28 * boxW);
+          x = rnd() < 0.5 ? k * 0.36 * boxW : boxW - k * 0.36 * boxW;
+        }
+        const top = -boxH * 0.05 + rnd() * boxH * 0.2;
+        const len = boxH * (0.4 + rnd() * 0.7);
+        const w = Math.max(3, (5 + rnd() * 9) * (boxW / 900));
+        const wob = 3 + rnd() * 9;
         const phase = rnd() * 6.28;
         const drift = (rnd() - 0.5) * 0.05;
-
         const pts: Pt[] = [];
-        for (let s2 = 0; s2 <= 22; s2++) {
-          const t = s2 / 22;
+        for (let s = 0; s < 29; s++) {
+          const t = s / 28;
           pts.push({
-            x: x + Math.sin(t * 5.5 + phase) * wob + t * len * drift,
+            x: x + Math.sin(t * 4.4 + phase) * wob + t * len * drift,
             y: top + len * t,
           });
         }
+        tracks.push({ pts, w, len });
 
-        // A wide, barely-there halo of thinned mist…
-        tapered(pts, w * 3.2, w * 1.7, 0.05 + rnd() * 0.05, true);
-        // …the channel itself…
-        tapered(pts, w, w * 0.45, 0.24 + rnd() * 0.24, true);
-        // …and the two lit shoulders that read as water.
-        const edge = 0.1 + rnd() * 0.08;
-        tapered(pts, w * 0.5, w * 0.24, edge, false, -w * 0.62);
-        tapered(pts, w * 0.5, w * 0.24, edge * 0.8, false, w * 0.62);
-
-        // The bead that stopped at the end of the run.
+        // The wet halo either side of the channel.
         f.globalCompositeOperation = 'destination-out';
-        f.globalAlpha = 0.55;
         f.fillStyle = '#000';
+        f.globalAlpha = 0.035;
+        along(pts, w * 3.4, w * 2.0, disc);
+
+        // The channel: thinner mist...
+        f.globalAlpha = 0.14;
+        along(pts, w, w * 0.5, disc);
+
+        // ...tinted graphite, so it stays neutral over skin as over wall.
+        const dark = Math.round(54 + rnd() * 30);
+        f.globalCompositeOperation = 'source-atop';
+        f.fillStyle = `rgb(${dark},${dark},${dark})`;
+        f.globalAlpha = 0.52 + rnd() * 0.14;
+        along(pts, w * 0.9, w * 0.45, disc);
+
+        // Lit shoulders.
+        f.globalCompositeOperation = 'source-over';
+        f.fillStyle = 'rgb(252,252,252)';
+        f.globalAlpha = 0.03 + rnd() * 0.03;
+        along(pts, w * 1.6, w * 0.8, disc);
+      }
+
+      /* Droplets. Water obeys gravity and warmth: more of it low down, far
+         less across the patch his face has cleared. Macro-reference density
+         on a full-figure hero is not condensation, it is spatter. */
+      const drop = (x: number, y: number, r: number, el: number) => {
+        const ry = r * el;
+
+        f.globalCompositeOperation = 'destination-out';
+        f.fillStyle = '#000';
+        f.globalAlpha = 0.15 + rnd() * 0.2;
         f.beginPath();
-        f.arc(pts[pts.length - 1].x, pts[pts.length - 1].y, w * 0.8, 0, Math.PI * 2);
+        f.ellipse(x, y, r, ry, 0, 0, Math.PI * 2);
         f.fill();
 
-        tracks.push({ pts, w });
-      }
-      f.globalAlpha = 1;
-      f.globalCompositeOperation = 'source-over';
-
-      /* ── 4. Condensation ───────────────────────────────────────────
-         The dominant feature of the reference, and the thing that sells
-         it: thousands of small beads. Each thins the mist, carries a rim
-         light on its shoulder, and the larger ones catch a specular
-         pin-light. Baked once; free at runtime. */
-      const bead = (x: number, y: number, r: number) => {
-        const ry = r * (1 + Math.min(1, r / 4) * 0.55);
-
-        f.globalCompositeOperation = 'destination-out';
-        f.globalAlpha = 0.34 + rnd() * 0.34;
-        f.fillStyle = '#000';
+        const dark = Math.round(56 + rnd() * 44);
+        f.globalCompositeOperation = 'source-atop';
+        f.fillStyle = `rgb(${dark},${dark},${dark})`;
+        f.globalAlpha = 0.38 + rnd() * 0.24;
         f.beginPath();
         f.ellipse(x, y, r, ry, 0, 0, Math.PI * 2);
         f.fill();
 
         f.globalCompositeOperation = 'source-over';
-        if (r > 1) {
-          f.globalAlpha = 0.16 + rnd() * 0.16;
-          f.strokeStyle = 'rgba(238,248,252,1)';
-          f.lineWidth = Math.max(0.4, r * 0.3);
+        // Only the larger beads carry a hint of a rim — a hard highlight on
+        // every drop is what makes them read as painted circles.
+        if (r > 2.1) {
+          f.strokeStyle = 'rgba(255,255,255,0.7)';
+          f.lineWidth = Math.max(0.4, r * 0.24);
+          f.globalAlpha = 0.09 + rnd() * 0.09;
           f.beginPath();
-          f.ellipse(x, y, r * 1.04, ry * 1.04, 0, Math.PI * 0.15, Math.PI * 1.15);
+          f.ellipse(x, y, r * 1.02, ry * 1.02, 0, Math.PI * 0.05, Math.PI * 0.65);
           f.stroke();
         }
-        if (r > 1.7) {
-          f.globalAlpha = 0.3 + rnd() * 0.25;
-          f.fillStyle = 'rgba(255,255,255,0.95)';
-          f.beginPath();
-          f.arc(x - r * 0.34, y - ry * 0.38, Math.max(0.4, r * 0.24), 0, Math.PI * 2);
-          f.fill();
+        if (r > 2.6) {
+          f.fillStyle = 'rgba(255,255,255,0.85)';
+          f.globalAlpha = 0.18 + rnd() * 0.12;
+          disc(x - r * 0.3, y - ry * 0.34, Math.max(0.35, r * 0.18));
         }
       };
 
-      const beads = Math.min(9000, Math.round((boxW * boxH) / 300));
-      for (let i = 0; i < beads; i++) {
-        const bias = rnd();
-        bead(rnd() * boxW, rnd() * boxH, 0.5 + bias * bias * 2.9);
+      const scattered = Math.min(1700, Math.round((boxW * boxH) / 950));
+      for (let i = 0; i < scattered; i++) {
+        const x = rnd() * boxW;
+        const y = boxH * Math.pow(rnd(), 0.72);
+        if (rnd() < cleared(x, y) * 3.2) continue;
+        const b = rnd();
+        const r = 0.4 + b * b * b * 4.4;
+        drop(x, y, r, 1 + (r > 1.4 ? rnd() * 1.2 : rnd() * 0.3));
       }
-      // Beads crowd along the wet tracks, which is what ties the two
-      // features together instead of leaving them as separate layers.
-      for (const track of tracks) {
-        const last = track.pts[track.pts.length - 1];
-        const len = last.y - track.pts[0].y;
-        const n = Math.round(len / 6);
+
+      // And crowded along every track, the way real ones bead on a wet path.
+      for (let t = 0; t < tracks.length; t++) {
+        const { pts, w, len } = tracks[t];
+        const n = Math.round(len / 10);
         for (let i = 0; i < n; i++) {
-          const t = rnd();
-          const at = track.pts[Math.min(track.pts.length - 1, Math.round(t * 22))];
-          const bias = rnd();
-          bead(
-            at.x + (rnd() - 0.5) * track.w * 7,
-            at.y,
-            0.5 + bias * bias * 2.2,
+          const p = pts[Math.min(pts.length - 1, Math.floor(rnd() * pts.length))];
+          const b = rnd();
+          drop(
+            p.x + (rnd() - 0.5) * w * 4.5,
+            p.y + (rnd() - 0.5) * 10,
+            0.4 + b * b * 2.6,
+            1 + rnd() * 1,
           );
         }
       }
-      f.globalAlpha = 1;
-      f.globalCompositeOperation = 'source-over';
 
-      /* ── 5. The grade ──────────────────────────────────────────────
-         Cream type over a bright pane is unreadable. This is what buys
-         the headline its contrast back without flattening the glass. */
+      /* ── 3. The grade ──────────────────────────────────────────────
+         Almost nothing, and neutral. A heavy dark pass was half of what
+         used to read as solid. */
+      f.globalCompositeOperation = 'source-over';
+      f.globalAlpha = 1;
       const grade = f.createLinearGradient(0, 0, 0, boxH);
-      grade.addColorStop(0, 'rgba(23,25,24,0.26)');
-      grade.addColorStop(0.36, 'rgba(23,25,24,0.18)');
-      grade.addColorStop(1, 'rgba(23,25,24,0.62)');
+      grade.addColorStop(0, 'rgba(26,26,26,0.05)');
+      grade.addColorStop(0.36, 'rgba(26,26,26,0.02)');
+      grade.addColorStop(1, 'rgba(26,26,26,0.14)');
       f.fillStyle = grade;
       f.fillRect(0, 0, boxW, boxH);
     };
@@ -577,10 +675,10 @@ const Hero: React.FC = () => {
     const paintOverlay = () => {
       syncBox();
       if (boxW < 8 || boxH < 8) return;
-      // The pane now carries real detail — single-pixel frost and beads a
-      // couple of pixels across — so it does want better than half
-      // resolution. 1.5 is the balance: the water stays crisp, and the
-      // per-wipe fill cost is still well under a full Retina buffer.
+      // The pane now carries real detail — beads and runnels a couple of
+      // pixels across — so it does want better than half resolution. 1.5 is
+      // the balance: the water stays crisp, and the per-wipe fill cost is
+      // still well under a full Retina buffer.
       dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       const pxW = Math.floor(boxW * dpr);
       const pxH = Math.floor(boxH * dpr);
@@ -703,73 +801,6 @@ const Hero: React.FC = () => {
     // path through the overlay, exactly like the ring does.
     bodyTrailRef.current = erase;
 
-    /**
-     * Where the photograph actually sits.
-     *
-     * `object-fit: cover` crops; to put anything on top of the picture at a
-     * known point of the PICTURE (an earring on an ear) we have to redo the
-     * browser's own mapping. Read object-position rather than assuming
-     * centre, so the CSS stays the single source of truth.
-     */
-    // Cached, because coverOf() reads getComputedStyle and this used to be
-    // recomputed inside the animation loop — a synchronous style flush every
-    // frame, which is exactly what makes a cursor-follower feel like it is
-    // catching on something. Geometry only changes when the box or the image
-    // changes, and both of those call refreshCover().
-    let cover: Cover | null = null;
-    const refreshCover = () => {
-      const src = overlayImgRef.current;
-      cover = src ? coverOf(src, boxW, boxH) : null;
-    };
-
-    /**
-     * The magnifying glass.
-     *
-     * CULTURE LED CREATIVE orbits a real lens: the ring redraws the
-     * photograph beneath it, magnified, clipped to a circle. Because the
-     * ring is also the eraser, the glass both clears the mist and enlarges
-     * what it clears — one gesture doing two jobs.
-     *
-     * It is one drawImage of a small source rect into a ~110px buffer, so
-     * the cost is trivial next to the full-width pane it sits on.
-     */
-    const LENS_ZOOM = 1.85;
-    // Held, because getContext() on every frame is a needless lookup.
-    let lensCtx: CanvasRenderingContext2D | null = null;
-    const drawLens = () => {
-      const lens = lensRef.current;
-      const src = overlayImgRef.current;
-      if (!lens || !src) return;
-      const lctx = lensCtx ?? (lensCtx = lens.getContext('2d'));
-      const geo = cover;
-      if (!lctx || !geo) return;
-
-      const size = lens.width;
-      lctx.setTransform(1, 0, 0, 1, 0, 0);
-      lctx.clearRect(0, 0, size, size);
-      lctx.save();
-      lctx.beginPath();
-      lctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
-      lctx.clip();
-
-      // Hero-local centre → source pixels, then take a smaller bite than the
-      // lens covers. A smaller bite drawn into the same circle IS the zoom.
-      const sxc = (cx - geo.ox) / geo.scale;
-      const syc = (cy - geo.oy) / geo.scale;
-      const half = radius / (geo.scale * LENS_ZOOM);
-      lctx.drawImage(src, sxc - half, syc - half, half * 2, half * 2, 0, 0, size, size);
-
-      // A breath of glass: the edge of a real lens darkens and bends.
-      const vign = lctx.createRadialGradient(
-        size / 2, size / 2, size * 0.3, size / 2, size / 2, size / 2,
-      );
-      vign.addColorStop(0, 'rgba(0,0,0,0)');
-      vign.addColorStop(1, 'rgba(8,12,14,0.42)');
-      lctx.fillStyle = vign;
-      lctx.fillRect(0, 0, size, size);
-      lctx.restore();
-    };
-
     const centre = () => {
       tx = boxW / 2;
       ty = boxH / 2;
@@ -782,7 +813,6 @@ const Hero: React.FC = () => {
 
     syncBox();
     measureRing();
-    refreshCover();
     paintOverlay();
     centre();
 
@@ -790,14 +820,13 @@ const Hero: React.FC = () => {
     fonts?.ready
       .then(() => {
         measureRing();
-        refreshCover();
         paintOverlay();
-            centre();
+        centre();
       })
       .catch(() => {});
 
     const img = overlayImgRef.current;
-    const onImgLoad = () => { refreshCover(); paintOverlay(); };
+    const onImgLoad = () => paintOverlay();
     if (img && !img.complete) img.addEventListener('load', onImgLoad);
 
     let resizeTimer = 0;
@@ -806,9 +835,8 @@ const Hero: React.FC = () => {
       resizeTimer = window.setTimeout(() => {
         primed = false;
         measureRing();
-        refreshCover();
         paintOverlay();
-            centre();
+        centre();
       }, 140);
     };
     window.addEventListener('resize', onResize, { passive: true });
@@ -825,10 +853,10 @@ const Hero: React.FC = () => {
     window.addEventListener('scroll', onScroll, { passive: true });
 
     /**
-     * While the pointer is over the hero, the magnifier IS the cursor — so the
+     * While the pointer is over the hero, the ring IS the cursor — so the
      * site's own lime circle steps aside. Two concentric lime circles inside
-     * the CULTURE LED CREATIVE ring is one circle too many; the lens rim is
-     * the one that means something here.
+     * the CULTURE LED CREATIVE ring is one circle too many; the ring is the
+     * one that means something here.
      */
     const setHeroCursor = (on: boolean) => {
       if (on) document.body.dataset.heroCursor = '1';
@@ -924,10 +952,6 @@ const Hero: React.FC = () => {
 
       if (!show) return;
 
-      // The lens tracks the ring every frame it is on screen, wiped or not:
-      // a magnifying glass that only magnifies while moving is a gimmick.
-      drawLens();
-
       // Gentle continuous rotation of the label. Rotating the group (one
       // transform) instead of shifting text along the path keeps every frame
       // free of SVG text re-layout — the big lag source while sweeping. The
@@ -976,7 +1000,7 @@ const Hero: React.FC = () => {
           alt="Papi Raborife"
           className="hero-photo absolute inset-0 h-full w-full object-cover"
           width="2560"
-          height="1429"
+          height="1803"
           fetchPriority="high"
           decoding="async"
           onError={(e) => { e.currentTarget.style.display = 'none'; }}
@@ -1059,10 +1083,11 @@ const Hero: React.FC = () => {
         </div>
       </div>
 
-      {/* CULTURE LED CREATIVE — a real magnifying glass that wraps the
-          cursor, sized just under the "O" of AWESOMENESS. The lens shows the
-          photograph enlarged, a lime circle rims it, and the label orbits
-          outside the glass. Only rendered where there is a real cursor. */}
+      {/* CULTURE LED CREATIVE. One lime circle, sized just under the "O" of
+          AWESOMENESS, with the label orbiting outside it. The circle is the
+          cursor and the eraser — it is what clears the steam. No lens, no
+          magnification: the glass wipes clean, it does not enlarge.
+          Only rendered where there is a real cursor. */}
       {interactive && (
         <div
           ref={ringRef}
@@ -1070,19 +1095,28 @@ const Hero: React.FC = () => {
           style={{ opacity: 0 }}
           aria-hidden
         >
-          <canvas ref={lensRef} className="hero-lens absolute inset-0 block rounded-full" />
-          <div className="hero-lens-rim absolute inset-0 rounded-full" />
+          {/* Exactly one lime circle, and it is this one. */}
+          <div className="hero-ring-circle absolute inset-0 rounded-full" />
           <svg width="100%" height="100%" className="absolute inset-0 overflow-visible block">
             <defs>
               <path id={ringPathId} fill="none" />
             </defs>
             {/* The label rides a circle OUTSIDE the glass, so it never sits
-                on top of what the lens is magnifying. */}
+                on top of what the ring is wiping. */}
             <g ref={ringSpinRef}>
+              {/* Inter Black, not the mono. JetBrains Mono's bold is a
+                  narrow-stemmed 700 and at this size it simply does not read
+                  as bold — the label kept looking light however the weight
+                  was declared. Inter ships a real 900, and a hairline stroke
+                  in the same lime under the fill thickens the stems further
+                  without touching the letterforms. */}
               <text
                 fill="#d7ff4f"
-                fontFamily="'JetBrains Mono', ui-monospace, SFMono-Regular, monospace"
-                fontWeight="700"
+                stroke="#d7ff4f"
+                strokeWidth="0.7"
+                paintOrder="stroke"
+                fontFamily="Inter, system-ui, sans-serif"
+                fontWeight="900"
               >
                 <textPath href={`#${ringPathId}`} startOffset="0%">
                   {RING_TEXT}

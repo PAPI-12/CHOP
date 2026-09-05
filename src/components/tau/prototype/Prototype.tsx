@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useScrollLock } from '../../../hooks/useScrollLock';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X, ArrowLeft, Search, ShoppingBag, MapPin, Check, Plus, Minus, Trash2, Loader2 } from 'lucide-react';
 import {
@@ -792,19 +793,16 @@ export default function Prototype({ open, onClose }: { open: boolean; onClose: (
   }, [open]);
 
   // Escape to close + focus management + body scroll lock
+  useScrollLock(open);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKey);
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     closeButtonRef.current?.focus();
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = originalOverflow;
-    };
+    return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
   // Sync the checkout slot with the cart totals slot
