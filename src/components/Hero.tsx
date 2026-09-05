@@ -699,9 +699,9 @@ const Hero: React.FC = () => {
         along(pts, w * 1.6, w * 0.8, disc);
       }
 
-      /* Droplets. Water obeys gravity and warmth: more of it low down, far
-         less across the patch his face has cleared. Macro-reference density
-         on a full-figure hero is not condensation, it is spatter. */
+      /* Droplets. Dense, packed, tiny — the reference is a rough pane covered
+         in thousands of beads, not a clean field of a few big circles. Baked
+         once, so the count is free per frame. */
       const drop = (x: number, y: number, r: number, el: number) => {
         const ry = r * el;
         const lit = litAt(x, y);
@@ -743,27 +743,27 @@ const Hero: React.FC = () => {
       // Dense small beads, the way a pane looks in the macro reference: many
       // tiny beads, few large ones. Baked once, so density costs nothing per
       // frame — only the offscreen tile gets bigger.
-      const scattered = Math.min(4200, Math.round((boxW * boxH) / 430));
+      const scattered = Math.min(20000, Math.round((boxW * boxH) / 110));
       for (let i = 0; i < scattered; i++) {
         const x = rnd() * boxW;
-        const y = boxH * Math.pow(rnd(), 0.74);
+        const y = boxH * Math.pow(rnd(), 0.72);
         if (rnd() < cleared(x, y) * 3.2) continue;
         const b = rnd();
-        const r = 0.3 + b * b * b * 3.4;
-        drop(x, y, r, 1 + (r > 1.4 ? rnd() * 1.1 : rnd() * 0.3));
+        const r = 0.24 + b * b * b * 2.9;
+        drop(x, y, r, 1 + (r > 1.3 ? rnd() * 1.0 : rnd() * 0.3));
       }
 
       // And crowded along every track, the way real ones bead on a wet path.
       for (let t = 0; t < tracks.length; t++) {
         const { pts, w, len } = tracks[t];
-        const n = Math.round(len / 8);
+        const n = Math.round(len / 6);
         for (let i = 0; i < n; i++) {
           const p = pts[Math.min(pts.length - 1, Math.floor(rnd() * pts.length))];
           const b = rnd();
           drop(
             p.x + (rnd() - 0.5) * w * 4.5,
             p.y + (rnd() - 0.5) * 10,
-            0.3 + b * b * 2.4,
+            0.24 + b * b * 2.1,
             1 + rnd() * 1,
           );
         }
