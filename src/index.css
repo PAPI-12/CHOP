@@ -159,10 +159,19 @@
    that mists over again afterwards. Touch and reduced-motion visitors — who
    have nothing to wipe with — get this static equivalent instead. It is pure
    CSS, so it costs one composited layer and never repaints. */
-/* One hero plate for every viewport, centred. A hair above true centre only
-   so a tall phone crop keeps his head rather than his shoulders. */
+/* One hero plate for every viewport, re-framed per shape.
+   On a wide screen, centred, a hair above true centre. On a phone the crop is
+   brutal — a 390px window into a ~1250px-wide plate — and dead centre slices
+   his face in half at the right edge. 62% puts his head fully in frame with
+   the headline sitting in the clear space to its left. Verified against the
+   real asset at 390x700, 390x600 and 430x780. */
 .hero-photo {
-  object-position: 50% 46%;
+  object-position: 62% 42%;
+}
+@media (min-width: 768px) {
+  .hero-photo {
+    object-position: 50% 46%;
+  }
 }
 
 /* ── The lens ──────────────────────────────────────────────────────────
@@ -176,7 +185,7 @@
     0 14px 34px rgba(0, 0, 0, 0.45);
 }
 .hero-lens-rim {
-  border: 2px solid #d7ff4f;
+  border: 3px solid #d7ff4f;
   box-shadow:
     0 0 0 1px rgba(23, 25, 24, 0.6),
     0 0 20px rgba(215, 255, 79, 0.32);
@@ -196,16 +205,16 @@
   filter: drop-shadow(0 0 6px rgba(215, 255, 79, 0.55)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
 }
 
-/* ── Breathed-on glass, no cursor ──────────────────────────────────────
-   Touch and reduced-motion visitors get the same pane, already misted, in
-   pure CSS. Warm breath on cold glass: an even, milky diffusion, not dirt —
-   so no speckle layer, no beading, no droplets. */
-.hero-glass-static {
-  backdrop-filter: blur(24px) saturate(0.44) brightness(0.79);
-  -webkit-backdrop-filter: blur(24px) saturate(0.44) brightness(0.79);
-  background-image:
-    radial-gradient(82% 66% at 50% 44%, rgba(222, 238, 246, 0.34), rgba(206, 226, 236, 0.14) 78%),
-    linear-gradient(180deg, rgba(23, 25, 24, 0.3), rgba(23, 25, 24, 0.2) 34%, rgba(23, 25, 24, 0.74));
+/* ── The site cursor stands down over the hero ─────────────────────────
+   The magnifier IS the cursor there, and its lime rim is the one lime circle
+   the CULTURE LED CREATIVE ring should contain. Toggled from Hero.tsx on
+   pointer enter/leave rather than by hover, so it survives the ring being
+   pointer-events: none. */
+.custom-cursor {
+  transition: opacity 180ms ease;
+}
+body[data-hero-cursor='1'] .custom-cursor {
+  opacity: 0 !important;
 }
 
 /* ── The matrix strike ─────────────────────────────────────────────────
@@ -250,6 +259,8 @@
 }
 .hero-ring text {
   text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .will-change-transform {

@@ -4,6 +4,36 @@ import { ScribbleX, ScribbleUnderline, FloatingCross, FloatingWave } from './Scr
 import SplitFlapText from './SplitFlapText';
 import { useHeroPhysics, type HeroCursor } from '../hooks/useHeroPhysics';
 
+/**
+ * Where `object-fit: cover` has actually put the photograph inside a box.
+ *
+ * Both the magnifier and the earring need to convert a point on the
+ * photograph into a point on screen, and the answer depends on the crop. Read
+ * `object-position` rather than assuming centre, so the CSS stays the single
+ * source of truth — including the mobile override.
+ */
+type Cover = { ox: number; oy: number; dw: number; dh: number; scale: number };
+const coverOf = (img: HTMLImageElement, boxW: number, boxH: number): Cover | null => {
+  if (!img.complete || !img.naturalWidth || boxW < 8 || boxH < 8) return null;
+  const scale = Math.max(boxW / img.naturalWidth, boxH / img.naturalHeight);
+  const dw = img.naturalWidth * scale;
+  const dh = img.naturalHeight * scale;
+  let posX = 50;
+  let posY = 50;
+  const pos = getComputedStyle(img).objectPosition.trim().split(/\s+/);
+  if (pos.length === 2) {
+    const px = parseFloat(pos[0]);
+    const py = parseFloat(pos[1]);
+    if (Number.isFinite(px)) posX = px;
+    if (Number.isFinite(py)) posY = py;
+  }
+  return { ox: (boxW - dw) * (posX / 100), oy: (boxH - dh) * (posY / 100), dw, dh, scale };
+};
+
+/** The stud, in normalised photograph coordinates: the centre of his lobe. */
+const EAR_U = 0.51;
+const EAR_V = 0.4875;
+
 const RING_WORD = 'CULTURE LED CREATIVE';
 /**
  * One label, laid around the full circumference and pinned to it with
@@ -61,12 +91,40 @@ const Hero: React.FC = () => {
 
   const handleIntroComplete = useCallback(() => setIntroComplete(true), []);
 
+  /**
+   * Is this the web version?
+   *
+   * The steam, the magnifier and the wipe are one desktop feature, gated
+   * together. A fine pointer that can hover, no reduced-motion preference,
+   * and a viewport wide enough to be a computer. Anything else — every
+   * phone, every tablet — gets the photograph, clean, on landing.
+   *
+   * This re-evaluates, because a desktop browser dragged narrow and back is
+   * the cheapest way to end up with a fogged pane and no way to clear it.
+   */
   useEffect(() => {
-    const fine =
-      window.matchMedia('(pointer: fine)').matches &&
-      window.matchMedia('(hover: hover)').matches;
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    setInteractive(fine && !reduce);
+    const fine = window.matchMedia('(pointer: fine)');
+    const hover = window.matchMedia('(hover: hover)');
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let timer = 0;
+    const evaluate = () =>
+      setInteractive(fine.matches && hover.matches && !reduce.matches && window.innerWidth >= 768);
+    const settle = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(evaluate, 160);
+    };
+    evaluate();
+    fine.addEventListener('change', evaluate);
+    hover.addEventListener('change', evaluate);
+    reduce.addEventListener('change', evaluate);
+    window.addEventListener('resize', settle, { passive: true });
+    return () => {
+      window.clearTimeout(timer);
+      fine.removeEventListener('change', evaluate);
+      hover.removeEventListener('change', evaluate);
+      reduce.removeEventListener('change', evaluate);
+      window.removeEventListener('resize', settle);
+    };
   }, []);
 
   // Physics starts only once the headline has finished settling, so the intro
@@ -78,6 +136,63 @@ const Hero: React.FC = () => {
   useEffect(() => {
     const t = window.setTimeout(() => setIntroComplete(true), 4200);
     return () => window.clearTimeout(t);
+  }, []);
+
+  /**
+   * The earring.
+   *
+   * A lime cross on the subject's lobe, pinned in IMAGE space so it stays on
+   * his ear at every viewport instead of drifting off his face the moment the
+   * crop changes — and the crop does change: the photograph is framed
+   * differently on a phone so his head survives the portrait cut.
+   *
+   * This lives in its own effect, deliberately. It used to be part of the
+   * desktop steam effect, which bails out entirely on touch — so the stud
+   * vanished on exactly the devices that now land on the clean photograph and
+   * can actually see it. It is static by design: no float, no spin, no
+   * physics, the same stillness as the PAPI RABORIFE line.
+   */
+  useEffect(() => {
+    const hero = heroRef.current;
+    const el = earringRef.current;
+    const img = overlayImgRef.current;
+    if (!hero || !el || !img) return;
+
+    const place = () => {
+      const r = hero.getBoundingClientRect();
+      const geo = coverOf(img, r.width, r.height);
+      if (!geo) { el.style.opacity = '0'; return; }
+      const x = geo.ox + geo.dw * EAR_U;
+      const y = geo.oy + geo.dh * EAR_V;
+      // Scales with the picture, so it reads as the same physical stud whether
+      // the hero is a phone or a 2560 display.
+      const size = Math.max(9, Math.min(20, geo.dw * 0.0075));
+      el.style.width = `${size}px`;
+      el.style.height = `${size}px`;
+      el.style.transform =
+        `translate3d(${(x - size / 2).toFixed(1)}px, ${(y - size / 2).toFixed(1)}px, 0)`;
+      // Off the edge of a heavy crop: hide rather than float in the margin.
+      el.style.opacity = x > 0 && y > 0 && x < r.width && y < r.height ? '1' : '0';
+    };
+
+    place();
+    const onLoad = () => place();
+    if (!img.complete) img.addEventListener('load', onLoad);
+
+    let timer = 0;
+    const onResize = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(place, 140);
+    };
+    window.addEventListener('resize', onResize, { passive: true });
+    const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
+    fonts?.ready.then(place).catch(() => {});
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('resize', onResize);
+      img.removeEventListener('load', onLoad);
+    };
   }, []);
 
   useEffect(() => {
@@ -596,49 +711,15 @@ const Hero: React.FC = () => {
      * browser's own mapping. Read object-position rather than assuming
      * centre, so the CSS stays the single source of truth.
      */
-    type Cover = { ox: number; oy: number; dw: number; dh: number; scale: number };
-    const coverGeometry = (): Cover | null => {
+    // Cached, because coverOf() reads getComputedStyle and this used to be
+    // recomputed inside the animation loop — a synchronous style flush every
+    // frame, which is exactly what makes a cursor-follower feel like it is
+    // catching on something. Geometry only changes when the box or the image
+    // changes, and both of those call refreshCover().
+    let cover: Cover | null = null;
+    const refreshCover = () => {
       const src = overlayImgRef.current;
-      if (!src || !src.complete || !src.naturalWidth) return null;
-      const scale = Math.max(boxW / src.naturalWidth, boxH / src.naturalHeight);
-      const dw = src.naturalWidth * scale;
-      const dh = src.naturalHeight * scale;
-      let posX = 50;
-      let posY = 50;
-      const pos = getComputedStyle(src).objectPosition.trim().split(/\s+/);
-      if (pos.length === 2) {
-        const px = parseFloat(pos[0]);
-        const py = parseFloat(pos[1]);
-        if (Number.isFinite(px)) posX = px;
-        if (Number.isFinite(py)) posY = py;
-      }
-      return { ox: (boxW - dw) * (posX / 100), oy: (boxH - dh) * (posY / 100), dw, dh, scale };
-    };
-
-    /**
-     * The earring. A lime cross on the subject's ear, pinned in IMAGE space
-     * so it stays on the ear at every viewport instead of drifting off his
-     * face the moment the crop changes. Static by design — it belongs to the
-     * photograph, so it does not float, spin or answer to the physics.
-     */
-    const EAR_U = 0.51;
-    const EAR_V = 0.475;
-    const placeEarring = () => {
-      const el = earringRef.current;
-      if (!el) return;
-      const geo = coverGeometry();
-      if (!geo) { el.style.opacity = '0'; return; }
-      const x = geo.ox + geo.dw * EAR_U;
-      const y = geo.oy + geo.dh * EAR_V;
-      // Scale with the picture so it reads as the same physical stud whether
-      // the hero is 1280 or 2560 wide.
-      const size = Math.max(9, Math.min(20, geo.dw * 0.0075));
-      el.style.width = `${size}px`;
-      el.style.height = `${size}px`;
-      el.style.transform = `translate3d(${(x - size / 2).toFixed(1)}px, ${(y - size / 2).toFixed(1)}px, 0)`;
-      // Off the edge of a heavy crop: hide rather than float in the margin.
-      const inside = x > 0 && y > 0 && x < boxW && y < boxH;
-      el.style.opacity = inside ? '1' : '0';
+      cover = src ? coverOf(src, boxW, boxH) : null;
     };
 
     /**
@@ -653,12 +734,14 @@ const Hero: React.FC = () => {
      * the cost is trivial next to the full-width pane it sits on.
      */
     const LENS_ZOOM = 1.85;
+    // Held, because getContext() on every frame is a needless lookup.
+    let lensCtx: CanvasRenderingContext2D | null = null;
     const drawLens = () => {
       const lens = lensRef.current;
       const src = overlayImgRef.current;
       if (!lens || !src) return;
-      const lctx = lens.getContext('2d');
-      const geo = coverGeometry();
+      const lctx = lensCtx ?? (lensCtx = lens.getContext('2d'));
+      const geo = cover;
       if (!lctx || !geo) return;
 
       const size = lens.width;
@@ -699,23 +782,22 @@ const Hero: React.FC = () => {
 
     syncBox();
     measureRing();
+    refreshCover();
     paintOverlay();
-    placeEarring();
     centre();
 
     const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
     fonts?.ready
       .then(() => {
         measureRing();
+        refreshCover();
         paintOverlay();
-        placeEarring();
-        centre();
+            centre();
       })
       .catch(() => {});
 
     const img = overlayImgRef.current;
-    // The earring cannot be placed until the picture's natural size is known.
-    const onImgLoad = () => { paintOverlay(); placeEarring(); };
+    const onImgLoad = () => { refreshCover(); paintOverlay(); };
     if (img && !img.complete) img.addEventListener('load', onImgLoad);
 
     let resizeTimer = 0;
@@ -724,12 +806,15 @@ const Hero: React.FC = () => {
       resizeTimer = window.setTimeout(() => {
         primed = false;
         measureRing();
+        refreshCover();
         paintOverlay();
-        placeEarring();
-        centre();
+            centre();
       }, 140);
     };
     window.addEventListener('resize', onResize, { passive: true });
+
+    let pointerEver = false;
+    let shown: boolean | null = null;
 
     let scrollTick = false;
     const onScroll = () => {
@@ -739,15 +824,27 @@ const Hero: React.FC = () => {
     };
     window.addEventListener('scroll', onScroll, { passive: true });
 
+    /**
+     * While the pointer is over the hero, the magnifier IS the cursor — so the
+     * site's own lime circle steps aside. Two concentric lime circles inside
+     * the CULTURE LED CREATIVE ring is one circle too many; the lens rim is
+     * the one that means something here.
+     */
+    const setHeroCursor = (on: boolean) => {
+      if (on) document.body.dataset.heroCursor = '1';
+      else delete document.body.dataset.heroCursor;
+    };
+
     const onPointerMove = (e: PointerEvent) => {
       if (e.pointerType === 'touch') return;
       const x = e.clientX - boxLeft;
       const y = e.clientY - boxTop;
 
       // Outside the hero: park the ring back at centre rather than pinning it
-      // to an edge, and stop erasing.
+      // to an edge, stop erasing, and hand the cursor back to the site.
       if (x < 0 || y < 0 || x > boxW || y > boxH) {
         pointerSeen = false;
+        setHeroCursor(false);
         // Break only the ring's stroke; re-entering elsewhere must not erase a
         // straight line from the old exit point. Letter trails are keyed
         // separately and are unaffected.
@@ -756,7 +853,18 @@ const Hero: React.FC = () => {
         return;
       }
 
+      if (!pointerSeen) {
+        // First frame back inside. Without this the ring would spring across
+        // the whole hero from wherever it was parked, wiping a stripe of glass
+        // on the way — the single ugliest thing the old build did.
+        cx = x;
+        cy = y;
+        vx = 0;
+        vy = 0;
+      }
+      pointerEver = true;
       pointerSeen = true;
+      setHeroCursor(true);
       tx = x;
       ty = y;
     };
@@ -803,24 +911,34 @@ const Hero: React.FC = () => {
       c.active = pointerSeen;
 
       ring.style.transform = `translate3d(${(cx - r).toFixed(2)}px, ${(cy - r).toFixed(2)}px, 0)`;
-      ring.style.opacity = primed ? '1' : '0';
+
+      // Visible while the pointer is in the hero, plus on landing — before the
+      // first mouse move the ring sits at the centre as an invitation. What it
+      // must NOT do is hang in the middle of the headline after you have moved
+      // away; that reads as a stuck element, not a cursor.
+      const show = primed && (pointerSeen || !pointerEver);
+      if (show !== shown) {
+        shown = show;
+        ring.style.opacity = show ? '1' : '0';
+      }
+
+      if (!show) return;
 
       // The lens tracks the ring every frame it is on screen, wiped or not:
       // a magnifying glass that only magnifies while moving is a gimmick.
       drawLens();
 
-      if (pointerSeen) {
-        erase(RING_STROKE, cx, cy, radius);
-        // Gentle continuous rotation of the label. Rotating the group (one
-        // transform) instead of shifting text along the path keeps every frame
-        // free of SVG text re-layout — the big lag source while sweeping.
-        // The circumference-pinned label makes the loop seamless.
-        spin = (spin + dt * 14) % 360;
-        ringSpinRef.current?.setAttribute(
-          'transform',
-          `rotate(${spin.toFixed(2)} ${ringC} ${ringC})`,
-        );
-      }
+      // Gentle continuous rotation of the label. Rotating the group (one
+      // transform) instead of shifting text along the path keeps every frame
+      // free of SVG text re-layout — the big lag source while sweeping. The
+      // circumference-pinned label makes the loop seamless.
+      spin = (spin + dt * 14) % 360;
+      ringSpinRef.current?.setAttribute(
+        'transform',
+        `rotate(${spin.toFixed(2)} ${ringC} ${ringC})`,
+      );
+
+      if (pointerSeen) erase(RING_STROKE, cx, cy, radius);
     };
     raf = requestAnimationFrame(frame);
 
@@ -833,6 +951,7 @@ const Hero: React.FC = () => {
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('pointermove', onPointerMove);
       img?.removeEventListener('load', onImgLoad);
+      delete document.body.dataset.heroCursor;
     };
   }, [interactive]);
 
@@ -871,12 +990,13 @@ const Hero: React.FC = () => {
           style={{ opacity: 0 }}
           aria-hidden
         />
-        {interactive ? (
+        {/* The steam is a DESKTOP effect, and only a desktop effect.
+            It exists to be wiped, and wiping needs a cursor. On a phone there
+            is nothing to wipe with, so a fogged pane is not an effect — it is
+            just a photograph you cannot see. Touch, coarse-pointer and
+            reduced-motion visitors land on the clean hero image. */}
+        {interactive && (
           <canvas ref={eraserRef} className="absolute inset-0 w-full h-full pointer-events-none z-[2]" aria-hidden />
-        ) : (
-          // No cursor to wipe with — present the pane already fogged, in CSS,
-          // so touch and reduced-motion visitors still get the glass.
-          <div className="hero-glass-static absolute inset-0 z-[2]" aria-hidden />
         )}
       </div>
 
@@ -962,7 +1082,7 @@ const Hero: React.FC = () => {
               <text
                 fill="#d7ff4f"
                 fontFamily="'JetBrains Mono', ui-monospace, SFMono-Regular, monospace"
-                fontWeight="500"
+                fontWeight="700"
               >
                 <textPath href={`#${ringPathId}`} startOffset="0%">
                   {RING_TEXT}

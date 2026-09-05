@@ -195,6 +195,25 @@ built in two stages: `paintOverlay` lays down the flat gradient synchronously
 `requestIdleCallback` and swapped in — unless the visitor has already started
 wiping, in which case it is never stamped over their work.
 
+**The steam is desktop-only, and gated as one feature.** A fine pointer that can
+hover, no reduced-motion preference, and a viewport at least 768 px wide — all
+four, re-evaluated when the browser is resized across the boundary. Fail any of
+them and the whole desktop hero effect is never constructed: no ring, no lens,
+no canvas, and the `useEffect` returns before it allocates anything. The reason
+is simple. The steam exists to be wiped, and wiping needs a cursor. On a phone a
+fogged pane is not an effect, it is a photograph you cannot see. Touch visitors
+land on the clean hero image.
+
+Which means the crop matters, so the photograph is framed per shape:
+`object-position: 62% 42%` below 768 px, `50% 46%` above. Dead centre on a
+390 px-wide window into a ~1250 px plate slices his face in half at the right
+edge; 62% puts his head fully in frame with the headline in the clear space
+beside it. Verified against the real asset at 390×700, 390×600 and 430×780.
+
+The earring lives in its own effect for the same reason — it used to be part of
+the desktop steam effect, so the stud vanished on exactly the devices that can
+now see it.
+
 Governing principle, arrived at the hard way over four calibration passes: **a
 runnel must thin the mist, never punch through it.** Clearing all the way to the
 photograph makes the channel pick up skin tone and the whole pane instantly reads

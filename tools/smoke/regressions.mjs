@@ -13,12 +13,18 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`);
 };
 
-async function boot(route = '/') {
+async function boot(route = '/', opts = {}) {
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
     url: 'https://papi.example' + route, pretendToBeVisual: true, runScripts: 'outside-only',
   });
   const { window } = dom;
-  window.matchMedia = (q) => ({ media: q, matches: /pointer: fine|hover: hover|min-width/.test(q) && !/reduce/.test(q), addListener(){}, removeListener(){}, addEventListener(){}, removeEventListener(){}, dispatchEvent(){return false;}, onchange:null });
+  const answer = (q) => {
+    // A phone: coarse pointer, no hover, narrow viewport.
+    if (opts.touch && /pointer: fine|hover: hover/.test(q)) return false;
+    return /pointer: fine|hover: hover|min-width/.test(q) && !/reduce/.test(q);
+  };
+  window.matchMedia = (q) => ({ media: q, matches: answer(q), addListener(){}, removeListener(){}, addEventListener(){}, removeEventListener(){}, dispatchEvent(){return false;}, onchange:null });
+  if (opts.touch) Object.defineProperty(window, 'innerWidth', { value: 390, configurable: true, writable: true });
   window.IntersectionObserver = class { constructor(cb){this.cb=cb;} observe(el){ this.cb([{isIntersecting:true,target:el,intersectionRatio:1}], this); } unobserve(){} disconnect(){} takeRecords(){return [];} };
   window.ResizeObserver = class { observe(){} unobserve(){} disconnect(){} };
   window.requestIdleCallback = (cb) => window.setTimeout(() => cb({didTimeout:false,timeRemaining:()=>5}), 0);
@@ -72,6 +78,46 @@ const click = (window, el) =>
   check('the ring has a magnifier lens', !!hero.querySelector('.hero-ring canvas.hero-lens'));
   check('the lens has a lime rim', !!hero.querySelector('.hero-ring .hero-lens-rim'));
   check('the earring is on the photograph', !!hero.querySelector('.hero-earring'));
+  window.close();
+}
+
+/* ── 2b. The ring holds exactly one lime circle, and the label is bold ─ */
+{
+  const { window } = await boot('/');
+  const ring = window.document.querySelector('.hero-ring');
+  const lime = /#d7ff4f|rgb\(215,\s*255,\s*79\)/i;
+
+  // Anything round-and-lime living inside the ring, by any mechanism.
+  const circles = [...ring.querySelectorAll('*')].filter((el) => {
+    if (el.tagName === 'circle') return true;
+    const cls = el.getAttribute('class') || '';
+    const style = el.getAttribute('style') || '';
+    const round = /rounded-full/.test(cls) || /border-radius:\s*(50%|9999px)/.test(style);
+    const isLime = lime.test(cls) || lime.test(style) || cls.includes('hero-lens-rim');
+    return round && isLime;
+  });
+  check('the ring contains exactly one lime circle', circles.length === 1,
+    circles.map((c) => c.getAttribute('class') || c.tagName).join(' | ') || 'none');
+  check('the second lime circle is the site cursor, which stands aside',
+    !!window.document.querySelector('.custom-cursor'));
+
+  const text = ring.querySelector('text');
+  check('CULTURE LED CREATIVE is bold', text?.getAttribute('font-weight') === '700',
+    text?.getAttribute('font-weight') || 'unset');
+  window.close();
+}
+
+/* ── 2c. Mobile lands on the photograph, with no steam over it ─────── */
+{
+  const { window, errors } = await boot('/', { touch: true });
+  const hero = window.document.getElementById('hero');
+  check('mobile renders the hero photograph', !!hero.querySelector('img.hero-photo'));
+  check('mobile has no steam overlay at all',
+    !hero.querySelector('.hero-glass-static') && hero.querySelectorAll('canvas').length === 0,
+    `${hero.querySelectorAll('canvas').length} canvas`);
+  check('mobile has no magnifier ring', !hero.querySelector('.hero-ring'));
+  check('mobile still wears the earring', !!hero.querySelector('.hero-earring'));
+  check('mobile hero throws nothing', errors.length === 0, errors[0] || '');
   window.close();
 }
 
