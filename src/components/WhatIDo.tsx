@@ -1,5 +1,4 @@
-import React, { useLayoutEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useLayoutEffect, useRef } from 'react';
 
 const SKILLS = [
   { title: 'UX/UI DESIGN', note: 'interfaces with instinct', color: '#f5f3ee' },
@@ -28,6 +27,21 @@ const MATRIX_GLYPHS =
   'CRAFTINGAWESOMENESS2015CULTRLDVIXPAPI·0123456789<>*+-=/\\|#$%&@';
 
 const clamp01 = (t: number) => (t < 0 ? 0 : t > 1 ? 1 : t);
+/** Fast off the mark, settling — the page transition's own curve. */
+const expoOut = (t: number) => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t));
+
+/* ── The matrix arrives the way a page does ────────────────────────────
+   Once the machine has finished speaking, the code does not fade up. A
+   hairline is struck across the stage and the rain opens out of it,
+   symmetrically. That rain then carries over the section boundary and hands
+   the visitor to Selected Work, where the cards are cut out of it by the
+   same gesture. The code exists here and nowhere else on the site. */
+/** The hairline is drawn for this long before the rectangle opens. */
+const STRIKE_S = 0.22;
+/** How long the rectangle takes to open to the full stage. */
+const OPEN_S = 0.46;
+/** Thickness of the struck line, in CSS pixels. */
+const LINE_PX = 2;
 const smoothstep = (t: number) => {
   const x = clamp01(t);
   return x * x * (3 - 2 * x);
@@ -55,9 +69,8 @@ const rand = (i: number) => {
                   lines). Scrolling is held until the transmission is over,
                   then the surge rains down, "continue" lights, and the pin
                   hands off to Featured Work.
-     0.86 → 1.00  the code SPILLS out of the section: a viewport-fixed layer
-                  of light drops carries the rain over Featured Work and only
-                  rains itself out once the visitor keeps scrolling down.
+     The code never leaves this section. Whatever the matrix does, it does
+     inside the stage and nowhere else on the page.
    ABOUT — never blank:
      0.00 → 0.78  the same continuous glide; AI CREATIVE sails off in its
                   original white like every other skill
@@ -70,9 +83,6 @@ const T_CODE_END = 0.72;
 const T_VANISH_END = 0.8;
 const T_CUE_FADE_START = 0.42;
 const T_CUE_FADE_END = 0.56;
-
-/** Where the spill layer starts bleeding past the section edge. */
-const T_SPILL_START = 0.86;
 
 /** Total scroll length of the pinned sequences, in screen heights. */
 const SCREENS_HOME = 8.2;
@@ -120,7 +130,6 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
   /**
    * home  — skills glide → ART COMES 1ST encodes → machine wakes (auto-played,
    *         scroll-held) → surge hands off to Featured Work, and the code
-   *         spills over the boundary into it.
    * about — the practice only: the same glide, AI CREATIVE exits in white,
    *         then "continue" lights and Experience is pulled up. No machine.
    */
@@ -128,7 +137,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
   const rootRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const rainRef = useRef<HTMLCanvasElement>(null);
-  const spillRef = useRef<HTMLCanvasElement>(null);
+  const rainLineRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Array<HTMLDivElement | null>>([]);
   const titleRefs = useRef<Array<HTMLHeadingElement | null>>([]);
   const noteRefs = useRef<Array<HTMLParagraphElement | null>>([]);
@@ -140,21 +149,8 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
   const initRef = useRef<HTMLParagraphElement>(null);
   const barRef = useRef<HTMLSpanElement>(null);
   const bootTagRef = useRef<HTMLParagraphElement>(null);
-  const lineRefs = useRef<Array<HTMLParagraphElement | null>>([]);
+  const lineRefs = useRef<Array<HTMLElement | null>>([]);
   const guideRef = useRef<HTMLDivElement>(null);
-
-  /**
-   * The spill layer is a portal so it can sit ABOVE the following section:
-   * anything rendered inside this component is trapped in the page's own
-   * stacking order and would be painted over by Featured Work's opaque
-   * background. Decided once, at mount, so the ref exists for the layout
-   * effect on the very first commit.
-   */
-  const [spillOn] = useState(
-    () =>
-      typeof window !== 'undefined' &&
-      !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-  );
 
   // Variant-resolved choreography values, captured by the effects below.
   const SCREENS = machineMode ? SCREENS_HOME : SCREENS_ABOUT;
@@ -177,8 +173,11 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
     let rainAlpha = 0;
     /** 0 = normal fall, 1 = Reloaded surge on the way out. */
     let rainBoost = 0;
-    /** 0 = no spill, 1 = full spill over the following section. */
-    let spillAlpha = 0;
+    /**
+     * True once the machine has finished saying its piece. Nothing rains —
+     * not in the section, not over the section below — until this flips.
+     */
+    let humanSpoken = machineActSpent;
 
     /**
      * The pin's height is measured and written in pixels. Pure-CSS svh
@@ -280,6 +279,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
     /** Full reset — called when the section leaves the viewport either way. */
     const resetAct = () => {
       actStart = -1;
+      humanSpoken = machineActSpent;
       disarmLock();
       if (initRef.current) { initRef.current.dataset.txt = ''; initRef.current.style.opacity = '0'; }
       lineRefs.current.forEach((el) => { if (el) { el.dataset.txt = ''; el.style.visibility = 'hidden'; } });
@@ -325,7 +325,14 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       const initT = actT > 0 ? clamp01(actT / T_BOOT) : 0;
       const speakT = actT > T_BOOT + 0.35 ? 1 : 0; // arm flag; lines use their schedules
       const releaseT = actT > SPEAK_END ? smoothstep((actT - SPEAK_END) / 0.9) : 0;
-      const surgeT = actT > SPEAK_END - 0.5 ? smoothstep((actT - (SPEAK_END - 0.5)) / 2.0) : 0;
+      /**
+       * The rain is the machine's ANSWER, so it may not start a frame before
+       * the human-readable transmission has finished being typed. Everything
+       * up to that point — the encode, the brownout, INITIALIZING, the three
+       * spoken lines — plays on a clean stage.
+       */
+      const surgeT = actT > SPEAK_END ? smoothstep((actT - SPEAK_END) / 1.5) : 0;
+      if (machineMode && actT > SPEAK_END) humanSpoken = true;
       if (machineMode && actStart > 0 && actT > ACT_DONE) {
         // Transmission complete: release any hold and remember — the machine
         // plays once per visit, then the section belongs to scroll again.
@@ -344,12 +351,51 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       // About exit: furniture fades as "continue" takes over the stage.
       const outT = machineMode ? 0 : smoothstep((p - 0.84) / 0.14);
 
-      rainAlpha = Math.max(
-        codeT * 0.85,
-        vanishT,
-        initT * 0.9,
-        machineMode ? Math.max(surgeT, (actT > 0 && acting) ? 0.35 : 0, spentZone * 0.45) : 0,
-      );
+      /**
+       * The rain is the machine's ANSWER, and it is introduced the same way
+       * a new page is: a struck hairline that opens into a rectangle. So the
+       * canvas is CLIPPED open rather than faded in — clipping reveals the
+       * code at its true size, where a fade would just dissolve it into
+       * view and lose the architecture of the gesture entirely.
+       */
+      const revealT = machineMode && actStart > 0 && actT > SPEAK_END
+        ? clamp01((actT - SPEAK_END) / OPEN_S)
+        : 0;
+      // Revisiting after the act has played: the section is already open.
+      const opened = revealT > 0 ? expoOut(revealT) : (spentZone > 0 ? 1 : 0);
+
+      const rainEl = rainRef.current;
+      if (rainEl) {
+        if (opened <= 0) {
+          rainEl.style.clipPath = 'inset(50% 0px 50% 0px)';
+        } else if (opened >= 0.999) {
+          rainEl.style.clipPath = 'none';
+        } else {
+          const halfStage = ch / 2;
+          const half = LINE_PX / 2 + (halfStage - LINE_PX / 2) * opened;
+          const inset = Math.max(0, halfStage - half);
+          rainEl.style.clipPath = `inset(${inset.toFixed(1)}px 0px ${inset.toFixed(1)}px 0px)`;
+        }
+      }
+
+      // The line itself: struck just before the opening, gone once the
+      // rectangle has anywhere near enough height to speak for itself.
+      const strikeT = machineMode && actStart > 0
+        ? clamp01((actT - (SPEAK_END - STRIKE_S)) / STRIKE_S)
+        : 0;
+      const lineEl = rainLineRef.current;
+      if (lineEl) {
+        lineEl.style.opacity = String(
+          opened > 0 ? Math.max(0, 1 - opened * 2.2) : strikeT,
+        );
+      }
+
+      // Behind the clip the code is at full strength almost immediately —
+      // the reveal is the clip's job, not the alpha's.
+      const surgeA = actT > SPEAK_END ? smoothstep((actT - SPEAK_END) / 0.5) : 0;
+      rainAlpha = machineMode
+        ? Math.max(surgeA, humanSpoken || machineActSpent ? spentZone * 0.5 : 0)
+        : 0;
       rainBoost = surgeT;
 
       const idx = Math.min(LAST, Math.round(Math.min(front, LAST)));
@@ -625,49 +671,6 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       }
     };
 
-    /* ── Spill rain: the code that runs OUT of the section ───────────
-       A viewport-fixed layer, portalled to <body> so it paints over the
-       following section instead of being buried under its background. It
-       lights up as the pin ends, keeps raining lightly across the top of
-       Featured Work, and rains itself out as the visitor keeps going down.
-       Deliberately sparse + slow: ambience, never a curtain over the work. */
-
-    const spill = spillRef.current;
-    const sctx = spill?.getContext('2d') ?? null;
-    let spillCols: Col[] = [];
-    let sw = 0;
-    let sh = 0;
-    let sdpr = 1;
-    const SPILL_FONT = 13;
-    const SPILL_ROW = 17;
-
-    const setupSpill = () => {
-      if (!spill || !sctx) return;
-      sw = window.innerWidth;
-      sh = window.innerHeight;
-      if (sw < 8 || sh < 8) return;
-      sdpr = Math.min(window.devicePixelRatio || 1, 1.5);
-      spill.width = Math.floor(sw * sdpr);
-      spill.height = Math.floor(sh * sdpr);
-      spill.style.width = `${sw}px`;
-      spill.style.height = `${sh}px`;
-      sctx.setTransform(sdpr, 0, 0, sdpr, 0, 0);
-
-      // Far sparser than the section rain: these are drops, not a downpour.
-      const spacing = 76;
-      const count = Math.ceil(sw / spacing);
-      spillCols = [];
-      for (let i = 0; i < count; i++) {
-        spillCols.push({
-          x: Math.round(i * spacing + 10 + Math.random() * 26),
-          y: Math.random() * sh - sh * 0.5,
-          speed: 55 + Math.random() * 95,
-          len: 4 + Math.floor(Math.random() * 6),
-          seed: Math.floor(Math.random() * 1000),
-        });
-      }
-    };
-
     /* ── Frame loop ─────────────────────────────────────────────────── */
 
     let raf = 0;
@@ -676,7 +679,6 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
     let lastT = 0;
     let lastProgress = -1;
     let rainDrawn = false;
-    let spillDrawn = false;
     let rainTick = 0;
 
     const frame = (now: number) => {
@@ -688,7 +690,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       lastT = now;
 
       // One rect read per frame, shared by the progress, the stage-visibility
-      // test and the spill fade — layout is only ever measured once.
+      // test — layout is only ever measured once.
       const rect = root.getBoundingClientRect();
       const vh = window.innerHeight;
       const travel = rect.height - vh;
@@ -703,17 +705,6 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       if (Math.abs(p - lastProgress) > 0.0002 || actLive) {
         lastProgress = p;
         paint(p, now);
-      }
-
-      // Spill: fades in with the hand-off, then rains out over ~1 screen of
-      // travel past the section. Scroll back up and it is gone with the pin.
-      if (machineMode && sctx) {
-        const past = vh - rect.bottom; // px travelled beyond the pin's end
-        const fadeIn = smoothstep((p - T_SPILL_START) / (1 - T_SPILL_START));
-        const fadeOut = 1 - smoothstep((past - vh * 0.1) / vh);
-        spillAlpha = fadeIn * clamp01(fadeOut);
-      } else {
-        spillAlpha = 0;
       }
 
       // Rain — rendered on a half-cadence tick. Falling code is perceived as
@@ -757,41 +748,6 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
         }
       }
 
-      if (sctx && spill) {
-        if (spillAlpha > 0.01) {
-          spillDrawn = true;
-          if (rainTick) {
-            sctx.clearRect(0, 0, sw, sh);
-            sctx.font = `${SPILL_FONT}px "JetBrains Mono", ui-monospace, monospace`;
-            sctx.textBaseline = 'top';
-            for (let i = 0; i < spillCols.length; i++) {
-              const col = spillCols[i];
-              col.y += col.speed * dt * 2;
-              if (col.y - col.len * SPILL_ROW > sh) {
-                col.y = -Math.random() * sh * 0.6;
-                col.speed = 55 + Math.random() * 95;
-                col.len = 4 + Math.floor(Math.random() * 6);
-              }
-              for (let k = 0; k < col.len; k++) {
-                const y = col.y - k * SPILL_ROW;
-                if (y < -SPILL_ROW || y > sh) continue;
-                const fade = 1 - k / col.len;
-                sctx.globalAlpha = spillAlpha * fade * (k === 0 ? 0.75 : 0.34);
-                sctx.fillStyle = k === 0 ? '#f2ffd0' : '#d7ff4f';
-                sctx.fillText(
-                  glyphFor(col.seed + k + Math.floor(col.y / SPILL_ROW)),
-                  col.x,
-                  y,
-                );
-              }
-            }
-            sctx.globalAlpha = 1;
-          }
-        } else if (spillDrawn) {
-          sctx.clearRect(0, 0, sw, sh);
-          spillDrawn = false;
-        }
-      }
     };
 
     /* ── Wiring ─────────────────────────────────────────────────────── */
@@ -800,7 +756,6 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
 
     measure();
     setupRain();
-    setupSpill();
     paint(0, 0);
 
     if (reduce) {
@@ -861,9 +816,9 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
     }
 
     /**
-     * The top margin is deliberately huge: the loop must stay alive for about
-     * a screen and a half AFTER the section has left, because that is exactly
-     * where the spill rain is still falling over Featured Work.
+     * A modest margin: the loop only has to be alive slightly before and
+     * after the stage is on screen. Nothing this section draws survives past
+     * its own edges any more, so there is nothing to keep running for.
      */
     const io = new IntersectionObserver(
       ([entry]) => {
@@ -874,10 +829,9 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
         // come back and you see skills, not a spent terminal.
         if (wasOn && !onScreen) {
           resetAct();
-          if (sctx) { sctx.clearRect(0, 0, sw, sh); spillDrawn = false; }
         }
       },
-      { rootMargin: '160% 0px 15% 0px' },
+      { rootMargin: '20% 0px 20% 0px' },
     );
     io.observe(root);
 
@@ -887,8 +841,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       resizeTimer = window.setTimeout(() => {
         measure();
         setupRain();
-        setupSpill();
-        lastProgress = -1;
+            lastProgress = -1;
       }, 150);
     };
     window.addEventListener('resize', onResize, { passive: true });
@@ -914,28 +867,6 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       className="relative z-10 bg-[#171715]"
       style={{ height: machineMode ? '820vh' : '560vh' }}
     >
-      {/* The code that runs out of the section. Portalled to <body> so it can
-          keep falling ACROSS the next section instead of being clipped by the
-          page's stacking order. Below the navbar (z-50), above the content. */}
-      {machineMode && spillOn && typeof document !== 'undefined'
-        ? createPortal(
-            <canvas
-              ref={spillRef}
-              aria-hidden
-              className="pointer-events-none fixed inset-0 z-[30]"
-              style={{
-                // Heaviest at the top of the new section, thinning downward —
-                // it reads as rain arriving, not as a screen-wide filter.
-                maskImage:
-                  'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 45%, rgba(0,0,0,0) 100%)',
-                WebkitMaskImage:
-                  'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 45%, rgba(0,0,0,0) 100%)',
-              }}
-            />,
-            document.body,
-          )
-        : null}
-
       <div
         ref={stageRef}
         className="sticky top-0 overflow-hidden bg-[#171715]"
@@ -953,8 +884,24 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
 
         {/* Matrix rain sits behind the type but above the ambient wash.
             Home only — the About variant never wakes the machine. */}
+        {/* The rain, and the hairline it opens out of. Same component parts
+            as the page transition, same easing — one gesture the site reuses
+            instead of two effects that merely rhyme. */}
         {machineMode && (
-          <canvas ref={rainRef} className="pointer-events-none absolute inset-0 z-[2]" aria-hidden />
+          <>
+          <canvas
+            ref={rainRef}
+            className="pointer-events-none absolute inset-0 z-[2]"
+            style={{ clipPath: 'inset(50% 0px 50% 0px)' }}
+            aria-hidden
+          />
+          <div
+            ref={rainLineRef}
+            className="matrix-strike-line pointer-events-none absolute left-0 right-0 top-1/2 z-[3]"
+            style={{ opacity: 0 }}
+            aria-hidden
+          />
+          </>
         )}
 
         <div
@@ -1089,21 +1036,30 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
             </span>
           </div>
 
-          <div className="flex flex-col items-center gap-3 md:gap-4">
+          <div className="flex w-full max-w-[min(56rem,92vw)] flex-col items-center gap-4 md:gap-5">
             {ROBOT_LINES.map((line, i) => (
+              /* The <p> is sized by an invisible copy of the FULL line, and the
+                 typed characters are painted over it. Without that the box
+                 grew character by character and, at this weight and size, the
+                 whole transmission shuffled around while it was being typed. */
               <p
                 key={line}
-                ref={(el) => { lineRefs.current[i] = el; }}
-                data-caret="false"
-                className={`robot-line text-center whitespace-nowrap ${
+                className={`relative w-full text-center ${
                   i === 0
-                    ? 'font-display text-[#f5f3ee] text-[7vw] sm:text-[5vw] md:text-[3.4vw] lg:text-[2.9vw] leading-none tracking-[-0.02em]'
+                    ? 'font-display font-black text-[#f5f3ee] text-[13vw] sm:text-[9.5vw] md:text-[6.2vw] lg:text-[5.2vw] leading-[0.95] tracking-[-0.03em]'
                     : i === 1
-                      ? 'font-display text-[#d7ff4f] text-[3.1vw] sm:text-[2.7vw] md:text-[2.1vw] lg:text-[1.75vw] leading-none tracking-[0.01em]'
-                      : 'font-mono text-[#d7ff4f] text-[2.4vw] sm:text-[1.7vw] md:text-[1.05vw] lg:text-[0.9vw] tracking-[0.4em]'
+                      ? 'font-display font-black text-[#d7ff4f] text-[6.6vw] sm:text-[5.2vw] md:text-[3.6vw] lg:text-[3vw] leading-[1.05] tracking-[-0.01em]'
+                      : 'font-mono font-bold text-[#d7ff4f] text-[4.2vw] sm:text-[3vw] md:text-[1.8vw] lg:text-[1.5vw] leading-[1.3] tracking-[0.26em]'
                 }`}
-                style={{ visibility: 'hidden' }}
-              />
+              >
+                <span aria-hidden className="invisible">{line}</span>
+                <span
+                  ref={(el) => { lineRefs.current[i] = el; }}
+                  data-caret="false"
+                  className="robot-line absolute inset-0 block"
+                  style={{ visibility: 'hidden' }}
+                />
+              </p>
             ))}
           </div>
         </div>

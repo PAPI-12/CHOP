@@ -1,4 +1,7 @@
 import { useState, useRef } from "react";
+import VideoEmbed, { VideoPoster } from "./VideoEmbed";
+
+const JOSHUA_YT_ID = "VUCKP8Z2frQ";
 
 export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -67,7 +70,12 @@ export default function App() {
           <span
             style={{
               fontFamily: "'Anton', sans-serif",
-              backgroundImage: `url('https://img.youtube.com/vi/VUCKP8Z2frQ/maxresdefault.jpg')`,
+              // Layered sources, best first: if the maxres still does not
+              // exist for this upload the browser simply paints the next one
+              // down, and the flat colour underneath guarantees the word is
+              // never clipped to nothing.
+              backgroundColor: '#CDA99E',
+              backgroundImage: `url('https://i.ytimg.com/vi/${JOSHUA_YT_ID}/maxresdefault.jpg'), url('https://i.ytimg.com/vi/${JOSHUA_YT_ID}/hqdefault.jpg')`,
               backgroundPosition: `${mousePos.x}% ${mousePos.y}%`,
               backgroundSize: "125%",
             }}
@@ -95,8 +103,8 @@ export default function App() {
           {/* Thumbnail / Video */}
           {!isPlaying ? (
             <>
-              <img loading="lazy" decoding="async"
-                src="https://img.youtube.com/vi/VUCKP8Z2frQ/maxresdefault.jpg"
+              <VideoPoster
+                id={JOSHUA_YT_ID}
                 alt="Joshua The I AM - OTR thumbnail"
                 className="absolute inset-0 h-full w-full object-cover scale-[1.02] group-hover:scale-100 transition-transform duration-[1.8s] ease-[cubic-bezier(0.16,1,0.3,1)]"
               />
@@ -127,12 +135,10 @@ export default function App() {
               </div>
             </>
           ) : (
-            <iframe
-              className="absolute inset-0 h-full w-full"
-              src="https://www.youtube.com/embed/VUCKP8Z2frQ?autoplay=1&rel=0&modestbranding=1"
-              title="Joshua The I AM - OTR"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
+            <VideoEmbed
+              id={JOSHUA_YT_ID}
+              title="Joshua The I AM — OTR, official music video"
+              autoPlay
             />
           )}
 

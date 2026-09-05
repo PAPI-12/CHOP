@@ -35,38 +35,33 @@ const Navbar: React.FC = () => {
     return () => { document.body.style.overflow = prev; };
   }, [isMobileMenuOpen]);
 
-  // Clicking the wordmark should always land on the hero, whether we are
-  // already on "/" (smooth scroll up) or on a case-study page (navigate first).
+  /**
+   * The wordmark has exactly one job: put the visitor on the hero. Nowhere
+   * else, ever.
+   *
+   * It used to smooth-scroll the whole way up, which meant travelling back
+   * THROUGH the pinned What I Do sequence — that section re-arms and takes
+   * the scroll while you are passing through it, and you get left stranded
+   * somewhere in the middle of the page. So there is no journey: the page is
+   * simply put at the hero. Nothing to hijack, nothing to fight.
+   */
   const goToHero = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsMobileMenuOpen(false);
+    resetMachineAct();
 
-    const scrollHero = () => {
-      const hero = document.getElementById('hero');
-      if (hero) hero.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      else window.scrollTo({ top: 0, behavior: 'smooth' });
+    const atHero = () => {
+      window.scrollTo(0, 0);
+      // Some browsers restore scroll asynchronously after a route swap.
+      requestAnimationFrame(() => window.scrollTo(0, 0));
     };
 
     if (location.pathname === '/') {
-      scrollHero();
+      atHero();
       return;
     }
-
-    // Coming from another route the hero does not exist yet. A fixed timeout
-    // was a guess and missed whenever the lazy chunk resolved slowly, which is
-    // why the wordmark sometimes did nothing. Poll for the element instead and
-    // give up cleanly after a bounded window.
     navigate('/');
-    let tries = 0;
-    const findHero = () => {
-      if (document.getElementById('hero')) {
-        scrollHero();
-        return;
-      }
-      if (tries++ < 40) requestAnimationFrame(findHero);
-      else window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-    requestAnimationFrame(findHero);
+    atHero();
   };
 
   const navLinks = [
@@ -82,7 +77,7 @@ const Navbar: React.FC = () => {
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 flex justify-between items-center">
           {/* Clicking the brand also re-arms the What I Do machine act — it is
               the explicit "play it again" affordance besides a page reload. */}
-          <Link to="/" onClick={(e) => { resetMachineAct(); goToHero(e); }} className="flex items-center gap-3 group" aria-label="Papi Raborife — back to top">
+          <Link to="/" data-no-transition onClick={goToHero} className="flex items-center gap-3 group" aria-label="Papi Raborife — back to top">
             <svg width="40" height="40" viewBox="0 0 40 40" fill="none" className="transition-transform group-hover:rotate-12">
               <rect x="2" y="2" width="36" height="36" rx="18" stroke="#D7FF4F" strokeWidth="1.5" />
               <path d="M20 8L25 18H15L20 8Z" fill="#F5F3EE" />

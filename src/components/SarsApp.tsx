@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import VideoEmbed from "./VideoEmbed";
 
-const youtubeUrl = "https://www.youtube.com/embed/ARPCyulojp8";
+const SARS_YT_ID = "ARPCyulojp8";
 const youtubeWatchUrl = "https://youtu.be/ARPCyulojp8?si=S3nmuS-4MZ4S9Is8";
 
 const details = [
@@ -78,13 +79,13 @@ export default function App() {
           </div>
 
           <div id="sars-film" className="relative mt-8 overflow-hidden rounded-[1.7rem] bg-[#111] shadow-[0_40px_110px_rgba(0,0,0,0.65)] md:rounded-[2.2rem]">
-            <iframe
-              className="aspect-video w-full"
-              src={youtubeUrl}
-              title="SARS Friends and Taxes TV advert"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
+            <div className="aspect-video w-full">
+              <VideoEmbed
+                id={SARS_YT_ID}
+                title="SARS Friends and Taxes TV advert"
+                hint="Play the advert"
+              />
+            </div>
             <div className="pointer-events-none absolute bottom-4 left-5 z-10 flex flex-col text-white md:bottom-6 md:left-8">
               <span className="text-sm font-black uppercase tracking-tight md:text-base">SARS MobiApp</span>
               <span className="font-sars-serif text-xs italic tracking-normal text-white/80 md:text-sm">Commercial Ad</span>

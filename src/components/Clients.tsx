@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScribbleX, ScribbleUnderline, ScribbleWave } from './Scribbles';
+import { ScribbleX, ScribbleUnderline, FloatingCross, FloatingWave } from './Scribbles';
 import Reveal from './Reveal';
 
 const brands = [
@@ -51,28 +51,48 @@ const Clients: React.FC = () => {
         </p>
       </div>
 
-      {/* Ambient scribbles — a constellation of crosses and waves in mixed
-          sizes and weights, placed in the negative space around the stack. */}
-      <ScribbleX className="absolute top-[18%] left-[10%] w-8 h-8 md:w-10 md:h-10 opacity-65 rotate-12 hidden sm:block" />
-      <ScribbleX className="absolute top-[42%] right-[7%] w-7 h-7 opacity-55 -rotate-6 hidden md:block" />
-      <ScribbleX className="absolute bottom-[8%] right-[12%] w-7 h-7 opacity-55 rotate-12 hidden lg:block" />
-      <ScribbleUnderline className="absolute top-[48%] left-[15%] w-44 h-5 opacity-45 hidden md:block" />
-      <ScribbleUnderline className="absolute bottom-[18%] right-[18%] w-48 h-5 opacity-45 hidden lg:block" />
-      <ScribbleWave className="absolute bottom-[6%] left-[6%] w-20 h-6 opacity-55 hidden md:block" />
+      {/* ── Ambient drift ────────────────────────────────────────────
+          A constellation of crosses and waves in mixed sizes, weights and
+          cadences. These are the FLOATING variants, not the static ones —
+          the whole point of this section is that the marks keep moving
+          behind the names, so the wall of type never sits still. Every
+          duration is deliberately a different prime-ish number so the
+          field never falls into visible lockstep, and each one is behind
+          its own breakpoint so a phone is not asked to animate thirty
+          elements it has no room to show. */}
+      <FloatingCross className="absolute top-[8%] left-[10%] z-[1] hidden sm:block" size={38} duration={6.5} delay={0} />
+      <FloatingCross className="absolute top-[13%] right-[9%] z-[1] hidden sm:block" size={26} duration={7.3} delay={0.6} />
+      <FloatingCross className="absolute top-[19%] left-[26%] z-[1] hidden lg:block" size={16} duration={5.4} delay={1.2} />
+      <FloatingCross className="absolute top-[24%] right-[24%] z-[1] hidden md:block" size={20} duration={8.1} delay={0.3} />
+      <FloatingCross className="absolute top-[31%] left-[5%] z-[1] hidden md:block" size={30} duration={6.9} delay={1.5} />
+      <FloatingCross className="absolute top-[37%] right-[13%] z-[1] hidden sm:block" size={22} duration={5.8} delay={0.9} />
+      <FloatingCross className="absolute top-[44%] left-[17%] z-[1] hidden lg:block" size={14} duration={7.7} delay={0.2} />
+      <FloatingCross className="absolute top-[51%] right-[6%] z-[1] hidden md:block" size={34} duration={6.2} delay={1.8} />
+      <FloatingCross className="absolute top-[58%] left-[9%] z-[1] hidden sm:block" size={18} duration={8.4} delay={0.5} />
+      <FloatingCross className="absolute top-[64%] right-[28%] z-[1] hidden xl:block" size={13} duration={5.6} delay={1.1} />
+      <FloatingCross className="absolute top-[71%] left-[31%] z-[1] hidden xl:block" size={16} duration={7.1} delay={0.7} />
+      <FloatingCross className="absolute top-[77%] right-[11%] z-[1] hidden md:block" size={28} duration={6.6} delay={1.4} />
+      <FloatingCross className="absolute bottom-[13%] left-[13%] z-[1] hidden sm:block" size={24} duration={7.9} delay={0.4} />
+      <FloatingCross className="absolute bottom-[7%] right-[18%] z-[1] hidden lg:block" size={19} duration={6.1} delay={1.6} />
+      <FloatingCross className="absolute bottom-[4%] left-[42%] z-[1] hidden xl:block" size={15} duration={8.6} delay={1} />
 
-      {/* Light tick-marks high, a heavy cross low right, waves running the
-          baseline — the rhythm loosely follows the brand rows. */}
-      <ScribbleX className="absolute top-[9%] right-[20%] w-4 h-4 opacity-40 rotate-45 hidden md:block" />
-      <ScribbleX className="absolute top-[26%] right-[12%] w-3 h-3 opacity-35 -rotate-12 hidden sm:block" />
-      <ScribbleX className="absolute top-[52%] left-[6%] w-4 h-4 opacity-45 rotate-[24deg] hidden lg:block" />
-      <ScribbleX className="absolute top-[63%] right-[16%] w-6 h-6 opacity-50 rotate-6 hidden md:block" />
-      <ScribbleX className="absolute bottom-[14%] left-[9%] w-12 h-12 opacity-[0.38] -rotate-12 hidden sm:block" />
-      <ScribbleX className="absolute bottom-[26%] left-[30%] w-3.5 h-3.5 opacity-40 rotate-[72deg] hidden xl:block" />
-      <ScribbleWave className="absolute top-[14%] left-[24%] w-28 h-5 opacity-35 rotate-2 hidden lg:block" />
-      <ScribbleWave className="absolute top-[58%] right-[26%] w-24 h-4 opacity-30 -rotate-3 hidden xl:block" />
-      <ScribbleWave className="absolute bottom-[24%] right-[6%] w-36 h-6 opacity-45 rotate-1 hidden md:block" />
-      <ScribbleUnderline className="absolute top-[34%] left-[4%] w-28 h-4 opacity-30 rotate-[-8deg] hidden lg:block" />
-      <ScribbleUnderline className="absolute top-[70%] left-[38%] w-36 h-4 opacity-35 rotate-2 hidden xl:block" />
+      <FloatingWave className="absolute top-[11%] left-[33%] z-[1] hidden lg:block" width={130} duration={7.4} delay={0.2} />
+      <FloatingWave className="absolute top-[21%] right-[4%] z-[1] hidden md:block" width={96} duration={8.8} delay={1.3} />
+      <FloatingWave className="absolute top-[34%] left-[3%] z-[1] hidden xl:block" width={112} duration={6.7} delay={0.8} />
+      <FloatingWave className="absolute top-[47%] right-[20%] z-[1] hidden xl:block" width={88} duration={7.8} delay={1.7} />
+      <FloatingWave className="absolute top-[56%] left-[24%] z-[1] hidden lg:block" width={120} duration={6.3} delay={0.5} />
+      <FloatingWave className="absolute top-[68%] right-[7%] z-[1] hidden md:block" width={140} duration={8.2} delay={0} />
+      <FloatingWave className="absolute top-[81%] left-[7%] z-[1] hidden sm:block" width={104} duration={7} delay={1.1} />
+      <FloatingWave className="absolute bottom-[9%] right-[30%] z-[1] hidden xl:block" width={92} duration={6.8} delay={1.9} />
+      <FloatingWave className="absolute bottom-[19%] left-[36%] z-[1] hidden xl:block" width={116} duration={8.5} delay={0.6} />
+
+      {/* A few marks stay still on purpose. An entirely moving field reads
+          as noise; the static ones give the eye somewhere to rest. */}
+      <ScribbleUnderline className="absolute top-[29%] left-[4%] w-28 h-4 opacity-30 rotate-[-8deg] hidden lg:block" />
+      <ScribbleUnderline className="absolute top-[62%] left-[38%] w-36 h-4 opacity-35 rotate-2 hidden xl:block" />
+      <ScribbleUnderline className="absolute bottom-[22%] right-[16%] w-44 h-5 opacity-40 hidden lg:block" />
+      <ScribbleX className="absolute top-[42%] right-[34%] w-3 h-3 opacity-35 rotate-45 hidden xl:block" />
+      <ScribbleX className="absolute bottom-[31%] left-[21%] w-3.5 h-3.5 opacity-40 rotate-[72deg] hidden xl:block" />
 
       {/* Stack is strictly contained inside project margins; desktop keeps the
           editorial offset rhythm while mobile remains centered and safe. */}
