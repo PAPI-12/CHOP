@@ -5,12 +5,19 @@ import CTAButton from './CTAButton';
 /* ═══════════════════════════════════════════════════════════════════════
    SELECTED WORK — handed over from What I Do by the code itself.
 
-   What I Do ends with the machine's rain. That rain does not simply stop at
-   the section boundary: it arrives HERE, falls across the empty grid, and
-   the three cards are cut out of it one after another — each struck as a
-   lime hairline, opened into a rectangle, its title resolving out of
-   scrambled glyphs. Once the last card has landed the code rains itself out
-   and the section is just the work again.
+   What I Do ends with the machine's rain. That rain does not stop at the
+   section boundary: while the What I Do stage slides up out of view, the
+   code rains off its bottom edge and continues HERE as this section's own
+   rain — raindrops overlapping the whole section while it is pulled up.
+   At FULL strength the instant the section's leading edge arrives, the
+   three cards are cut out of it one after another — each struck as a lime
+   hairline, opened into a rectangle, its title resolving out of scrambled
+   glyphs. Then, as the section lands, the code rains itself out — gone by
+   the time the visitor is ON the section and it is just the work again.
+
+   The rain's strength is scroll-driven, not timer-driven: it follows the
+   section's own arrival, so however fast or slow you scroll, it is present
+   for the whole overlap and disappears exactly when you arrive.
 
    The canvas is scoped INSIDE this section. It cannot leak onto the rest of
    the page the way a viewport-fixed layer can.
@@ -149,31 +156,50 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
     let raf = 0;
     let lastT = 0;
     let onScreen = false;
-    let started = 0;
     let tick = 0;
     let drawn = false;
+    let opened = false;
+    /**
+     * True once the code has rained itself out on arrival. The signature
+     * plays one direction: back-scrolling from below re-shows the settled
+     * work, never a second rain.
+     */
+    let rainDone = false;
 
     /**
-     * Rain is at FULL strength the instant the section's edge arrives — the
-     * code is the same rain What I Do pulled down over this section, not a
-     * new shower fading in. It holds while the cards are cut out, then rains
-     * itself out.
+     * Scroll-driven, not timer-driven: this is the same stream What I Do
+     * rained off its bottom edge, so its strength follows the section's own
+     * arrival —
+     *   top >= vh          section still below the viewport  →  dry
+     *   0 < top < vh       being pulled up, rain overlaps it  →  FULL
+     *   top <= 0           the section is landing             →  raining
+     *                      itself out over the first sliver
+     *                      of settled scroll
+     * so the raindrops overlap the whole section while it arrives and are
+     * gone exactly when you are ON it — at any scroll speed.
      */
-    const RAIN_IN = 0;
-    const RAIN_HOLD = 1500;
-    const RAIN_OUT = 1400;
-
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       if (!onScreen || document.hidden) { lastT = 0; return; }
       const dt = lastT ? Math.min((now - lastT) / 1000, 0.05) : 1 / 60;
       lastT = now;
 
-      const since = started ? now - started : 0;
+      const top = root.getBoundingClientRect().top;
+      const vh = window.innerHeight;
       let alpha: number;
-      if (since < RAIN_IN) alpha = since / RAIN_IN;
-      else if (since < RAIN_IN + RAIN_HOLD) alpha = 1;
-      else alpha = Math.max(0, 1 - (since - RAIN_IN - RAIN_HOLD) / RAIN_OUT);
+      if (rainDone) alpha = 0;
+      else if (top >= vh) alpha = 0;
+      else if (top > 0) alpha = 1;
+      else {
+        alpha = Math.max(0, 1 + top / (vh * 0.22));
+        if (alpha <= 0) rainDone = true;
+      }
+
+      // The cards are cut out of the code once it is properly over the grid.
+      if (!opened && top <= vh * 0.75) {
+        opened = true;
+        openCards();
+      }
 
       // Once it has rained out there is nothing left to compute.
       if (!ctx) return;
@@ -224,21 +250,18 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
       });
     };
 
-    let opened = false;
     const io = new IntersectionObserver(
       ([entry]) => {
         onScreen = !!entry?.isIntersecting;
         if (!onScreen) { lastT = 0; return; }
         setup();
-        if (!opened) {
-          opened = true;
-          started = performance.now();
-          openCards();
-        }
       },
-      // Fires as the section's leading edge arrives, which is exactly when
-      // What I Do is handing over.
-      { rootMargin: '0px 0px -25% 0px' },
+      // Fires the moment the section's leading edge touches the viewport —
+      // the exact instant What I Do's stage bottoms out and the code's
+      // stream crosses the boundary into this section. The rain's own
+      // strength is computed per-frame from the section's position (above),
+      // and the cards open from the frame loop, not from here.
+      { rootMargin: '0px 0px 0px 0px' },
     );
     io.observe(root);
 
@@ -264,23 +287,17 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
   return (
     <section
       ref={rootRef}
-      className="relative z-20 overflow-hidden px-4 sm:px-6 lg:px-12 xl:px-24 py-20 md:py-32 bg-[#1d1d1a]"
+      className="relative z-20 overflow-hidden px-4 sm:px-6 lg:px-12 xl:px-24 py-20 md:py-32 bg-[#171715]"
     >
       {/* The code that carried you here. Scoped to this section — it can
-          never paint over anything else on the page. */}
+          never paint over anything else on the page. Raindrops cover the
+          WHOLE section while it is pulled up (the cards are cut out of
+          that code); when it stops is purely a function of the section's
+          arrival, computed per-frame above. */}
       <canvas
         ref={canvasRef}
         aria-hidden
         className="pointer-events-none absolute inset-0 z-0"
-        style={{
-          // Full strength across the grid — the cards need code to be cut
-          // out OF — and dissolved only at the very bottom, so the rain
-          // runs out of the page rather than stopping at a hard edge.
-          maskImage:
-            'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 72%, rgba(0,0,0,0) 100%)',
-          WebkitMaskImage:
-            'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 72%, rgba(0,0,0,0) 100%)',
-        }}
       />
 
       <div className="relative z-10 max-w-[1600px] mx-auto">

@@ -211,7 +211,7 @@ const Work: React.FC = () => {
         </div>
       </section>
 
-      <section className="py-8 md:py-12 mb-16 md:mb-32 border-y border-white/10 overflow-hidden bg-[#1d1d1a]">
+      <section className="py-8 md:py-12 mb-16 md:mb-32 border-y border-white/10 overflow-hidden bg-[#171715]">
         <div className="flex gap-8 md:gap-16 whitespace-nowrap will-change-transform work-marquee-track">
           {[...Array(2)].map((_, i) => (
             <React.Fragment key={i}>

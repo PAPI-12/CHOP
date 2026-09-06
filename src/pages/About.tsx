@@ -73,7 +73,7 @@ const About: React.FC = () => {
             {/* Portrait plate. Bleeds into the right page margin on desktop so
                 the crop feels like a printed edge, not a floating card. */}
             <figure className="lg:col-span-5 relative -mx-4 sm:-mx-6 lg:mx-0 lg:-mr-12 xl:-mr-24 lg:mt-1">
-              <div className="relative overflow-hidden lg:rounded-l-2xl border-y lg:border-l lg:border-r-0 border-[#f5f3ee]/12 bg-[#1d1d1a]">
+              <div className="relative overflow-hidden lg:rounded-l-2xl border-y lg:border-l lg:border-r-0 border-[#f5f3ee]/12 bg-[#171715]">
                 <img
                   loading="eager"
                   decoding="async"
@@ -132,7 +132,7 @@ const About: React.FC = () => {
         </div>
       </section>
 
-      <section className="px-4 sm:px-6 lg:px-12 xl:px-24 py-14 md:py-24 bg-[#1d1d1a]">
+      <section className="px-4 sm:px-6 lg:px-12 xl:px-24 py-14 md:py-24 bg-[#171715]">
         <div className="max-w-[1600px] mx-auto text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
             <p className="hand-note text-[#d7c4aa] text-2xl md:text-4xl mb-5 md:mb-6">ready to collaborate?</p>

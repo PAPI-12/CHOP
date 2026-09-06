@@ -78,7 +78,7 @@ const Resume: React.FC = () => {
                 <span className="w-8 h-[1px] bg-[#d7ff4f]" />
                 <p className="text-[10px] md:text-xs font-bold tracking-[0.3em] uppercase text-[#d7ff4f]">PHASE 03 — CAPABILITY MATRIX</p>
               </div>
-              <div className="grid grid-cols-1 divide-y divide-white/10 border-y border-white/10 bg-[#1d1d1a] rounded-xl overflow-hidden">
+              <div className="grid grid-cols-1 divide-y divide-white/10 border-y border-white/10 bg-[#171715] rounded-xl overflow-hidden">
                 {skills.map((s) => (
                   <div key={s} className="flex items-center justify-between px-4 py-3 md:py-3.5">
                     <span className="text-[10px] md:text-xs font-bold uppercase tracking-[0.15em] text-[#f5f3ee]">{s}</span>

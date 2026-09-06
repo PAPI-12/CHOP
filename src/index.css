@@ -14,9 +14,11 @@
 }
 
 :root {
+  /* The whole site's dark surface is the Clients & Partners black — one
+     high-quality near-black, no dark-grey steps. Panels share it too. */
   --bg-main: #171715;
-  --bg-panel: #1d1d1a;
-  --bg-panel-alt: #23221f;
+  --bg-panel: #171715;
+  --bg-panel-alt: #171715;
   --text-main: #f5f3ee;
   --text-muted: #8f8f88;
   --text-cream: #d7c4aa;

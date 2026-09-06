@@ -156,7 +156,7 @@ const Contact: React.FC = () => {
             </div>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="bg-[#1d1d1a] p-5 md:p-10 rounded-2xl md:rounded-3xl">
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="bg-[#171715] p-5 md:p-10 rounded-2xl md:rounded-3xl">
             <form onSubmit={handleSubmit} className="space-y-5 md:space-y-6" noValidate={false}>
               <input
                 type="text"

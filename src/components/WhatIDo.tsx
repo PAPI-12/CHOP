@@ -31,11 +31,14 @@ const clamp01 = (t: number) => (t < 0 ? 0 : t > 1 ? 1 : t);
 const expoOut = (t: number) => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t));
 
 /* ── The matrix arrives the way a page does ────────────────────────────
-   Once the machine has finished speaking, the code does not fade up. A
-   hairline is struck across the stage and the rain opens out of it,
-   symmetrically. That rain then carries over the section boundary and hands
-   the visitor to Selected Work, where the cards are cut out of it by the
-   same gesture. The code exists here and nowhere else on the site. */
+   Once the human lines have finished being typed, the code does not fade
+   up. A hairline is struck across the stage — only AFTER the last
+   character has landed, so the human text reveals the matrix code, never
+   the other way round — and the rain opens out of it, symmetrically.
+   That rain then carries over the section boundary: while the stage
+   slides up out of view the code rains off its bottom edge and continues
+   as Selected Work's own rain, which overlaps that section with raindrops
+   until it lands, then is gone. */
 /** The hairline is drawn for this long before the rectangle opens. */
 const STRIKE_S = 0.22;
 /** How long the rectangle takes to open to the full stage. */
@@ -70,12 +73,15 @@ const rand = (i: number) => {
                   OH, HELLO / YOU CAN NOW CONTINUE TO FEATURED WORK /
                   FOLLOW THE MATRIX CODE — jittered cadence, breaths between
                   lines. Scrolling is held until the transmission is over.
-     SPEAK_END    transition: a hairline strikes, the matrix rectangle opens
-                  out of it and the surge rains down; "continue" lights, and
-                  the pin hands off to Selected Work, where the cards are cut
-                  out of the same code.
-     The code never leaves this section. Whatever the matrix does, it does
-     inside the stage and nowhere else on the page.
+     SPEAK_END    transition: the last character of FOLLOW THE MATRIX CODE
+                  lands, the hairline strikes, the matrix rectangle opens
+                  out of it and the surge rains down; "continue" lights,
+                  and the pin hands off to Selected Work, where the cards
+                  are cut out of the same code.
+     The stream does not stop at the section boundary: while the stage
+     slides up out of view the code rains off its bottom edge at hand-off
+     strength and continues as Selected Work's own rain, which overlaps
+     the section until it arrives, then rains itself out.
    ABOUT — never blank:
      0.00 → 0.78  the same continuous glide; AI CREATIVE sails off in its
                   original white like every other skill
@@ -397,8 +403,14 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
        * code at its true size, where a fade would just dissolve it into
        * view and lose the architecture of the gesture entirely.
        */
-      const revealT = machineMode && actStart > 0 && actT > SPEAK_END
-        ? clamp01((actT - SPEAK_END) / OPEN_S)
+      /**
+       * The reveal is the human text's: the strike only begins once the
+       * LAST character of the transmission has landed (SPEAK_END), and the
+       * rectangle opens out of the strike. Before that instant there is
+       * zero code on the stage — the text reveals the matrix, not before.
+       */
+      const revealT = machineMode && actStart > 0 && actT > SPEAK_END + STRIKE_S
+        ? clamp01((actT - (SPEAK_END + STRIKE_S)) / OPEN_S)
         : 0;
       // Revisiting after the act has played: the section is already open.
       const opened = revealT > 0 ? expoOut(revealT) : (spentZone > 0 ? 1 : 0);
@@ -420,7 +432,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       // The line itself: struck just before the opening, gone once the
       // rectangle has anywhere near enough height to speak for itself.
       const strikeT = machineMode && actStart > 0
-        ? clamp01((actT - (SPEAK_END - STRIKE_S)) / STRIKE_S)
+        ? clamp01((actT - SPEAK_END) / STRIKE_S)
         : 0;
       const lineEl = rainLineRef.current;
       if (lineEl) {
@@ -747,6 +759,22 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       if (Math.abs(p - lastProgress) > 0.0002 || actLive) {
         lastProgress = p;
         paint(p, now);
+      }
+
+      // Carry-over: the pin is spent and the stage is now sliding up out of
+      // view. The code does NOT stop at the section boundary — it rains off
+      // the stage's bottom edge at hand-off strength and continues as
+      // Selected Work's own rain below the seam (see SelectedWork.tsx), so
+      // the hand-off reads as one unbroken stream of raindrops across both
+      // sections instead of a dry gap at the boundary. It eases down over
+      // the last 40% of the exit so the hand-over to the section's full
+      // rain reads as a blend, not a cut.
+      if (machineMode && rainConsumed && stageVisible) {
+        const exitT = (-rect.top - (rect.height - vh)) / vh;
+        if (exitT > 0) {
+          const ease = Math.max(0, exitT < 0.6 ? 1 : 1 - (exitT - 0.6) / 0.4);
+          rainAlpha = Math.max(rainAlpha, 0.55 * ease);
+        }
       }
 
       // Rain — rendered on a half-cadence tick. Falling code is perceived as
