@@ -81,7 +81,9 @@ const click = (window, el) =>
   check('the ring has no lime rim of its own', !hero.querySelector('.hero-ring .hero-ring-circle'));
   check('there is no SVG circle/path left in the ring',
     !hero.querySelector('.hero-ring circle') && !hero.querySelector('.hero-ring path'));
-  check('the earring is on the photograph', !!hero.querySelector('.hero-earring'));
+  check('no earring floats over the wet glass', !hero.querySelector('.hero-earring'));
+  check('the rain window is the photograph itself, with no pane over it',
+    hero.querySelectorAll('canvas').length === 0, `${hero.querySelectorAll('canvas').length} canvas`);
   window.close();
 }
 
@@ -119,7 +121,7 @@ const click = (window, el) =>
   window.close();
 }
 
-/* ── 2c. Mobile lands on the photograph, with no vapor over it ─────── */
+/* ── 2c. Mobile lands on the rain-window photograph, with no pane ──── */
 {
   const { window, errors } = await boot('/', { touch: true });
   const hero = window.document.getElementById('hero');
@@ -128,7 +130,7 @@ const click = (window, el) =>
     !hero.querySelector('.hero-glass-static') && hero.querySelectorAll('canvas').length === 0,
     `${hero.querySelectorAll('canvas').length} canvas`);
   check('mobile has no CULTURE LED CREATIVE ring', !hero.querySelector('.hero-ring'));
-  check('mobile still wears the earring', !!hero.querySelector('.hero-earring'));
+  check('mobile has no earring floating over the wet glass', !hero.querySelector('.hero-earring'));
   check('mobile hero throws nothing', errors.length === 0, errors[0] || '');
   window.close();
 }
@@ -213,30 +215,21 @@ const click = (window, el) =>
     offenders.length === 0, offenders.join(', '));
 }
 
-/* ── 2f. The pane is a field, dark rain glass, and no flour next to it ── */
+/* ── 2f. The wet glass is one photograph, not a painted pane ────────── */
 {
   const hero = fs.readFileSync(new URL('../../src/components/Hero.tsx', import.meta.url), 'utf8');
-  const vapor = hero.slice(hero.indexOf('const buildVapor'), hero.indexOf('const paintOverlay'));
 
-  // The single-pixel frost pass. It is what read as flour, and nothing on a
-  // real pane looks like it.
-  check('no single-pixel frost speckle',
-    !/fillRect\([^)]*rnd\(\)[^)]*,\s*1,\s*1\)/.test(hero) && !/flecks/.test(hero));
-
-  // A constant alpha is what makes an overlay feel like a solid panel, so the
-  // density has to come from a computed field, not a gradient stop.
-  check('the pane density is a computed field',
-    /createImageData/.test(vapor) && /octaves/.test(vapor));
-  check('the field has soft blooms where the vapor has cleared', /blooms/.test(vapor));
-  check('water is a dark lens, not a hole in the glass',
-    /source-atop/.test(vapor) && /destination-out/.test(vapor));
-  check('the vapor is neutral rain glass over the photograph',
-    /graphite/.test(vapor) || /blue-grey/.test(vapor));
+  // The old canvas pane (noise fields, blooms, runnels, a blurred second
+  // copy of the portrait) is what read as fake glass and as "two images".
+  check('no procedural glass is painted over the photograph',
+    !/getContext|createImageData|buildVapor|heroWipe/.test(hero));
+  check('the hero photograph is the rain window',
+    /hero-rain-window-\d+\.webp/.test(hero));
+  check('the droplets and the blur are baked in, not a runtime filter',
+    !/filter:\s*(blur|backdrop)/i.test(hero) && !/backdrop-filter/.test(hero));
 }
 
-/* The hero's clear-photo lifecycle is exercised by hero.mjs. The old string
-   checks only found session-storage markers, even when the implementation
-   ignored them; they did not catch glass being repainted after a wipe. */
+/* The hero's one-photograph lifecycle is exercised by hero.mjs. */
 
 /* ── 3. The wordmark goes to the hero and nowhere else ─────────────── */
 {

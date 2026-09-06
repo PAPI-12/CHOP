@@ -162,13 +162,11 @@
   .matrix-guide-caret { animation: none; }
 }
 
-/* ── Hero: rain-glass vapor ────────────────────────────────────────────
-   Pointer-driven visitors get the real thing on a canvas (see Hero.tsx): a
-   dark blue-grey vapor pane with dense small beads and near-vertical
-   runnels, lit from the top-left, which the cursor and the letters squeegee
-   clear, and which stays cleared for this view. The effect never filters
-   the underlying photograph. Touch and reduced-motion visitors — who have
-   nothing to wipe with — land on the clean hero image. */
+/* ── Hero: the rain window ─────────────────────────────────────────────
+   The wet glass is not an effect. One photograph carries the whole look —
+   the window, the dense glistening droplets, and the soft blur they draw
+   over the face — so nothing is painted, filtered or wiped over it at
+   runtime. Every visitor, pointer or not, sees the same real window. */
 /* ── Reserve the scrollbar's lane, permanently ─────────────────────────
    Every modal on this site locks the page with `overflow: hidden`, which on
    any platform drawing a classic scrollbar reclaims ~15px of width — and the
@@ -187,11 +185,14 @@ html {
    the headline sitting in the clear space to its left. Verified against the
    real asset at 390x700, 390x600 and 430x780. */
 .hero-photo {
-  /* All blur/tint belongs to the erasable canvas, never the sharp source. */
+  /* The blur, the droplets, the tint — the entire wet-glass look is baked
+     into the photograph. No runtime filter, ever: a CSS filter here would
+     be a second layer over the picture, which is exactly what made the old
+     canvas pane read as fake. */
   filter: none;
-  /* The plate was re-cropped so the subject is centred IN THE IMAGE, so the
-     same 50% position holds on every viewport — a phone keeps his head in
-     frame because the plate itself, not object-position, does the framing. */
+  /* The plate was framed so the subject is centred IN THE IMAGE, so the same
+     50% position holds on every viewport — a phone keeps his head in frame
+     because the plate itself, not object-position, does the framing. */
   object-position: 50% 42%;
 }
 @media (min-width: 768px) {
@@ -203,21 +204,8 @@ html {
 /* ── The CULTURE LED CREATIVE ring ────────────────────────────────────
    The ring IS the label: CULTURE LED CREATIVE loops around the size of the O
    in AWESOMENESS. There is no lime rim and no second circle — the site's
-   small lime cursor reads inside the loop. */
-
-/* ── The earring ───────────────────────────────────────────────────────
-   A lime cross on the subject's ear. It belongs to the photograph, so it is
-   deliberately inert: no float, no spin, no physics — the same stillness as
-   the PAPI RABORIFE line above the headline. */
-.hero-earring {
-  will-change: transform;
-  transition: opacity 240ms ease;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d7ff4f' stroke-width='4.5' stroke-linecap='round'%3E%3Cpath d='M5 5 19 19M19 5 5 19'/%3E%3C/svg%3E");
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
-  filter: drop-shadow(0 0 6px rgba(215, 255, 79, 0.55)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
-}
+   small lime cursor reads inside the loop. It no longer erases anything;
+   the rain window is one photograph, so the ring is pure cursor identity. */
 
 /* ── The site cursor is the hero's lime circle ─────────────────────────
    CULTURE LED CREATIVE no longer owns a lime rim, so the site's own lime
