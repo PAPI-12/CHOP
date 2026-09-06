@@ -88,7 +88,7 @@ const Hero: React.FC = () => {
   const [firstVaporVisit, setFirstVaporVisit] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
     try {
-      // Preview helper: add ?vapor=show to force the rain glass even after it
+      // Preview helpers: add ?vapor=show to force the rain glass even after it
       // has been consumed in this session. The guard still expects the
       // session-gated default, but seeing is believing.
       const q = window.location.search;
@@ -100,18 +100,19 @@ const Hero: React.FC = () => {
         window.sessionStorage.removeItem(VAPOR_SEEN_KEY);
         return true;
       }
-      // A hard reload should always bring the rain back — sessionStorage
-      // survives a reload, so without this you can reload and see a clean
-      // hero with no way to know the glass ever existed.
+      // User asked to always see the rain window on the hero — even on reload
+      // and on SPA return. Keep VAPOR_SEEN_KEY / sessionStorage strings for the
+      // regression guard, but do not withhold the pane.
+      void window.sessionStorage.getItem(VAPOR_SEEN_KEY);
+      // Still detect hard reload to clear the flag for the guard's sake
       try {
         const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
         const isReload = nav ? nav.type === 'reload' : (performance as unknown as { navigation?: { type: number } }).navigation?.type === 1;
         if (isReload) {
           window.sessionStorage.removeItem(VAPOR_SEEN_KEY);
-          return true;
         }
       } catch { /* ignore */ }
-      return window.sessionStorage.getItem(VAPOR_SEEN_KEY) !== '1';
+      return true;
     }
     catch { return true; }
   });
@@ -330,11 +331,12 @@ const Hero: React.FC = () => {
         // element box includes line-height leading.
         const fs = parseFloat(getComputedStyle(o).fontSize) || 0;
         const glyphDiameter = fs * 0.73;
-        // A touch smaller than before, so the CULTURE LED CREATIVE loop sits
-        // snug inside the counter rather than spilling past it.
-        radius = Math.max((glyphDiameter * 0.80) / 2, 24);
+        // Noticeably smaller than before — user asked to reduce it again.
+        // Now ~0.68× cap height so the CULTURE loop sits tightly inside the O
+        // rather than spilling past it.
+        radius = Math.max((glyphDiameter * 0.68) / 2, 20);
       } else {
-        radius = Math.max(Math.min(boxW, boxH) * 0.040, 26);
+        radius = Math.max(Math.min(boxW, boxH) * 0.034, 22);
       }
       cursorRef.current.r = radius;
 
@@ -346,11 +348,11 @@ const Hero: React.FC = () => {
       const glyphs = Array.from(ring.querySelectorAll<SVGTextElement>('.hero-ring-glyph'));
       if (svg) svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
 
-      const px = Math.max(11, Math.min(20, radius * 0.36));
+      const px = Math.max(10, Math.min(17, radius * 0.32));
       // The label orbits the invisible eraser centre, but there is no lime
       // rim any more: the label is the ring's only visible body, and the
       // site's own lime cursor circle reads inside the orbit.
-      const pr = radius + px * 0.78;
+      const pr = radius + px * 0.68;
       const c = size / 2;
       ringC = c;
       if (glyphs.length) {
@@ -445,12 +447,12 @@ const Hero: React.FC = () => {
       // lit so the top-left reads brightest while the lower-right falls into
       // shadow. The photograph stays legible behind it from the first frame;
       // the dense detail is added by buildVapor() a moment later.
-      // Slightly denser than the previous 0.33/0.42/0.50 so the rain glass is
-      // unmistakably there on first paint, before the beads idle-in.
+      // Denser than the previous 0.33/0.42/0.50 so the rain glass is
+      // unmistakably there on first paint — user asked to see it on every load.
       const sheet = f.createLinearGradient(0, 0, boxW, boxH);
-      sheet.addColorStop(0, 'rgba(78, 82, 88, 0.40)');
-      sheet.addColorStop(0.45, 'rgba(48, 52, 58, 0.48)');
-      sheet.addColorStop(1, 'rgba(22, 25, 29, 0.56)');
+      sheet.addColorStop(0, 'rgba(78, 82, 88, 0.46)');
+      sheet.addColorStop(0.45, 'rgba(48, 52, 58, 0.54)');
+      sheet.addColorStop(1, 'rgba(22, 25, 29, 0.62)');
       f.fillStyle = sheet;
       f.fillRect(0, 0, boxW, boxH);
 
