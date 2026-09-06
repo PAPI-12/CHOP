@@ -38,7 +38,7 @@ const expoOut = (t: number) => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t));
    That rain then carries over the section boundary: while the stage
    slides up out of view the code rains off its bottom edge and continues
    as Selected Work's own rain, which overlaps that section with raindrops
-   until it lands, then is gone. */
+   until What I Do is completely out of view. */
 /** The hairline is drawn for this long before the rectangle opens. */
 const STRIKE_S = 0.22;
 /** How long the rectangle takes to open to the full stage. */
@@ -81,7 +81,7 @@ const rand = (i: number) => {
      The stream does not stop at the section boundary: while the stage
      slides up out of view the code rains off its bottom edge at hand-off
      strength and continues as Selected Work's own rain, which overlaps
-     the section until it arrives, then rains itself out.
+     the section until What I Do is completely out of view.
    ABOUT — never blank:
      0.00 → 0.78  the same continuous glide; AI CREATIVE sails off in its
                   original white like every other skill
@@ -136,7 +136,16 @@ const buildLineSchedule = (line: string, startAt: number) => {
   return { times, end: t + 0.12 };
 };
 
-const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' }) => {
+/** One lifecycle for both section-scoped canvases; scroll never re-renders React. */
+export type MatrixHandoff = {
+  source: HTMLElement | null;
+  active: boolean;
+};
+
+const WhatIDo: React.FC<{
+  variant?: 'home' | 'about';
+  matrixHandoffRef?: React.RefObject<MatrixHandoff>;
+}> = ({ variant = 'home', matrixHandoffRef }) => {
   /**
    * home  — skills glide → ART COMES 1ST parks and encodes → it browns out,
    *         then WHAT I DO · INITIALIZING decrypts (auto-played, scroll-held),
@@ -174,6 +183,19 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
     const stage = stageRef.current;
     if (!root || !stage) return;
 
+    const handoff = machineMode ? matrixHandoffRef?.current : undefined;
+    if (handoff) handoff.source = root;
+    const publishHandoff = (active: boolean) => {
+      const value = String(active);
+      if (root.dataset.matrixActive !== value) root.dataset.matrixActive = value;
+      if (handoff) handoff.active = active;
+    };
+    const clearHandoff = () => {
+      publishHandoff(false);
+      if (handoff?.source === root) handoff.source = null;
+    };
+    publishHandoff(false);
+
     const cards = cardRefs.current;
     const titles = titleRefs.current;
     const notes = noteRefs.current;
@@ -185,20 +207,13 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
     let rainAlpha = 0;
     /** 0 = normal fall, 1 = Reloaded surge on the way out. */
     let rainBoost = 0;
+    /** A remount after the transmission must not replay the one-shot rain. */
+    let rainConsumed = machineActSpent;
     /**
-     * True once the machine has finished saying its piece. Nothing rains —
-     * not in the section, not over the section below — until this flips.
+     * Latched after the last human-readable line. Releasing the pin does NOT
+     * end the hand-off: it stays live until the whole section leaves the
+     * viewport, or the visitor scrolls back out of the matrix phase.
      */
-    let humanSpoken = machineActSpent;
-    /**
-     * True once THIS page load has handed over to Selected Work. The hand-off
-     * rain is a once-per-load signature: it plays while the section is pulled
-     * up, but a revisit later in the same visit shows the work without
-     * re-tripping the matrix. A reload starts a fresh page, so it plays again.
-     */
-    let rainConsumed = false;
-    /** True only during the single hand-off pass that actually carries the
-        visitor into the next section. */
     let handoffActive = false;
 
     /**
@@ -301,10 +316,22 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
     /** Full reset — called when the section leaves the viewport either way. */
     const resetAct = () => {
       actStart = -1;
-      humanSpoken = machineActSpent;
       disarmLock();
       if (initRef.current) { initRef.current.dataset.txt = ''; initRef.current.style.opacity = '0'; }
       lineRefs.current.forEach((el) => { if (el) { el.dataset.txt = ''; el.style.visibility = 'hidden'; } });
+    };
+
+    const consumeRain = () => {
+      if (handoffActive) {
+        rainConsumed = true;
+        machineActSpent = true;
+      }
+      handoffActive = false;
+      rainAlpha = 0;
+      rainBoost = 0;
+      publishHandoff(false);
+      if (rainRef.current) rainRef.current.style.clipPath = 'inset(50% 0px 50% 0px)';
+      resetAct();
     };
 
     /* ── Stack painting ─────────────────────────────────────────────── */
@@ -355,7 +382,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
        * spoken lines — plays on a clean stage.
        */
       const surgeT = actT > SPEAK_END ? smoothstep((actT - SPEAK_END) / 1.5) : 0;
-      if (machineMode && actT > SPEAK_END) humanSpoken = true;
+      if (machineMode && !rainConsumed && actT > SPEAK_END) handoffActive = true;
       if (machineMode && actStart > 0 && actT > ACT_DONE) {
         // Transmission complete: release any hold and remember — the machine
         // plays once per visit, then the section belongs to scroll again.
@@ -364,34 +391,10 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
         machineActSpent = true;
         disarmLock();
       }
-      // The hand-off rain is once per page load. The first time the machine
-      // hands the visitor into the deep end, hold the rain at full strength
-      // for that pull; once they have either been carried through (deep end)
-      // or backed away from it, remember it and never re-trip the matrix for
-      // the rest of this visit (a reload resets this module state).
-      if (
-        machineMode &&
-        !handoffActive &&
-        !rainConsumed &&
-        machineActSpent &&
-        actStart < 0 &&
-        p >= T_VANISH_END
-      ) {
-        handoffActive = true;
-      }
-      if (machineMode && handoffActive) {
-        // Stay live all the way to the bottom of the pin so the code hands
-        // straight over to Selected Work, then is consumed.
-        if (p > 0.999 || p < T_VANISH_END - 0.08) {
-          handoffActive = false;
-          rainConsumed = true;
-        }
-      }
-
-      // After the transmission (or after a breakout), the deep end of the pin
-      // still carries the code rain and the continue guide — scroll-driven now,
-      // but only during the single pass that actually handed over.
-      const spentZone = machineMode && handoffActive ? 1 : 0;
+      // The terminal clock may reset at the end of the pin, but the rain and
+      // continue guide remain fully open throughout the section overlap.
+      // While the clock is live, retain the original strike/open choreography.
+      const spentZone = machineMode && handoffActive && actStart < 0 ? 1 : 0;
 
       // About exit: furniture fades as "continue" takes over the stage.
       const outT = machineMode ? 0 : smoothstep((p - 0.84) / 0.14);
@@ -412,8 +415,9 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       const revealT = machineMode && actStart > 0 && actT > SPEAK_END + STRIKE_S
         ? clamp01((actT - (SPEAK_END + STRIKE_S)) / OPEN_S)
         : 0;
-      // Revisiting after the act has played: the section is already open.
-      const opened = revealT > 0 ? expoOut(revealT) : (spentZone > 0 ? 1 : 0);
+      // Never re-clip the canvas when the pin releases. Only consuming the
+      // hand-off (actual viewport exit / clearing the matrix) closes it.
+      const opened = handoffActive ? (revealT > 0 ? expoOut(revealT) : spentZone) : 0;
 
       const rainEl = rainRef.current;
       if (rainEl) {
@@ -444,10 +448,8 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       // Behind the clip the code is at full strength almost immediately —
       // the reveal is the clip's job, not the alpha's.
       const surgeA = actT > SPEAK_END ? smoothstep((actT - SPEAK_END) / 0.5) : 0;
-      rainAlpha = machineMode
-        ? Math.max(surgeA, humanSpoken || machineActSpent ? spentZone * 0.5 : 0)
-        : 0;
-      rainBoost = surgeT;
+      rainAlpha = machineMode && handoffActive ? Math.max(surgeA, spentZone) : 0;
+      rainBoost = Math.max(surgeT, spentZone);
 
       const idx = Math.min(LAST, Math.round(Math.min(front, LAST)));
       if (counterRef.current && counterRef.current.dataset.n !== String(idx)) {
@@ -751,7 +753,15 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       const vh = window.innerHeight;
       const travel = rect.height - vh;
       const p = travel > 0 ? clamp01(-rect.top / travel) : 0;
-      const stageVisible = rect.bottom > -1 && rect.top < vh + 1;
+      const stageVisible = rect.bottom > 0 && rect.top < vh;
+
+      // Progress is clamped at 1 while the stage slides away, so this MUST be
+      // checked every frame, not only in paint(). Even one visible pixel of
+      // What I Do keeps both canvases raining at full hand-off strength.
+      if (handoffActive && (!stageVisible || p < T_VANISH_END - 0.08)) {
+        consumeRain();
+        lastProgress = -1;
+      }
 
       // Repaint on scroll movement, and repaint continuously ONLY while the
       // machine act is actually playing — it runs on its own clock, not on the
@@ -763,21 +773,9 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
         paint(p, now);
       }
 
-      // Carry-over: the pin is spent and the stage is now sliding up out of
-      // view. The code does NOT stop at the section boundary — it rains off
-      // the stage's bottom edge at hand-off strength and continues as
-      // Selected Work's own rain below the seam (see SelectedWork.tsx), so
-      // the hand-off reads as one unbroken stream of raindrops across both
-      // sections instead of a dry gap at the boundary. It eases down over
-      // the last 40% of the exit so the hand-over to the section's full
-      // rain reads as a blend, not a cut.
-      if (machineMode && rainConsumed && stageVisible) {
-        const exitT = (-rect.top - (rect.height - vh)) / vh;
-        if (exitT > 0) {
-          const ease = Math.max(0, exitT < 0.6 ? 1 : 1 - (exitT - 0.6) / 0.4);
-          rainAlpha = Math.max(rainAlpha, 0.55 * ease);
-        }
-      }
+      // Selected Work reads the same latch. There is no exit fade, timer,
+      // or second one-shot flag that can cut the rain off at the seam.
+      publishHandoff(handoffActive && stageVisible);
 
       // Rain — rendered on a half-cadence tick. Falling code is perceived as
       // continuous at ~30fps, and half the fillText work per second keeps the
@@ -884,7 +882,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
         el.style.visibility = 'visible';
         el.textContent = line;
       });
-      return;
+      return clearHandoff;
     }
 
     /**
@@ -897,11 +895,9 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
         const wasOn = onScreen;
         onScreen = !!entry?.isIntersecting;
         if (onScreen) { lastT = 0; measure(); setupRain(); lastProgress = -1; }
-        // Leaving the section (up or down) resets the machine to the start:
-        // come back and you see skills, not a spent terminal.
-        if (wasOn && !onScreen) {
-          resetAct();
-        }
+        // Also handle a fast jump that skips the last visible frame. The
+        // completed hand-off stays consumed when scrolling back or revisiting.
+        if (wasOn && !onScreen) consumeRain();
       },
       { rootMargin: '20% 0px 20% 0px' },
     );
@@ -913,7 +909,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       resizeTimer = window.setTimeout(() => {
         measure();
         setupRain();
-            lastProgress = -1;
+        lastProgress = -1;
       }, 150);
     };
     window.addEventListener('resize', onResize, { passive: true });
@@ -924,11 +920,12 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       running = false;
       cancelAnimationFrame(raf);
       disarmLock();
+      clearHandoff();
       window.clearTimeout(resizeTimer);
       window.removeEventListener('resize', onResize);
       io.disconnect();
     };
-  }, [machineMode, SCREENS]);
+  }, [machineMode, SCREENS, matrixHandoffRef]);
 
   return (
     // Tall spacer drives the pin; the stage inside is what stays on screen.
@@ -936,6 +933,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
     // collapsing is how this section used to lose its lock and flash past.
     <div
       ref={rootRef}
+      data-matrix-active="false"
       className="relative z-10 bg-[#000000]"
       style={{ height: machineMode ? '820vh' : '560vh' }}
     >
@@ -952,7 +950,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
           className="pointer-events-none absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d7ff4f]/35 to-transparent"
         />
 
-        {/* Matrix rain sits behind the type but above the ambient wash.
+        {/* Matrix rain sits behind the type on pure black.
             Home only — the About variant never wakes the machine. */}
         {/* The rain, and the hairline it opens out of. Same component parts
             as the page transition, same easing — one gesture the site reuses
@@ -961,7 +959,7 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
           <>
           <canvas
             ref={rainRef}
-            className="pointer-events-none absolute inset-0 z-[2]"
+            className="matrix-rain pointer-events-none absolute inset-0 z-[2]"
             style={{ clipPath: 'inset(50% 0px 50% 0px)' }}
             aria-hidden
           />
