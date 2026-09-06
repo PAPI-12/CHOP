@@ -381,7 +381,13 @@ const click = (window, el) =>
     !/resetMachineAct/.test(nav) && !/resetMachineAct/.test(what));
 
   check('the incoming work rain hands over once per page load',
-    /handoffRainSpent/.test(sw) && /RAIN_IN = 0/.test(sw) && /at FULL strength the instant/i.test(sw));
+    /handoffRainSpent/.test(sw) && /at FULL strength the instant/i.test(sw));
+  check('the work rain is full the instant the section edge arrives, then rains out on arrival',
+    /top > 0\) alpha = 1/.test(sw) && /rainDone/.test(sw));
+  check('the code rains off the stage onto Selected Work — no dry gap at the boundary',
+    /rainConsumed && stageVisible/.test(what) && /exitT/.test(what));
+  check('the human text reveals the matrix code — the strike waits for the last character',
+    /clamp01\(\(actT - SPEAK_END\) \/ STRIKE_S\)/.test(what) && /SPEAK_END \+ STRIKE_S/.test(what));
 }
 
 console.log(`\n${failures === 0 ? 'ALL REGRESSION GUARDS PASS' : failures + ' FAILED'}`);

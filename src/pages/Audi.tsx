@@ -8,7 +8,7 @@ import AudiApp from '../components/audi/AudiApp';
 const Audi: React.FC = () => {
   return (
     <div className="audi-case bg-[#11100e]">
-      <div className="bg-[#171715] px-4 sm:px-6 lg:px-12 xl:px-24 pt-24 md:pt-28 pb-4">
+      <div className="bg-[#000000] px-4 sm:px-6 lg:px-12 xl:px-24 pt-24 md:pt-28 pb-4">
         <div className="max-w-[1600px] mx-auto">
           <Link
             to="/work"

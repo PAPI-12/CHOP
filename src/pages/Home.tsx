@@ -19,7 +19,7 @@ const Home: React.FC = () => {
     // grain film used to be per-section, and each section's own film sliding
     // into view read as the site "jittering" while scrolling.
     <div
-      className="relative z-10 bg-[#171715]"
+      className="relative z-10 bg-[#000000]"
       style={{
         backgroundImage:
           'radial-gradient(90% 60% at 85% -10%, rgba(215,255,79,0.16), transparent 55%), radial-gradient(70% 50% at -10% 30%, rgba(215,196,170,0.1), transparent 60%), radial-gradient(80% 60% at 50% 120%, rgba(245,243,238,0.06), transparent 62%)',
@@ -29,7 +29,7 @@ const Home: React.FC = () => {
 
       {/* About holds while What I Do — a full opaque page — scrolls over it. */}
       <div className="relative">
-        <section className="sticky top-0 z-0 h-[100svh] min-h-[540px] w-full overflow-hidden bg-[#171715]">
+        <section className="sticky top-0 z-0 h-[100svh] min-h-[540px] w-full overflow-hidden bg-[#000000]">
           <div className="absolute inset-0">
             <img loading="lazy"
               src="/images/PAPI RABORIFE ABOUT COVER.webp"
@@ -39,8 +39,8 @@ const Home: React.FC = () => {
               fetchPriority="low"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#171715] via-[#171715]/70 to-[#171715]/30" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#171715] via-transparent to-[#171715]/60" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#000000] via-[#000000]/70 to-[#000000]/30" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#000000] via-transparent to-[#000000]/60" />
           </div>
 
           <div className="relative z-10 h-full flex items-end md:items-center px-4 sm:px-6 lg:px-12 xl:px-24 py-20 md:py-32">
@@ -75,7 +75,7 @@ const Home: React.FC = () => {
 
       <Clients />
 
-      <section className="px-4 sm:px-6 lg:px-12 xl:px-24 py-20 md:py-32">
+      <section className="px-4 sm:px-6 lg:px-12 xl:px-24 py-20 md:py-32 bg-[#000000]">
         <div className="max-w-[1600px] mx-auto text-center">
           <Reveal>
             <p className="hand-note text-[#d7c4aa] text-2xl md:text-4xl mb-4">let's build something unforgettable</p>

@@ -14,9 +14,12 @@
 }
 
 :root {
-  --bg-main: #171715;
-  --bg-panel: #1d1d1a;
-  --bg-panel-alt: #23221f;
+  /* The whole site's dark surface is PURE #000000 black — one colour, no
+     dark-grey steps, so the brand colours stand out against it. Panels
+     share it too. */
+  --bg-main: #000000;
+  --bg-panel: #000000;
+  --bg-panel-alt: #000000;
   --text-main: #f5f3ee;
   --text-muted: #8f8f88;
   --text-cream: #d7c4aa;
@@ -67,7 +70,9 @@
 /* Grain film — a FIXED full-viewport layer, not a per-section one.
    A section-absolute film (the old behaviour) made each section's own grain
    slide into view, which read as the whole site "jittering" while scrolling.
-   One viewport-locked layer keeps the film still and continuous. */
+   One viewport-locked layer keeps the film still and continuous.
+   `screen` (not `overlay`) so the film stays visible on the site's pure
+   #000000 black — overlay blending vanishes on a black base. */
 .mix-grain::before {
   content: '';
   position: fixed;
@@ -76,7 +81,7 @@
   z-index: 40;
   transform: translateZ(0);
   opacity: 0.035;
-  mix-blend-mode: overlay;
+  mix-blend-mode: screen;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 180px 180px;
@@ -86,7 +91,8 @@
   position: absolute;
   inset: 0;
   opacity: 0.045;
-  mix-blend-mode: overlay;
+  /* `screen` so the film reads on the pure #000000 black. */
+  mix-blend-mode: screen;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 160px 160px;

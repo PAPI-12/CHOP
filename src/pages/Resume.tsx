@@ -39,7 +39,7 @@ const Resume: React.FC = () => {
   const handlePrint = () => window.print();
 
   return (
-    <div className="resume-page min-h-screen bg-[#171715] pt-24 md:pt-28 pb-0 overflow-hidden">
+    <div className="resume-page min-h-screen bg-[#000000] pt-24 md:pt-28 pb-0 overflow-hidden">
       <div className="resume-actions px-4 sm:px-6 lg:px-12 xl:px-24 mb-8 md:mb-14">
         <div className="max-w-[1600px] mx-auto flex items-center justify-between gap-3 md:gap-4 flex-wrap">
           <Link to="/" className="inline-flex items-center gap-2 text-[10px] md:text-xs font-bold uppercase tracking-[0.25em] text-[#8f8f88] hover:text-[#d7ff4f] transition-colors">
@@ -78,7 +78,7 @@ const Resume: React.FC = () => {
                 <span className="w-8 h-[1px] bg-[#d7ff4f]" />
                 <p className="text-[10px] md:text-xs font-bold tracking-[0.3em] uppercase text-[#d7ff4f]">PHASE 03 — CAPABILITY MATRIX</p>
               </div>
-              <div className="grid grid-cols-1 divide-y divide-white/10 border-y border-white/10 bg-[#1d1d1a] rounded-xl overflow-hidden">
+              <div className="grid grid-cols-1 divide-y divide-white/10 border-y border-white/10 bg-[#000000] rounded-xl overflow-hidden">
                 {skills.map((s) => (
                   <div key={s} className="flex items-center justify-between px-4 py-3 md:py-3.5">
                     <span className="text-[10px] md:text-xs font-bold uppercase tracking-[0.15em] text-[#f5f3ee]">{s}</span>
@@ -173,8 +173,8 @@ const Resume: React.FC = () => {
             <div key={dup} className="flex gap-8 md:gap-14 items-center shrink-0">
               {marquee.map((item, j) => (
                 <span key={j} className="flex shrink-0 items-center gap-8 md:gap-14">
-                  <span className="font-mono text-[10px] md:text-sm font-black uppercase tracking-[0.2em] text-[#171715]">{item}</span>
-                  <span className="text-[#171715] text-sm">✦</span>
+                  <span className="font-mono text-[10px] md:text-sm font-black uppercase tracking-[0.2em] text-[#000000]">{item}</span>
+                  <span className="text-[#000000] text-sm">✦</span>
                 </span>
               ))}
             </div>

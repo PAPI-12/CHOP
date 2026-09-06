@@ -33,14 +33,14 @@ const clampFont = (name: string, baseScale: number, mobileBase: number, desktopB
 
 const Clients: React.FC = () => {
   return (
-    <section className="relative min-h-screen bg-[#171715] overflow-x-clip py-20 md:py-28 lg:py-32">
-      <div className="absolute inset-0 bg-[#171715]" />
+    <section className="relative min-h-screen bg-[#000000] overflow-x-clip py-20 md:py-28 lg:py-32">
+      <div className="absolute inset-0 bg-[#000000]" />
       <div
         aria-hidden
         className="absolute inset-0"
         style={{
           background:
-            'radial-gradient(ellipse 70% 55% at 50% 42%, rgba(245,243,238,0.05), transparent 58%), linear-gradient(90deg, rgba(23,23,21,0.92), transparent 18%, transparent 82%, rgba(23,23,21,0.92))',
+            'radial-gradient(ellipse 70% 55% at 50% 42%, rgba(245,243,238,0.05), transparent 58%), linear-gradient(90deg, rgba(0, 0, 0,0.92), transparent 18%, transparent 82%, rgba(0, 0, 0,0.92))',
         }}
       />
       <div aria-hidden className="film-grain" />

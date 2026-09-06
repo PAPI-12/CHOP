@@ -116,7 +116,7 @@ const Contact: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#171715] pt-24 md:pt-32">
+    <div className="min-h-screen bg-[#000000] pt-24 md:pt-32">
       <section className="px-4 sm:px-6 lg:px-12 xl:px-24 py-6 md:py-16">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-[1600px] mx-auto">
           <p className="text-[10px] md:text-xs font-bold tracking-[0.3em] uppercase mb-3 md:mb-4 text-[#8f8f88]">Get In Touch</p>
@@ -156,7 +156,7 @@ const Contact: React.FC = () => {
             </div>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="bg-[#1d1d1a] p-5 md:p-10 rounded-2xl md:rounded-3xl">
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="bg-[#000000] p-5 md:p-10 rounded-2xl md:rounded-3xl">
             <form onSubmit={handleSubmit} className="space-y-5 md:space-y-6" noValidate={false}>
               <input
                 type="text"
@@ -171,16 +171,16 @@ const Contact: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
                 <div>
                   <label className="block text-[10px] md:text-xs text-[#8f8f88] uppercase tracking-wider mb-2">Name</label>
-                  <input type="text" required minLength={2} maxLength={120} autoComplete="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full bg-[#171715] border border-white/10 rounded-lg px-4 py-3 text-sm md:text-base text-[#f5f3ee] focus:border-[#d7ff4f] focus:outline-none transition-colors" placeholder="Your name" />
+                  <input type="text" required minLength={2} maxLength={120} autoComplete="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full bg-[#000000] border border-white/10 rounded-lg px-4 py-3 text-sm md:text-base text-[#f5f3ee] focus:border-[#d7ff4f] focus:outline-none transition-colors" placeholder="Your name" />
                 </div>
                 <div>
                   <label className="block text-[10px] md:text-xs text-[#8f8f88] uppercase tracking-wider mb-2">Email</label>
-                  <input type="email" required maxLength={254} autoComplete="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full bg-[#171715] border border-white/10 rounded-lg px-4 py-3 text-sm md:text-base text-[#f5f3ee] focus:border-[#d7ff4f] focus:outline-none transition-colors" placeholder="your@email.com" />
+                  <input type="email" required maxLength={254} autoComplete="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full bg-[#000000] border border-white/10 rounded-lg px-4 py-3 text-sm md:text-base text-[#f5f3ee] focus:border-[#d7ff4f] focus:outline-none transition-colors" placeholder="your@email.com" />
                 </div>
               </div>
               <div>
                 <label className="block text-[10px] md:text-xs text-[#8f8f88] uppercase tracking-wider mb-2">Project Type</label>
-                <select value={formData.project} onChange={(e) => setFormData({ ...formData, project: e.target.value })} className="w-full bg-[#171715] border border-white/10 rounded-lg px-4 py-3 text-sm md:text-base text-[#f5f3ee] focus:border-[#d7ff4f] focus:outline-none transition-colors">
+                <select value={formData.project} onChange={(e) => setFormData({ ...formData, project: e.target.value })} className="w-full bg-[#000000] border border-white/10 rounded-lg px-4 py-3 text-sm md:text-base text-[#f5f3ee] focus:border-[#d7ff4f] focus:outline-none transition-colors">
                   <option value="">Select a project type</option>
                   <option value="uxui">UX/UI – Tau Foods</option>
                   <option value="artdirection">Art Direction – SARS</option>
@@ -193,7 +193,7 @@ const Contact: React.FC = () => {
               </div>
               <div>
                 <label className="block text-[10px] md:text-xs text-[#8f8f88] uppercase tracking-wider mb-2">Message</label>
-                <textarea required minLength={10} maxLength={4000} value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} rows={5} className="w-full bg-[#171715] border border-white/10 rounded-lg px-4 py-3 text-sm md:text-base text-[#f5f3ee] focus:border-[#d7ff4f] focus:outline-none transition-colors resize-none" placeholder="Tell me about your project..." />
+                <textarea required minLength={10} maxLength={4000} value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} rows={5} className="w-full bg-[#000000] border border-white/10 rounded-lg px-4 py-3 text-sm md:text-base text-[#f5f3ee] focus:border-[#d7ff4f] focus:outline-none transition-colors resize-none" placeholder="Tell me about your project..." />
               </div>
               <label className="flex items-start gap-3 text-[10px] md:text-xs leading-relaxed text-[#8f8f88] cursor-pointer">
                 <input
@@ -211,7 +211,7 @@ const Contact: React.FC = () => {
               <button
                 type="submit"
                 disabled={status === 'sending'}
-                className="w-full py-4 bg-[#d7ff4f] text-[#171715] font-display text-xs md:text-sm uppercase tracking-[0.22em] hover:bg-[#f5f3ee] transition-colors rounded-full border border-transparent disabled:cursor-wait disabled:opacity-60"
+                className="w-full py-4 bg-[#d7ff4f] text-[#000000] font-display text-xs md:text-sm uppercase tracking-[0.22em] hover:bg-[#f5f3ee] transition-colors rounded-full border border-transparent disabled:cursor-wait disabled:opacity-60"
               >
                 {status === 'sending' ? 'SENDING…' : 'SEND MESSAGE'}
               </button>

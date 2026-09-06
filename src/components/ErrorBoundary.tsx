@@ -18,7 +18,7 @@ class ErrorBoundary extends React.Component<React.PropsWithChildren, State> {
   render() {
     if (!this.state.failed) return this.props.children;
     return (
-      <main className="min-h-screen flex items-center justify-center bg-[#171715] px-4">
+      <main className="min-h-screen flex items-center justify-center bg-[#000000] px-4">
         <div className="max-w-xl text-center">
           <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#8f8f88] mb-5">Interface recovery</p>
           <h1 className="font-display text-4xl md:text-7xl leading-[0.9] text-[#f5f3ee]">
@@ -26,7 +26,7 @@ class ErrorBoundary extends React.Component<React.PropsWithChildren, State> {
           </h1>
           <p className="mt-6 text-sm text-[#8f8f88]">Your form data has not been submitted. Reload the page or contact the studio directly.</p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <button onClick={() => window.location.reload()} className="rounded-full border border-[#d7ff4f] px-6 py-3 font-display text-xs tracking-[0.2em] text-[#d7ff4f] hover:bg-[#d7ff4f] hover:text-[#171715] transition-colors">RELOAD</button>
+            <button onClick={() => window.location.reload()} className="rounded-full border border-[#d7ff4f] px-6 py-3 font-display text-xs tracking-[0.2em] text-[#d7ff4f] hover:bg-[#d7ff4f] hover:text-[#000000] transition-colors">RELOAD</button>
             <a href="mailto:papiraborife@gmail.com" className="rounded-full border border-white/15 px-6 py-3 font-display text-xs tracking-[0.2em] text-[#f5f3ee] hover:border-[#d7ff4f] transition-colors">EMAIL STUDIO</a>
           </div>
         </div>
