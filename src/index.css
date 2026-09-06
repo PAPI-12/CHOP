@@ -162,13 +162,13 @@
   .matrix-guide-caret { animation: none; }
 }
 
-/* ── Hero: the rain window ─────────────────────────────────────────────
-   The wet glass is not an effect: one photograph carries the window, the
-   dense glistening droplets and the soft blur they draw over the face. On a
-   desktop that rain photograph is drawn onto a canvas pane which the cursor
-   ring and the flying letters squeegee away — `destination-out` strokes
-   reveal the sharp photograph of the same scene underneath. Touch and
-   reduced-motion visitors keep the unbroken rain window; there is nothing
+/* ── Hero: the original photograph, behind a rain window ─────────────
+   The photograph is the original portrait, untouched — every visitor lands
+   on it. On a desktop a rain pane sits over it: the same plate, softened to
+   graphite glass and wearing the droplets of a real rain window, drawn onto
+   a canvas which the cursor ring and the flying letters squeegee away —
+   `destination-out` strokes reveal the sharp photograph underneath. Touch
+   and reduced-motion visitors keep the clean photograph; there is nothing
    to wipe with. */
 /* ── Reserve the scrollbar's lane, permanently ─────────────────────────
    Every modal on this site locks the page with `overflow: hidden`, which on
@@ -181,20 +181,18 @@ html {
   scrollbar-gutter: stable;
 }
 
-/* Two plates, one geometry. The rain window and the clear photograph behind
-   it share this class, so their object-cover crops can never diverge — the
-   wipe's whole illusion is that the reveal sits exactly under the droplet
-   blur it replaces. The clear plate is only mounted where the pane exists;
-   both are the same 1904×1328 plate, re-framed per shape below.
+/* One plate for every viewport, re-framed per shape. The rain pane shares
+   this geometry: it is read off this element by the canvas, so the pane's
+   object-cover crop can never diverge from the photograph's — the wipe's
+   whole illusion is that the reveal sits exactly under the droplet blur it
+   replaces.
    On a wide screen, centred, a hair above true centre. On a phone the crop is
    brutal — a 390px window into a ~1250px-wide plate — and dead centre slices
    his face in half at the right edge. 42% keeps his head in frame with
    the headline sitting in the clear space to its left. */
 .hero-photo {
-  /* The droplets, the wet-glass blur and the reveal are all in the
-     photographs. No runtime filter, ever: a CSS filter here would be a
-     second layer over the picture, which is exactly what made the old
-     painted pane read as fake. */
+  /* The original photograph, as shot. No runtime filter, ever: the blur and
+     the droplets live in the pane above it, never on the picture itself. */
   filter: none;
   object-position: 50% 42%;
 }
@@ -202,6 +200,11 @@ html {
   .hero-photo {
     object-position: 50% 46%;
   }
+}
+/* The rain pane's plate. It exists only to be decoded — the canvas draws it,
+   so it must never be visible or take a hit. */
+.hero-pane-plate {
+  visibility: hidden;
 }
 
 /* ── The CULTURE LED CREATIVE ring ────────────────────────────────────

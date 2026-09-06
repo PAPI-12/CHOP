@@ -1,11 +1,11 @@
 /** Rain-pane and bounded-work regressions; exercises the real wipe controller
- * and Hero effects. The pane is the rain photograph itself — drawn once onto a
- * canvas, never a computed glass field — so this guards: the pane is a
- * photograph, the reveal layer stays hidden until rain is showing, the ring
- * squeegees, opaque wipe cores, cached brushes, unique coverage, completion
- * cleanup, no re-fog after late loads or resizes, grain exclusion over the
- * photo, high-DPI effect budgets, clean mobile and reduced-motion modes, and
- * matching cover-aware image/preload candidates. */
+ * and Hero effects. The photograph is the ORIGINAL portrait and the pane is a
+ * plate built on it — drawn once onto a canvas, never a computed glass field —
+ * so this guards: the base plate is the original, the pane plate is decoded
+ * but never shown, the ring squeegees, opaque wipe cores, cached brushes,
+ * unique coverage, completion cleanup, no re-fog after late loads or resizes,
+ * grain exclusion over the photo, high-DPI effect budgets, clean mobile and
+ * reduced-motion modes, and matching cover-aware image/preload candidates. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -70,8 +70,8 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
   let loaded = false;
   Object.defineProperties(window.HTMLImageElement.prototype, {
     complete: { configurable: true, get: () => loaded },
-    naturalWidth: { configurable: true, get: () => loaded ? 1904 : 0 },
-    naturalHeight: { configurable: true, get: () => loaded ? 1328 : 0 },
+    naturalWidth: { configurable: true, get: () => loaded ? 1920 : 0 },
+    naturalHeight: { configurable: true, get: () => loaded ? 1353 : 0 },
   });
   let resolveFonts;
   Object.defineProperty(doc, 'fonts', { value: { ready: new Promise(resolve => { resolveFonts = resolve; }) } });
@@ -142,7 +142,10 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
     advance();
   };
   const flushIdle = () => { for (const [key, cb] of [...idle]) if (idle.delete(key)) cb(); };
-  const imageLoaded = () => { loaded = true; doc.querySelector('img.hero-photo')?.dispatchEvent(new window.Event('load')); };
+  const imageLoaded = () => {
+    loaded = true;
+    for (const img of doc.querySelectorAll('#hero img')) img.dispatchEvent(new window.Event('load'));
+  };
   const resize = async (w, h = height) => {
     window.innerWidth = w;
     window.innerHeight = h;
@@ -216,11 +219,14 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
   const canvas = t.canvas();
   assert.ok(canvas, 'desktop starts with the rain pane over the photograph');
   const photos = [...t.doc.querySelectorAll('#hero img.hero-photo')];
-  assert.equal(photos.length, 2, 'the hero layers the rain window and the clear photograph');
-  const [rain, clear] = photos;
-  assert.ok(/hero-rain-window/.test(rain.getAttribute('src')), 'the base plate is the rain window');
-  assert.ok(/hero-clear/.test(clear.getAttribute('src')), 'the reveal layer is the clear photograph');
-  assert.equal(clear.style.visibility, 'hidden', 'the reveal stays hidden until the pane is showing rain');
+  assert.equal(photos.length, 1, 'the hero shows exactly one photograph: the original');
+  const [photo] = photos;
+  assert.ok(/hero-landscape/.test(photo.getAttribute('src')), 'the base plate is the original photograph');
+  assert.ok(!/rain|clear/.test(photo.getAttribute('src')), 'the base plate is never a re-rendered scene');
+  const pane = t.doc.querySelector('#hero img.hero-pane-plate');
+  assert.ok(pane && /hero-rain-pane/.test(pane.getAttribute('src')), 'the pane plate is the rain pane built on the original');
+  assert.ok(/\bopacity-0\b/.test(pane.className) && pane.getAttribute('aria-hidden') !== null,
+    'the pane plate is decoded but never shown — the canvas is the only glass on screen');
   assert.equal(t.imageDataCalls(), 0, 'the pane is a photograph, not a computed glass field');
   assert.equal(t.idle.size, 0, 'no deferred pane work is scheduled');
 
@@ -228,8 +234,8 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
   const drawsBefore = ctx.photoDraws;
   t.imageLoaded();
   t.advance();
-  assert.ok(ctx.photoDraws > drawsBefore, 'the pane draws the rain photograph itself');
-  assert.equal(clear.style.visibility, '', 'the reveal is armed once the pane is showing rain');
+  assert.ok(ctx.photoDraws > drawsBefore, 'the pane draws the rain plate itself');
+  assert.equal(photo.style.visibility, '', 'the original photograph is never hidden');
   const earring = t.doc.querySelector('.hero-earring');
   assert.ok(earring, 'the earring is on the photograph');
   assert.ok(earring.style.transform.length > 0 && earring.style.opacity === '1', 'the earring is pinned on the lobe in image space');
@@ -249,7 +255,8 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
   assert.equal(canvas.width * canvas.height, 1, 'completed overlay releases its large buffer');
   await t.resize(600);
   assert.equal(t.canvas(), null, 'narrow layout has no interactive overlay');
-  assert.equal(t.doc.querySelectorAll('#hero img.hero-photo').length, 1, 'narrow layout keeps only the rain window');
+  assert.equal(t.doc.querySelector('#hero img.hero-pane-plate'), null, 'narrow layout never fetches the pane plate');
+  assert.equal(t.doc.querySelectorAll('#hero img.hero-photo').length, 1, 'narrow layout keeps the original photograph');
   await t.resize(1200);
   assert.equal(t.canvas().style.visibility, 'hidden', 'returning to desktop does not re-fog the window');
 
@@ -265,7 +272,7 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
   t.window.heroTest.unmount();
   assert.equal(grain.style.getPropertyValue('--hero-grain-inset'), '', 'navigation removes the scoped grain mask');
   t.close();
-  console.log('PASS  photograph pane, hidden reveal, StrictMode, late callbacks, responsive remounts and scrolling preserve the wipe');
+  console.log('PASS  original photograph, hidden pane plate, StrictMode, late callbacks, responsive remounts and scrolling preserve the wipe');
 }
 
 {
@@ -283,32 +290,38 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
 
 for (const options of [{ touch: true, width: 390 }, { reduce: true }]) {
   const t = await boot(options);
-  assert.ok(t.doc.querySelector('img.hero-photo'), 'every visitor gets the rain-window photograph');
-  assert.equal(t.doc.querySelectorAll('#hero img.hero-photo').length, 1, 'no reveal layer without a cursor');
+  const photo = t.doc.querySelector('img.hero-photo');
+  assert.ok(photo && /hero-landscape/.test(photo.getAttribute('src')), 'every visitor gets the original photograph');
+  assert.equal(t.doc.querySelectorAll('#hero img').length, 1, 'no pane plate without a cursor');
   assert.equal(t.canvas(), null, 'no pane without a cursor');
   assert.equal(t.doc.querySelector('.hero-ring'), null, 'no ring without a cursor');
   assert.ok(t.doc.querySelector('.hero-earring'), 'the earring is there too');
   assert.equal(t.idle.size, 0, 'no deferred work is scheduled');
   t.close();
 }
-console.log('PASS  touch and reduced motion land on the unbroken rain window, earring included');
+console.log('PASS  touch and reduced motion land on the clean original photograph, earring included');
 
 {
   const t = await boot();
-  const photos = [...t.doc.querySelectorAll('img.hero-photo')];
+  const photo = t.doc.querySelector('img.hero-photo');
+  const pane = t.doc.querySelector('img.hero-pane-plate');
   const head = new JSDOM(fs.readFileSync(new URL('../../index.html', import.meta.url), 'utf8'));
   const preloads = [...head.window.document.querySelectorAll('link[rel="preload"][as="image"]')];
-  assert.equal(preloads.length, 2, 'both hero plates are preloaded');
-  for (const photo of photos) {
-    const preload = preloads.find(p => p.getAttribute('imagesrcset') === photo.getAttribute('srcset'));
-    assert.ok(preload, `a preload matches the ${photo.getAttribute('src')} family`);
-    assert.equal(preload.getAttribute('imagesizes'), photo.getAttribute('sizes'));
-    assert.equal(photo.getAttribute('sizes'), 'max(100vw, 142svh, 767px)', 'portrait screens select for the actual object-cover width');
-    assert.equal(photo.getAttribute('width'), '1904');
-    assert.equal(photo.getAttribute('height'), '1328');
-    assert.equal(photo.getAttribute('loading'), 'eager');
-    assert.equal(photo.getAttribute('decoding'), 'async');
-    for (const candidate of photo.getAttribute('srcset').split(',')) {
+  assert.equal(preloads.length, 2, 'the photograph and the pane are preloaded');
+  const plates = [
+    { img: photo, width: '2559', height: '1803' },
+    { img: pane, width: '1920', height: '1353' },
+  ];
+  for (const { img, width, height } of plates) {
+    const preload = preloads.find(p => p.getAttribute('imagesrcset') === img.getAttribute('srcset'));
+    assert.ok(preload, `a preload matches the ${img.getAttribute('src')} family`);
+    assert.equal(preload.getAttribute('imagesizes'), img.getAttribute('sizes'));
+    assert.equal(img.getAttribute('sizes'), 'max(100vw, 142svh, 767px)', 'portrait screens select for the actual object-cover width');
+    assert.equal(img.getAttribute('width'), width);
+    assert.equal(img.getAttribute('height'), height);
+    assert.equal(img.getAttribute('loading'), 'eager');
+    assert.equal(img.getAttribute('decoding'), 'async');
+    for (const candidate of img.getAttribute('srcset').split(',')) {
       const [url, descriptor] = candidate.trim().split(/\s+/);
       const file = fs.readFileSync(new URL('../../public' + url, import.meta.url));
       assert.ok(file.byteLength < 200 * 1024, 'each hero WebP stays below 200 KB');
@@ -317,9 +330,16 @@ console.log('PASS  touch and reduced motion land on the unbroken rain window, ea
       assert.equal(file.readUInt16LE(26) & 0x3fff, parseInt(descriptor), 'srcset width matches the actual file, not an invented upscale');
     }
   }
-  const [rain, clear] = photos;
-  assert.equal(rain.getAttribute('fetchpriority'), 'high', 'the rain window keeps the high priority');
-  assert.notEqual(clear.getAttribute('fetchpriority'), 'high', 'the reveal never competes with the first paint');
+  // The pane and the photograph share one plate: same aspect to the pixel
+  // tier, so the canvas can place the pane with the photograph's geometry.
+  assert.ok(Math.abs(2559 / 1803 - 1920 / 1353) < 0.002, 'the pane keeps the original plate\'s aspect');
+  assert.equal(photo.getAttribute('fetchpriority'), 'high', 'the photograph keeps the high priority');
+  assert.notEqual(pane.getAttribute('fetchpriority'), 'high', 'the pane never competes with the first paint');
+  const panePreload = preloads.find(p => p.getAttribute('imagesrcset') === pane.getAttribute('srcset'));
+  assert.ok(/pointer:\s*fine/.test(panePreload.getAttribute('media') || '') && /min-width/.test(panePreload.getAttribute('media') || ''),
+    'the pane preload is gated to the desktop feature so phones never download glass they cannot wipe');
+  assert.equal(preloads.find(p => p.getAttribute('imagesrcset') === photo.getAttribute('srcset')).getAttribute('media'), null,
+    'the photograph is preloaded for everyone');
   head.window.close();
   t.close();
   console.log('PASS  cover-aware responsive images/preloads, aligned plates, accurate dimensions and small payloads');
