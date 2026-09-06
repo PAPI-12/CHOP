@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import CTAButton from './CTAButton';
+import type { MatrixHandoff } from './WhatIDo';
 
 /* ═══════════════════════════════════════════════════════════════════════
    SELECTED WORK — handed over from What I Do by the code itself.
@@ -49,15 +50,16 @@ const CARD_STAGGER_MS = 260;
 const DECODE_MS = 620;
 
 /**
- * The matrix hand-off is a once-per-page-load signature. The first time this
- * section arrives the code rains over it and cuts the cards out; any later
- * visit in the same SPA session (or a return after navigating) shows the work
- * already landed, with no code. A full reload re-initialises the module and
- * the signature plays again.
+ * Only the card reveal is local. The rain's one-shot lifetime belongs to
+ * What I Do, so mounting (including StrictMode's effect replay) cannot
+ * consume the incoming rain before the visitor has ever seen it.
  */
-let handoffRainSpent = false;
+let workRevealSpent = false;
 
-const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
+const SelectedWork: React.FC<{
+  projects: Project[];
+  matrixHandoffRef: React.RefObject<MatrixHandoff>;
+}> = ({ projects, matrixHandoffRef }) => {
   const rootRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cardRefs = useRef<Array<HTMLElement | null>>([]);
@@ -70,29 +72,16 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
 
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+    /* Already-revealed cards stay open, independently of the live rain. */
+    if (reduce || workRevealSpent) {
+      cardRefs.current.forEach((c) => c?.setAttribute('data-open', '1'));
+      titleRefs.current.forEach((t, i) => {
+        if (t) t.textContent = projects[i]?.title ?? '';
+      });
+    }
     /* Reduced motion: no rain, no cutting. The work is simply there. */
-    if (reduce) {
-      cardRefs.current.forEach((c) => c?.setAttribute('data-open', '1'));
-      titleRefs.current.forEach((t, i) => {
-        if (t) t.textContent = projects[i]?.title ?? '';
-      });
-      if (canvas) canvas.style.display = 'none';
-      return;
-    }
-
-    /* ── Already handed over in this page load ────────────────────────
-       The code is a once-only signature. If it already played, land the
-       cards open and resolved — no rain, no cut-out, no decode. */
-
-    if (handoffRainSpent) {
-      cardRefs.current.forEach((c) => c?.setAttribute('data-open', '1'));
-      titleRefs.current.forEach((t, i) => {
-        if (t) t.textContent = projects[i]?.title ?? '';
-      });
-      if (canvas) canvas.style.display = 'none';
-      return;
-    }
-    handoffRainSpent = true;
+    if (canvas) canvas.style.display = reduce ? 'none' : '';
+    if (reduce) return;
 
     /* ── The title decode ───────────────────────────────────────────── */
 
@@ -131,7 +120,10 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
     const setup = () => {
       if (!canvas || !ctx) return;
       cw = root.clientWidth;
-      ch = root.clientHeight;
+      // Only the leading viewport can be visible while What I Do is still
+      // on screen. Seed that area, not the offscreen mobile card stack, so
+      // the incoming rain is immediately visible and equally dense on phones.
+      ch = Math.min(root.clientHeight, window.innerHeight);
       if (cw < 8 || ch < 8) return;
       // Retina rain quadruples the fill cost for no visible gain.
       const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
@@ -164,29 +156,13 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
     let onScreen = false;
     let tick = 0;
     let drawn = false;
-    let opened = false;
-    /**
-     * True once the code has rained itself out on arrival. The signature
-     * plays one direction: back-scrolling from below re-shows the settled
-     * work, never a second rain.
-     */
-    let rainDone = false;
+    let opened = workRevealSpent;
 
     /**
-     * Scroll-driven, not timer-driven: this is the same stream What I Do
-     * rained off its bottom edge, so its strength follows the SEAM — the
-     * line where the What I Do stage's bottom edge meets this section's top
-     * edge. The rain's whole life is tied to the What I Do section being on
-     * screen, so:
-     *   top >= vh          section still below the viewport      →  dry
-     *   0 < top < vh       What I Do stage still visible above,
-     *                      rain overlaps in full into the section →  FULL
-     *   top <= 0           the What I Do section has LEFT the
-     *                      viewport (you no longer see it)       →  raining
-     *                      itself out, one direction
-     * so the code carries on into the section without disappearing, and it
-     * only disappears the instant the What I Do section is fully gone — at
-     * any scroll speed.
+     * Follow the actual source section, not the intro's timer or the pin's
+     * clamped progress. Rain stays FULL throughout the overlap, including
+     * when the visitor pauses or reverses direction. The shared latch only
+     * ends after What I Do leaves completely or its matrix phase is cleared.
      */
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
@@ -196,19 +172,11 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
 
       const top = root.getBoundingClientRect().top;
       const vh = window.innerHeight;
-      let alpha: number;
-      if (rainDone) alpha = 0;
-      else if (top >= vh) alpha = 0;
-      else if (top > 0) alpha = 1;
-      else {
-        // The What I Do section has just left the viewport (top <= 0). The
-        // code carries on for a beat, then rains itself out — one
-        // direction. It does NOT linger down into the Selected Work: its
-        // life is tied to the What I Do section being on screen, so it is
-        // gone by the time the visitor is fully into this section.
-        alpha = Math.max(0, 1 + top / (vh * 0.25));
-        if (alpha <= 0) rainDone = true;
-      }
+      const { active, source } = matrixHandoffRef.current;
+      const sourceRect = active ? source?.getBoundingClientRect() : null;
+      // Check the geometry here too, so a fast jump clears this canvas even
+      // before the source's IntersectionObserver / next frame has caught up.
+      const alpha = sourceRect && sourceRect.bottom > 0 && sourceRect.top < vh && top < vh ? 1 : 0;
 
       // The cards are cut out of the code once it is properly over the grid.
       if (!opened && top <= vh * 0.75) {
@@ -253,6 +221,8 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
     };
 
     const openCards = () => {
+      // Spend the reveal when it is actually seen, never during effect setup.
+      workRevealSpent = true;
       cardRefs.current.forEach((card, i) => {
         if (!card) return;
         decodeTimers.push(
@@ -297,7 +267,7 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
       window.clearTimeout(resizeTimer);
       window.removeEventListener('resize', onResize);
     };
-  }, [projects]);
+  }, [projects, matrixHandoffRef]);
 
   return (
     <section
@@ -306,13 +276,13 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
     >
       {/* The code that carried you here. Scoped to this section — it can
           never paint over anything else on the page. Raindrops cover the
-          WHOLE section while it is pulled up (the cards are cut out of
-          that code); when it stops is purely a function of the section's
-          arrival, computed per-frame above. */}
+          visible part of the section as it is pulled up (the cards are cut
+          out of that code); it stops only when the source section is fully out of
+          view or the visitor clears its matrix phase. */}
       <canvas
         ref={canvasRef}
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-0"
+        className="matrix-rain pointer-events-none absolute inset-0 z-0"
       />
 
       <div className="relative z-10 max-w-[1600px] mx-auto">

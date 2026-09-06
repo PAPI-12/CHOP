@@ -221,6 +221,11 @@ html {
   transition: opacity 180ms ease;
 }
 
+/* The code sits on pure black in BOTH sections. While the hand-off is live,
+   suppress the screen-blended grain that would otherwise lift black to grey. */
+.matrix-rain { background: #000000; }
+.mix-grain:has([data-matrix-active='true'])::before { opacity: 0; }
+
 /* ── The matrix strike ─────────────────────────────────────────────────
    The hairline What I Do's code rain opens out of. See WhatIDo.tsx. */
 .matrix-strike-line {

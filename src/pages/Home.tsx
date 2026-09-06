@@ -1,18 +1,20 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import Hero from '../components/Hero';
 import Clients from '../components/Clients';
 import SelectedWork from '../components/SelectedWork';
-import WhatIDo from '../components/WhatIDo';
+import WhatIDo, { type MatrixHandoff } from '../components/WhatIDo';
 import CTAButton from '../components/CTAButton';
 import { ScribbleX } from '../components/Scribbles';
 import Reveal from '../components/Reveal';
 
+const projects = [
+  { title: 'TAU FOODS', subtitle: 'UX/UI', image: '/images/tau-hero-phones.webp', link: '/work/tau-foods' },
+  { title: 'CORNETTO', subtitle: 'UI/UX, ART DIRECTION & ILLUSTRATION', image: '/images/cornetto-truck.webp', link: '/work/cornetto' },
+  { title: 'SARS', subtitle: 'ART DIRECTION', image: '/images/sars-cover.webp', link: '/work/sars' },
+];
+
 const Home: React.FC = () => {
-  const projects = [
-    { title: 'TAU FOODS', subtitle: 'UX/UI', image: '/images/tau-hero-phones.webp', link: '/work/tau-foods' },
-    { title: 'CORNETTO', subtitle: 'UI/UX, ART DIRECTION & ILLUSTRATION', image: '/images/cornetto-truck.webp', link: '/work/cornetto' },
-    { title: 'SARS', subtitle: 'ART DIRECTION', image: '/images/sars-cover.webp', link: '/work/sars' },
-  ];
+  const matrixHandoffRef = useRef<MatrixHandoff>({ source: null, active: false });
 
   return (
     // A single, viewport-locked ambient wash spans the ENTIRE home page — the
@@ -68,10 +70,10 @@ const Home: React.FC = () => {
           <ScribbleX className="absolute top-20 md:top-24 right-6 md:right-16 w-8 h-8 md:w-10 md:h-10 z-20 opacity-70" />
         </section>
 
-        <WhatIDo />
+        <WhatIDo matrixHandoffRef={matrixHandoffRef} />
       </div>
 
-      <SelectedWork projects={projects} />
+      <SelectedWork projects={projects} matrixHandoffRef={matrixHandoffRef} />
 
       <Clients />
 

@@ -366,7 +366,6 @@ const click = (window, el) =>
 {
   const hero = fs.readFileSync(new URL('../../src/components/Hero.tsx', import.meta.url), 'utf8');
   const what = fs.readFileSync(new URL('../../src/components/WhatIDo.tsx', import.meta.url), 'utf8');
-  const sw = fs.readFileSync(new URL('../../src/components/SelectedWork.tsx', import.meta.url), 'utf8');
   const nav = fs.readFileSync(new URL('../../src/components/Navbar.tsx', import.meta.url), 'utf8');
 
   check('the floating crosses and waves never freeze',
@@ -380,12 +379,9 @@ const click = (window, el) =>
   check('the wordmark does not re-arm the matrix',
     !/resetMachineAct/.test(nav) && !/resetMachineAct/.test(what));
 
-  check('the incoming work rain hands over once per page load',
-    /handoffRainSpent/.test(sw) && /at FULL strength the instant/i.test(sw));
-  check('the work rain is full the instant the section edge arrives, then rains out on arrival',
-    /top > 0\) alpha = 1/.test(sw) && /rainDone/.test(sw));
-  check('the code rains off the stage onto Selected Work — no dry gap at the boundary',
-    /rainConsumed && stageVisible/.test(what) && /exitT/.test(what));
+  // The rain's actual lifetime, drawing and overlap are exercised by
+  // matrix.mjs, including StrictMode's setup/cleanup/setup cycle. Checking
+  // source strings here previously passed while both canvases disappeared.
   check('the human text reveals the matrix code — the strike waits for the last character',
     /clamp01\(\(actT - SPEAK_END\) \/ STRIKE_S\)/.test(what) && /SPEAK_END \+ STRIKE_S/.test(what));
 }
