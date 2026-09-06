@@ -165,29 +165,34 @@ sweeping every consumer — `Navbar`'s `goToHero` now does a plain double
 
 ### Layer 5b — The hero photograph
 
-**The rain window is in the picture.** One photograph carries the window, the
-dense glistening droplets, and the soft blur they draw over the face; nothing
-procedural is painted over it. The reveal is a second photograph — the same
-scene with the glass wiped clean — kept hidden until the pane above it is
-showing rain, so the payoff is never spoiled by a slow decode.
+**The photograph is the original portrait, untouched.** It is the one plate
+every visitor lands on and the thing the desktop wipe reveals — no re-render,
+no filter, no second person. The rain is a separate pane laid over it: the
+same plate softened and darkened to graphite glass, wearing the droplets and
+runnels lifted from a real rain-window photograph
+(`tools/hero/build-rain-pane.py`). Only the water is taken from that source —
+its own subject, background and the straight edges of its glass are masked
+out — so no borders and no stranger's silhouette ride along with the rain.
+The pane is built on the original plate's geometry, so what the squeegee
+uncovers lines up with the droplet blur it replaces, pixel for pixel.
 
 The desktop interactivity is gated as one feature: a fine pointer that can
 hover, no reduced-motion preference, and a viewport at least 768 px wide —
 all re-evaluated when the browser is resized across the boundary. Fail any of
-them and the pane, the reveal layer, the ring and the letter physics are
-never constructed; touch and reduced-motion visitors keep the unbroken rain
-window. The ring is the squeegee — what its path crosses, it clears — and the
-site's own lime cursor circle reads inside the orbit. Wiped glass stays
-wiped: there is no re-fogging pass, and a resize finishes the wipe rather
-than replaying it.
+them and the pane, the ring and the letter physics are never constructed;
+touch and reduced-motion visitors land on the clean photograph. The ring is
+the squeegee — what its path crosses, it clears — and the site's own lime
+cursor circle reads inside the orbit. Wiped glass stays wiped: there is no
+re-fogging pass, and a resize finishes the wipe rather than replaying it.
 
-The earring is pinned in image space (its lobe coordinates were measured on
-the plate via a marker edit verified pixel-stable by phase correlation), so
-it stays on his ear at every viewport, under the pane — on a desktop you
-wipe the window to find it.
+The earring is pinned in image space on the original plate's lobe, so it
+stays on his ear at every viewport, under the pane — on a desktop you wipe
+the window to find it.
 
-Which means the crop still matters, so the plates are framed per shape:
-`object-position: 50% 42%` below 768 px, `50% 46%` above.
+Which means the crop still matters, so the plate is framed per shape:
+`object-position: 50% 42%` below 768 px, `50% 46%` above. The pane is drawn
+at whatever rectangle that gives the photograph, so the two can never
+diverge.
 
 ---
 
@@ -197,29 +202,30 @@ Which means the crop still matters, so the plates are framed per shape:
 
 | Asset | Dimensions | Size |
 |---|---|---|
-| `hero-rain-window-1904.webp` | 1904 × 1328 | 192.2 KB |
-| `hero-rain-window-1280.webp` | 1280 × 893 | 137.5 KB |
-| `hero-clear-1904.webp` | 1904 × 1328 | 127.2 KB |
-| `hero-clear-1280.webp` | 1280 × 893 | 53.2 KB |
+| `hero-landscape-2560.webp` | 2559 × 1803 | 159.3 KB |
+| `hero-landscape-1920.webp` | 1920 × 1353 | 91.3 KB |
+| `hero-landscape-1280.webp` | 1280 × 902 | 50.2 KB |
+| `hero-rain-pane-1920.webp` | 1920 × 1353 | 193.1 KB |
+| `hero-rain-pane-1280.webp` | 1280 × 902 | 136.2 KB |
 
-That is the whole hero. **One scene, two plates** — the rain window and the
-clean glass behind it, both under the 200 KB budget. The rain window is the
-first paint and preloaded with `fetchpriority="high"`; the clear plate is the
-wipe's reveal, preloaded at default priority so it never competes with the
-first paint. The 1904 px plates are the full resolution of the sources; wider
-screens upscale in the browser rather than shipping an invented 2560 px tier,
-and portrait phones render the 1280 near-native through `object-cover`.
+That is the whole hero. **One photograph, one pane** — the original portrait
+in three widths, and the rain pane built on it in two, every file under the
+200 KB budget. The photograph is the first paint and preloaded with
+`fetchpriority="high"`; the pane is preloaded at default priority, behind a
+`media` query matching the desktop gate, so a phone never downloads glass it
+cannot wipe. The pane stops at 1920 px — a softened plate gains nothing from
+a 2560 tier, and the sharp photograph underneath still ships its native
+2560.
 
-It used to be three widths of a clean plate plus a procedural canvas pane
-painted on top of it. Before that it was two photographs — a 16:9 outpaint
-for wide screens and the original 3:4 portrait for everything else, switched
-by `<picture>`. That was a correctness bug, not just weight: the fog was
-generated *from the `<img>` element*, so on a wide screen the steam was built
-from one crop while the photograph behind it was another — the image appeared
-to change as you wiped it. The governing principle survived both fixes: if
-the glass must match the photograph exactly, the glass must *be* a photograph
-of the same scene — which is what makes the current wipe read as wiping a
-real window.
+It used to be two AI re-renders of the scene — a rain window and a "clear"
+version behind it — which is how a second person and a pair of glass borders
+ended up in the hero. Before that, a procedural canvas pane over the clean
+plate; before that, a 16:9 outpaint and the 3:4 portrait switched by
+`<picture>`, so the fog was built from one crop while the photograph behind
+it was another. The governing principle survived every fix: the glass must
+share the photograph's plate and geometry exactly — which is what makes the
+wipe read as wiping a real window, and why the pane is now generated from the
+original rather than painted or re-imagined.
 
 Every non-hero image is `loading="lazy"` + `decoding="async"`, and
 `assetsInlineLimit: 2048` keeps tiny assets off the network entirely.

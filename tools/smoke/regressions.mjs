@@ -48,20 +48,28 @@ async function boot(route = '/', opts = {}) {
 const click = (window, el) =>
   el.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
 
-/* ── 1. One hero image, not two crops ──────────────────────────────── */
+/* ── 1. One hero photograph — the original — not two crops ─────────── */
 {
   const { window } = await boot('/');
   const hero = window.document.getElementById('hero');
-  const imgs = [...hero.querySelectorAll('img')];
-  // Two plates, never two crops: the rain window and the clear photograph
-  // behind it are layered, not switched by viewport.
-  check('hero layers exactly two <img> plates', imgs.length === 2, `found ${imgs.length}`);
+  const photos = [...hero.querySelectorAll('img.hero-photo')];
+  const panes = [...hero.querySelectorAll('img.hero-pane-plate')];
+  // One photograph, never two crops. The rain pane is a plate built on that
+  // photograph and is decoded, not shown — the canvas draws it.
+  check('hero shows exactly one photograph', photos.length === 1, `found ${photos.length}`);
+  check('the photograph is the original portrait',
+    /hero-landscape-\d+\.webp/.test(photos[0]?.getAttribute('src') || ''), photos[0]?.getAttribute('src') || 'none');
+  check('the photograph is not a re-rendered scene',
+    !/rain|clear/.test(photos[0]?.getAttribute('src') || ''));
+  check('desktop mounts the rain pane plate, hidden', panes.length === 1 && /\bopacity-0\b/.test(panes[0].className),
+    `${panes.length} pane plates`);
   check('hero has no <picture> art-direction switch',
     hero.querySelectorAll('picture').length === 0 && hero.querySelectorAll('source').length === 0);
-  check('both plates share one geometry',
-    imgs.every(i => i.getAttribute('width') === '1904' && i.getAttribute('height') === '1328'),
-    imgs.map(i => `${i.getAttribute('width')}x${i.getAttribute('height')}`).join(' | '));
-  for (const img of imgs) {
+  const ratio = (img) => Number(img.getAttribute('width')) / Number(img.getAttribute('height'));
+  check('the pane shares the photograph\'s plate geometry',
+    panes.length === 1 && Math.abs(ratio(panes[0]) - ratio(photos[0])) < 0.002,
+    [...photos, ...panes].map(i => `${i.getAttribute('width')}x${i.getAttribute('height')}`).join(' | '));
+  for (const img of [...photos, ...panes]) {
     const families = new Set([...(img.getAttribute('srcset') || '').matchAll(/\/images\/([a-z-]+?)-\d+\.webp/g)].map((m) => m[1]));
     check(`every srcset width of ${families.values().next().value || '?'} is the same photograph`, families.size === 1,
       [...families].join(', ') || 'none');
@@ -88,8 +96,13 @@ const click = (window, el) =>
   check('there is no SVG circle/path left in the ring',
     !hero.querySelector('.hero-ring circle') && !hero.querySelector('.hero-ring path'));
   check('the earring is on the photograph', !!hero.querySelector('.hero-earring'));
-  check('the rain pane is the rain photograph on a canvas',
+  check('the rain pane is a photograph plate on a canvas',
     !!hero.querySelector('canvas.hero-rain'), 'no pane');
+
+  // SINCE 2015 is set in the site's lime, filled — no outline treatment.
+  const since = [...hero.querySelectorAll('h1')].find((h) => /SINCE\s*2015/.test(h.textContent || '') && h.getAttribute('aria-hidden') === 'true');
+  check('SINCE 2015 is lime', !!since && /text-\[#d7ff4f\]/.test(since.className), since?.className || 'missing');
+  check('SINCE 2015 is filled, not outlined', !!since && !/text-stroke/.test(since.className));
   window.close();
 }
 
@@ -127,14 +140,16 @@ const click = (window, el) =>
   window.close();
 }
 
-/* ── 2c. Mobile lands on the rain-window photograph, with no pane ──── */
+/* ── 2c. Mobile lands on the original photograph, with no pane ─────── */
 {
   const { window, errors } = await boot('/', { touch: true });
   const hero = window.document.getElementById('hero');
   check('mobile renders the hero photograph', !!hero.querySelector('img.hero-photo'));
-  check('mobile keeps only the rain window, no reveal layer',
-    hero.querySelectorAll('img.hero-photo').length === 1,
-    `${hero.querySelectorAll('img.hero-photo').length} plates`);
+  check('mobile renders the original photograph',
+    /hero-landscape/.test(hero.querySelector('img.hero-photo')?.getAttribute('src') || ''));
+  check('mobile keeps only the photograph, no pane plate',
+    hero.querySelectorAll('img').length === 1,
+    `${hero.querySelectorAll('img').length} plates`);
   check('mobile has no vapor overlay at all',
     !hero.querySelector('.hero-glass-static') && hero.querySelectorAll('canvas').length === 0,
     `${hero.querySelectorAll('canvas').length} canvas`);
@@ -224,24 +239,30 @@ const click = (window, el) =>
     offenders.length === 0, offenders.join(', '));
 }
 
-/* ── 2f. The pane is the rain photograph, not a painted glass field ─── */
+/* ── 2f. The pane is a photograph plate, not a painted glass field ──── */
 {
   const hero = fs.readFileSync(new URL('../../src/components/Hero.tsx', import.meta.url), 'utf8');
   const wipe = fs.readFileSync(new URL('../../src/utils/heroWipe.ts', import.meta.url), 'utf8');
+  const css = fs.readFileSync(new URL('../../src/index.css', import.meta.url), 'utf8');
 
   // The procedural glass (noise fields, blooms, runnels, a blurred second
-  // copy of the portrait) is what read as fake. The pane must be the rain
-  // photograph itself, drawn once.
+  // copy of the portrait) is what read as fake. The pane must be a plate
+  // built on the original photograph, drawn once.
   check('no computed glass field is painted',
     !/createImageData|octaves|blooms|putImageData/.test(hero));
-  check('the pane is drawn from the rain photograph',
-    /drawImage\(img/.test(hero) && /hero-rain-window-\d+\.webp/.test(hero));
-  check('the reveal layer is the clear photograph behind the window',
-    /hero-clear-\d+\.webp/.test(hero));
+  check('the pane is drawn from the rain-pane plate',
+    /drawImage\(pane/.test(hero) && /hero-rain-pane-\d+\.webp/.test(hero));
+  check('the base photograph is the original, and the re-rendered scenes are gone',
+    /hero-landscape-\d+\.webp/.test(hero) && !/hero-rain-window|hero-clear/.test(hero));
+  check('the re-rendered plates are no longer shipped',
+    !fs.existsSync(new URL('../../public/images/hero-rain-window-1904.webp', import.meta.url)) &&
+    !fs.existsSync(new URL('../../public/images/hero-clear-1904.webp', import.meta.url)));
   check('wiping is a destination-out squeegee, never a repaint',
     /destination-out/.test(wipe) && !/putImageData/.test(wipe));
   check('the droplets and the blur are baked in, not a runtime filter',
-    !/filter:\s*(blur|backdrop)/i.test(hero) && !/backdrop-filter/.test(hero));
+    !/filter:\s*(blur|backdrop)/i.test(hero) && !/backdrop-filter/.test(hero) && /\.hero-photo\s*\{[^}]*filter:\s*none/.test(css));
+  check('the pane plate is never visible itself',
+    /\.hero-pane-plate\s*\{[^}]*visibility:\s*hidden/.test(css));
 }
 
 /* The hero's wipe lifecycle is exercised by hero.mjs. */

@@ -11,10 +11,10 @@ const MAX_PANE_PIXELS = 3_000_000;
 /**
  * Where `object-fit: cover` has actually put the photograph inside a box.
  *
- * The rain pane on the canvas must sit EXACTLY over the clear photograph
- * behind it — a hair of divergence and the wipe reveals a face that has
- * slipped. Read `object-position` rather than assuming centre, so the CSS
- * stays the single source of truth — including the mobile override.
+ * The rain pane on the canvas must sit EXACTLY over the photograph behind
+ * it — a hair of divergence and the wipe reveals a face that has slipped.
+ * Read `object-position` rather than assuming centre, so the CSS stays the
+ * single source of truth — including the mobile override.
  */
 type Cover = { ox: number; oy: number; dw: number; dh: number; scale: number };
 const coverOf = (img: HTMLImageElement, boxW: number, boxH: number): Cover | null => {
@@ -35,13 +35,10 @@ const coverOf = (img: HTMLImageElement, boxW: number, boxH: number): Cover | nul
 };
 
 /** The stud, in normalised photograph coordinates: the centre of his lobe.
-    Measured against the 1904×1328 plate: the clear photograph was re-rendered
-    once with a lime stud marked on the lobe (verified pixel-stable against the
-    shipped plate by phase correlation), and the stud's centroid is (737, 655).
-    The lobe is the fleshy lower part of the ear — above the jaw, below the
-    tragus. */
-const EAR_U = 737 / 1904;
-const EAR_V = 655 / 1328;
+    Measured against the original 1920×1353 plate. The lobe is the fleshy
+    lower part of the ear — above the jaw, below the tragus. */
+const EAR_U = 740 / 1920;
+const EAR_V = 680 / 1353;
 
 const RING_WORD = 'CULTURE LED CREATIVE';
 /**
@@ -78,8 +75,8 @@ const Hero: React.FC = () => {
   const ringSpinRef = useRef<SVGGElement>(null);
   const earringRef = useRef<HTMLDivElement>(null);
   const eraserRef = useRef<HTMLCanvasElement>(null);
-  const rainImgRef = useRef<HTMLImageElement>(null);
-  const clearImgRef = useRef<HTMLImageElement>(null);
+  const photoRef = useRef<HTMLImageElement>(null);
+  const paneImgRef = useRef<HTMLImageElement>(null);
   // Survives responsive interactivity changes: returning to a wide viewport
   // must not re-fog a window the visitor has already wiped clear.
   const hasWipedRef = useRef(false);
@@ -134,8 +131,8 @@ const Hero: React.FC = () => {
    * The rain pane and the wipe are one desktop feature, gated together. A
    * fine pointer that can hover, no reduced-motion preference, and a viewport
    * wide enough to be a computer. Anything else — every phone, every tablet —
-   * gets the rain-window photograph, clean, on landing: there is nothing to
-   * wipe with, so the reveal would be a photograph they could never see.
+   * lands on the original photograph, clean: there is nothing to wipe with,
+   * so a pane would be a photograph they could never see.
    *
    * This re-evaluates, because a desktop browser dragged narrow and back is
    * the cheapest way to end up with a rain pane and no way to clear it.
@@ -192,7 +189,7 @@ const Hero: React.FC = () => {
   useEffect(() => {
     const hero = heroRef.current;
     const el = earringRef.current;
-    const img = rainImgRef.current;
+    const img = photoRef.current;
     if (!hero || !el || !img) return;
 
     const place = () => {
@@ -356,13 +353,14 @@ const Hero: React.FC = () => {
     /**
      * ── The rain pane ─────────────────────────────────────────────────
      *
-     * The wet glass is a real photograph — the rain window — drawn ONCE onto
-     * this canvas at exactly the cover geometry of the clear photograph
-     * underneath. No fields, no runnels, no beads are painted here: the
-     * picture already has them, which is why it reads as a real window. The
-     * cursor ring and every displaced letter squeegee the rain away with
-     * `destination-out` strokes, and the sharp portrait shows through where
-     * they have been.
+     * The wet glass is a photograph of the ORIGINAL portrait behind a
+     * rained-on window: the same plate, softened and darkened to graphite
+     * glass, wearing the droplets and runnels of a real rain window (built
+     * by tools/hero/build-rain-pane.py). It is drawn ONCE onto this canvas at
+     * exactly the cover geometry of the sharp photograph underneath. No
+     * fields, no runnels, no beads are painted here. The cursor ring and
+     * every displaced letter squeegee the rain away with `destination-out`
+     * strokes, and the portrait shows through where they have been.
      */
     const hideOverlay = () => {
       canvas.style.visibility = 'hidden';
@@ -379,17 +377,21 @@ const Hero: React.FC = () => {
     };
 
     /**
-     * Lay the rain photograph onto the pane. Returns true when the pane is
-     * actually showing rain — false while the plate is still decoding, in
+     * Lay the rain pane onto the canvas at the exact rectangle `object-fit:
+     * cover` has given the photograph underneath — the pane was built on the
+     * same plate, so one geometry places both. Returns true when the pane is
+     * actually showing rain — false while either plate is still decoding, in
      * which case the pane stays empty and is repainted on the image's load.
      */
     const drawPane = (f: CanvasRenderingContext2D) => {
-      const img = rainImgRef.current;
-      const geo = img ? coverOf(img, boxW, boxH) : null;
-      if (!img || !geo) return false;
+      const photo = photoRef.current;
+      const pane = paneImgRef.current;
+      if (!photo || !pane || !pane.complete || !pane.naturalWidth) return false;
+      const geo = coverOf(photo, boxW, boxH);
+      if (!geo) return false;
       f.imageSmoothingEnabled = true;
       f.imageSmoothingQuality = 'high';
-      f.drawImage(img, geo.ox, geo.oy, geo.dw, geo.dh);
+      f.drawImage(pane, geo.ox, geo.oy, geo.dw, geo.dh);
       return true;
     };
 
@@ -422,13 +424,7 @@ const Hero: React.FC = () => {
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1;
       ctx.clearRect(0, 0, boxW, boxH);
-      const rained = drawPane(ctx);
-
-      // The sharp photograph behind the window stays hidden until the pane is
-      // showing rain — otherwise a slow rain decode would flash the reveal
-      // before the glass had ever been wiped.
-      const clear = clearImgRef.current;
-      if (clear) clear.style.visibility = rained ? '' : 'hidden';
+      drawPane(ctx);
 
       wiper = createHeroWiper(ctx, {
         width: boxW,
@@ -472,9 +468,13 @@ const Hero: React.FC = () => {
       })
       .catch(() => {});
 
-    const img = rainImgRef.current;
+    // The pane is painted when the rain plate has decoded; the photograph's
+    // decode matters too, because its cover geometry is what places the pane.
+    const plates = [paneImgRef.current, photoRef.current].filter(
+      (el): el is HTMLImageElement => !!el && !el.complete,
+    );
     const onImgLoad = () => paintPane();
-    if (img && !img.complete) img.addEventListener('load', onImgLoad);
+    plates.forEach((el) => el.addEventListener('load', onImgLoad));
 
     let resizeTimer = 0;
     const onResize = () => {
@@ -612,7 +612,7 @@ const Hero: React.FC = () => {
       window.removeEventListener('resize', onResize);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('pointermove', onPointerMove);
-      img?.removeEventListener('load', onImgLoad);
+      plates.forEach((el) => el.removeEventListener('load', onImgLoad));
     };
   }, [interactive]);
 
@@ -623,66 +623,60 @@ const Hero: React.FC = () => {
       className="relative h-[100svh] min-h-[540px] flex items-center justify-center overflow-hidden bg-[#000000]"
     >
       <div className="absolute inset-0 z-0">
-        {/* The rain window — the base photograph every visitor lands on, and
-            the plate the canvas pane draws from. The window, the dense
-            glistening droplets and the soft blur over the face are IN this
-            picture, not painted over it. */}
+        {/* The original photograph — the one plate every visitor lands on,
+            and what the desktop wipe reveals. Never filtered, never
+            re-rendered: this is the real me. */}
         <img
-          ref={rainImgRef}
-          src="/images/hero-rain-window-1904.webp"
-          srcSet="/images/hero-rain-window-1280.webp 1280w, /images/hero-rain-window-1904.webp 1904w"
+          ref={photoRef}
+          src="/images/hero-landscape-1920.webp"
+          srcSet="/images/hero-landscape-1280.webp 1280w, /images/hero-landscape-1920.webp 1920w, /images/hero-landscape-2560.webp 2559w"
           sizes="max(100vw, 142svh, 767px)"
-          alt="Papi Raborife behind a window covered in glistening rain droplets"
+          alt="Papi Raborife"
           className="hero-photo absolute inset-0 h-full w-full object-cover"
-          width="1904"
-          height="1328"
+          width="2559"
+          height="1803"
           loading="eager"
           fetchPriority="high"
           decoding="async"
           onError={(e) => { e.currentTarget.style.display = 'none'; }}
         />
-        {/* The photograph behind the window. Desktop only, and kept hidden
-            until the pane above it is showing rain — the wipe's whole payoff
-            is that you reveal this, so it must never be seen early. Same
-            plate geometry as the rain window (identical intrinsic size, same
-            object-cover class), so what the squeegee uncovers lines up with
-            the droplet blur it replaces, pixel for pixel. */}
-        {interactive && (
-          <img
-            ref={clearImgRef}
-            src="/images/hero-clear-1904.webp"
-            srcSet="/images/hero-clear-1280.webp 1280w, /images/hero-clear-1904.webp 1904w"
-            sizes="max(100vw, 142svh, 767px)"
-            alt=""
-            aria-hidden
-            className="hero-photo absolute inset-0 h-full w-full object-cover z-[1]"
-            width="1904"
-            height="1328"
-            loading="eager"
-            decoding="async"
-            style={{ visibility: 'hidden' }}
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-          />
-        )}
         {/* The stud. Positioned in image space by the earring effect, so it
-            stays on the lobe at every viewport. Above the photographs, below
+            stays on the lobe at every viewport. Above the photograph, below
             the rain pane — on a desktop you have to wipe the window to find
             it. */}
         <div
           ref={earringRef}
-          className="hero-earring absolute top-0 left-0 z-[2]"
+          className="hero-earring absolute top-0 left-0 z-[1]"
           style={{ opacity: 0 }}
           aria-hidden
         />
-        {/* The rain pane is a DESKTOP effect, and only a desktop effect. It
-            is the rain photograph itself, drawn onto a canvas so the cursor
-            ring and the flying letters can squeegee it away and reveal the
-            sharp portrait behind the window. Touch, coarse-pointer and
-            reduced-motion visitors keep the unbroken rain window — there is
-            nothing to wipe with, so an erasable pane is not an effect, it is
-            a photograph they can never uncover. */}
+        {/* The rain pane is a DESKTOP effect, and only a desktop effect: the
+            original photograph seen through a rained-on window, drawn onto a
+            canvas so the cursor ring and the flying letters can squeegee it
+            away and reveal the sharp portrait underneath. The plate itself is
+            a hidden <img> so the browser decodes it (and the preload in
+            index.html is honoured); the canvas is the only thing on screen.
+            Touch, coarse-pointer and reduced-motion visitors land on the
+            clean photograph — there is nothing to wipe with, so an erasable
+            pane is not an effect, it is a photograph they can never uncover. */}
         {interactive && (
-          <canvas ref={eraserRef} className="hero-rain absolute inset-0 w-full h-full pointer-events-none z-[3]" aria-hidden />
+          <>
+            <img
+              ref={paneImgRef}
+              src="/images/hero-rain-pane-1920.webp"
+              srcSet="/images/hero-rain-pane-1280.webp 1280w, /images/hero-rain-pane-1920.webp 1920w"
+              sizes="max(100vw, 142svh, 767px)"
+              alt=""
+              aria-hidden
+              className="hero-pane-plate absolute inset-0 h-full w-full object-cover opacity-0 pointer-events-none"
+              width="1920"
+              height="1353"
+              loading="eager"
+              decoding="async"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+            <canvas ref={eraserRef} className="hero-rain absolute inset-0 w-full h-full pointer-events-none z-[3]" aria-hidden />
+          </>
         )}
       </div>
 
@@ -738,7 +732,7 @@ const Hero: React.FC = () => {
 
           <h1
             aria-hidden="true"
-            className="hero-pop hero-pop-late font-display text-stroke text-[clamp(2.2rem,10.8vw,10rem)] md:text-[clamp(3.5rem,8.6vw,9.5rem)] leading-[0.86] tracking-[-0.04em] whitespace-nowrap"
+            className="hero-pop hero-pop-late font-display text-[#d7ff4f] text-[clamp(2.2rem,10.8vw,10rem)] md:text-[clamp(3.5rem,8.6vw,9.5rem)] leading-[0.86] tracking-[-0.04em] whitespace-nowrap"
           >
             <HeroLetters text="SINCE 2015" />
           </h1>

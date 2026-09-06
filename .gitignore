@@ -11,3 +11,4 @@ tools/smoke/bundle.js
 # Python bytecode
 __pycache__/
 *.pyc
+tools/hero/source/debug-*.png
