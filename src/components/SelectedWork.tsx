@@ -6,25 +6,23 @@ import type { MatrixHandoff } from './WhatIDo';
 /* ═══════════════════════════════════════════════════════════════════════
    SELECTED WORK — handed over from What I Do by the code itself.
 
-   What I Do ends with the machine's rain. That rain does not stop at the
-   section boundary: after the "continue" guide, while the What I Do stage
-   slides up out of view, the code rains off its bottom edge and carries on
-   HERE as this section's own rain — raindrops overlapping the whole
-   section while it is pulled up, at FULL strength the instant the
-   section's leading edge arrives. The three cards are cut out of it one
-   after another — each struck as a lime hairline, opened into a rectangle,
-   its title resolving out of scrambled glyphs.
+   What I Do ends with the machine's rain, and that rain never stops at the
+   section boundary. Once the matrix has been revealed it carries on HERE as
+   this section's own rain — over the WHOLE Selected Work section, from the
+   instant its leading edge arrives until the moment its last card leaves.
+   Scroll as fast or as slow as you like, rush the human text or wait it
+   out: the outcome is the same, because the rain is driven by one click of
+   the machine being revealed, not by a timer or by how far you've scrolled.
 
-   The rain's life is tied to the What I Do section being on screen: it
-   carries on into this section without disappearing, and it only
-   disappears once the What I Do section has LEFT the viewport completely —
-   the point where you no longer see it. After that the section is just the
-   work again.
+   The three cards are cut out of that code one after another — each struck
+   as a lime hairline, opened into a rectangle, its title resolving out of
+   scrambled glyphs.
 
-   The strength is scroll-driven, not timer-driven: it follows the seam
-   (where the What I Do stage's bottom edge meets this section's top edge),
-   so however fast or slow you scroll, it is present for the whole overlap
-   and is gone exactly when the What I Do section is.
+   The rain's life is tied to THIS section being on screen, not to What I
+   Do: while any part of Selected Work is in the viewport the raindrops are
+   at full strength, and they only stop when this section itself leaves —
+   the end of Selected Work. Coming back up through it, the code and rain
+   are gone and the What I Do skills are there instead.
 
    The canvas is scoped INSIDE this section. It cannot leak onto the rest of
    the page the way a viewport-fixed layer can.
@@ -166,20 +164,30 @@ const SelectedWork: React.FC<{
      */
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
-      if (!onScreen || document.hidden) { lastT = 0; return; }
+      if (!onScreen || document.hidden) {
+        // Leaving view clears the scoped canvas so no stale code lingers in
+        // the section's buffer (and the smoke test's dry-state can be relied
+        // on). The section is scoped, so this never affects anything else.
+        lastT = 0;
+        if (drawn && ctx) { ctx.clearRect(0, 0, cw, ch); drawn = false; }
+        return;
+      }
       const dt = lastT ? Math.min((now - lastT) / 1000, 0.05) : 1 / 60;
       lastT = now;
 
-      const top = root.getBoundingClientRect().top;
+      const { revealed } = matrixHandoffRef.current;
+      // Once the matrix has been revealed, the code no longer stops at the
+      // What I Do boundary. It carries on over the WHOLE Selected Work section
+      // — while any part of it is on screen the raindrops are present at full
+      // strength, and they only stop when this section itself leaves view
+      // (the end of Selected Work) or the matrix was never revealed. Scoping
+      // it to this section means it can never paint over anything else.
+      const rect = root.getBoundingClientRect();
       const vh = window.innerHeight;
-      const { active, source } = matrixHandoffRef.current;
-      const sourceRect = active ? source?.getBoundingClientRect() : null;
-      // Check the geometry here too, so a fast jump clears this canvas even
-      // before the source's IntersectionObserver / next frame has caught up.
-      const alpha = sourceRect && sourceRect.bottom > 0 && sourceRect.top < vh && top < vh ? 1 : 0;
+      const alpha = revealed && rect.top < vh && rect.bottom > 0 ? 1 : 0;
 
       // The cards are cut out of the code once it is properly over the grid.
-      if (!opened && top <= vh * 0.75) {
+      if (!opened && rect.top <= vh * 0.75) {
         opened = true;
         openCards();
       }

@@ -14,7 +14,7 @@ const projects = [
 ];
 
 const Home: React.FC = () => {
-  const matrixHandoffRef = useRef<MatrixHandoff>({ source: null, active: false });
+  const matrixHandoffRef = useRef<MatrixHandoff>({ source: null, active: false, revealed: false });
 
   return (
     // A single, viewport-locked ambient wash spans the ENTIRE home page — the
