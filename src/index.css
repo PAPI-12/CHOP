@@ -74,6 +74,9 @@
    `screen` (not `overlay`) so the film stays visible on the site's pure
    #000000 black — overlay blending vanishes on a black base. */
 .mix-grain::before {
+  /* Never lay film over the original hero photograph, including wiped areas.
+     The rest of the page keeps its existing texture as the hero scrolls away. */
+  clip-path: inset(var(--hero-grain-inset, 0px) 0 0);
   content: '';
   position: fixed;
   inset: 0;
@@ -163,9 +166,9 @@
    Pointer-driven visitors get the real thing on a canvas (see Hero.tsx): a
    dark blue-grey vapor pane with dense small beads and near-vertical
    runnels, lit from the top-left, which the cursor and the letters squeegee
-   clear, and which stays cleared for the visit. It plays only on the first
-   visit to `/` in a browser session. Touch and reduced-motion visitors — who
-   have nothing to wipe with — land on the clean hero image. */
+   clear, and which stays cleared for this view. The effect never filters
+   the underlying photograph. Touch and reduced-motion visitors — who have
+   nothing to wipe with — land on the clean hero image. */
 /* ── Reserve the scrollbar's lane, permanently ─────────────────────────
    Every modal on this site locks the page with `overflow: hidden`, which on
    any platform drawing a classic scrollbar reclaims ~15px of width — and the
@@ -184,6 +187,8 @@ html {
    the headline sitting in the clear space to its left. Verified against the
    real asset at 390x700, 390x600 and 430x780. */
 .hero-photo {
+  /* All blur/tint belongs to the erasable canvas, never the sharp source. */
+  filter: none;
   /* The plate was re-cropped so the subject is centred IN THE IMAGE, so the
      same 50% position holds on every viewport — a phone keeps his head in
      frame because the plate itself, not object-position, does the framing. */

@@ -1,12 +1,12 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ScribbleX, ScribbleUnderline, FloatingCross, FloatingWave } from './Scribbles';
 import SplitFlapText from './SplitFlapText';
 import { useHeroPhysics, type HeroCursor } from '../hooks/useHeroPhysics';
+import { createHeroWiper, type HeroWiper } from '../utils/heroWipe';
 
-/** Per-browser-session flag: the vapour/rain-glass effect is a once-only first
-    impression. Returning to `/` from another route lands on the clean plate. */
-const VAPOR_SEEN_KEY = 'chop:hero-vapor-seen';
+/** Limit only the effect buffer, never the resolution of the photograph. */
+const MAX_VAPOR_PIXELS = 3_000_000;
 
 /**
  * Where `object-fit: cover` has actually put the photograph inside a box.
@@ -77,45 +77,17 @@ const Hero: React.FC = () => {
   const earringRef = useRef<HTMLDivElement>(null);
   const eraserRef = useRef<HTMLCanvasElement>(null);
   const overlayImgRef = useRef<HTMLImageElement>(null);
+  // Survives responsive interactivity changes: returning to a wide viewport
+  // must not re-fog a photograph the visitor already uncovered.
+  const hasWipedRef = useRef(false);
 
   const [introComplete, setIntroComplete] = useState(false);
   const [interactive, setInteractive] = useState(false);
-  /**
-   * True while this browser session has not yet seen the vapour/rain-glass
-   * impression, so `/` may play it once. Read synchronously in the state
-   * initialiser so the paint effect knows on its very first run.
-   */
-  const [firstVaporVisit, setFirstVaporVisit] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    try {
-      // Preview helpers: add ?vapor=show to force the rain glass even after it
-      // has been consumed in this session. The guard still expects the
-      // session-gated default, but seeing is believing.
-      const q = window.location.search;
-      if (q.includes('vapor=show')) {
-        window.sessionStorage.removeItem(VAPOR_SEEN_KEY);
-        return true;
-      }
-      if (q.includes('vapor=clear')) {
-        window.sessionStorage.removeItem(VAPOR_SEEN_KEY);
-        return true;
-      }
-      // User asked to always see the rain window on the hero — even on reload
-      // and on SPA return. Keep VAPOR_SEEN_KEY / sessionStorage strings for the
-      // regression guard, but do not withhold the pane.
-      void window.sessionStorage.getItem(VAPOR_SEEN_KEY);
-      // Still detect hard reload to clear the flag for the guard's sake
-      try {
-        const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
-        const isReload = nav ? nav.type === 'reload' : (performance as unknown as { navigation?: { type: number } }).navigation?.type === 1;
-        if (isReload) {
-          window.sessionStorage.removeItem(VAPOR_SEEN_KEY);
-        }
-      } catch { /* ignore */ }
-      return true;
-    }
-    catch { return true; }
-  });
+  // Keep the existing wet-glass introduction on a fresh desktop visit. The
+  // explicit clear preview uses the SAME photograph, with no glass above it.
+  const [vaporEnabled, setVaporEnabled] = useState(() =>
+    typeof window === 'undefined' || new URLSearchParams(window.location.search).get('vapor') !== 'clear',
+  );
 
   // Dev helper: pressing `r` replays the rain glass without a full reload.
   // Helpful while tuning the pane in the preview. Flips false→true so the
@@ -125,10 +97,10 @@ const Hero: React.FC = () => {
       if (e.key.toLowerCase() !== 'r' || e.metaKey || e.ctrlKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
       if (target && /input|textarea|select/i.test(target.tagName)) return;
-      try { window.sessionStorage.removeItem(VAPOR_SEEN_KEY); } catch {}
-      setFirstVaporVisit(false);
+      hasWipedRef.current = false;
+      setVaporEnabled(false);
       requestAnimationFrame(() => {
-        setFirstVaporVisit(true);
+        setVaporEnabled(true);
         window.dispatchEvent(new Event('resize'));
       });
     };
@@ -151,16 +123,31 @@ const Hero: React.FC = () => {
 
   const handleIntroComplete = useCallback(() => setIntroComplete(true), []);
 
-  /**
-   * Mark the once-only impression the moment a real pointer is about to see
-   * it. Mobile/touch never marks it, so a later desktop visit in the same
-   * session still gets the signature moment.
-   */
-  useEffect(() => {
-    if (!interactive || !firstVaporVisit) return;
-    try { window.sessionStorage.setItem(VAPOR_SEEN_KEY, '1'); }
-    catch { /* private mode / storage disabled: keep the effect for this mount */ }
-  }, [interactive, firstVaporVisit]);
+  // The fixed site grain used to sit above even fully erased glass. Clip it
+  // BELOW the hero, on desktop and mobile, instead of grading the photo or
+  // disabling the texture on the rest of the page.
+  useLayoutEffect(() => {
+    const hero = heroRef.current;
+    const grain = hero?.closest<HTMLElement>('.mix-grain');
+    if (!hero || !grain) return;
+    let frame = 0;
+    const place = () => {
+      frame = 0;
+      const rect = hero.getBoundingClientRect();
+      const bottom = rect.top < window.innerHeight ? Math.max(0, Math.min(window.innerHeight, rect.bottom)) : 0;
+      grain.style.setProperty('--hero-grain-inset', `${bottom}px`);
+    };
+    const queue = () => { if (!frame) frame = requestAnimationFrame(place); };
+    place();
+    window.addEventListener('scroll', queue, { passive: true });
+    window.addEventListener('resize', queue, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', queue);
+      window.removeEventListener('resize', queue);
+      grain.style.removeProperty('--hero-grain-inset');
+    };
+  }, []);
 
   /**
    * Is this the web version?
@@ -289,13 +276,9 @@ const Hero: React.FC = () => {
     let primed = false;
     let pointerSeen = false;
 
-    /**
-     * Eraser strokes, one per emitter: the ring uses RING_STROKE, each physics
-     * body uses its own key. Tracking them separately means a letter's trail is
-     * never joined to the ring's trail by a stray line across the hero.
-     */
     let ctx: CanvasRenderingContext2D | null = null;
-    const strokes = new Map<number, { x: number; y: number }>();
+    let wiper: HeroWiper | null = null;
+    let disposed = false;
 
     /**
      * Wiped glass stays wiped.
@@ -432,7 +415,37 @@ const Hero: React.FC = () => {
         loading, then again when the image fires `load`. */
     let vaporPhoto = false;
     /** True the moment the visitor clears any glass at all. */
-    let wiped = false;
+    let wiped = hasWipedRef.current;
+    let detailIdle: number | null = null;
+    let detailTimer = 0;
+    let detailGeneration = 0;
+    const cancelDetail = () => {
+      detailGeneration++;
+      if (detailIdle !== null) {
+        window.cancelIdleCallback?.(detailIdle);
+        detailIdle = null;
+      }
+      window.clearTimeout(detailTimer);
+      detailTimer = 0;
+    };
+    const releaseVapor = () => {
+      if (vapor) { vapor.width = 1; vapor.height = 1; vapor = null; }
+    };
+    const hideOverlay = () => {
+      cancelDetail();
+      canvas.style.visibility = 'hidden';
+      // Drop the large backing store as well as its compositing layer.
+      canvas.width = 1;
+      canvas.height = 1;
+      releaseVapor();
+      bodyTrailRef.current = null;
+    };
+    const finishWipe = () => {
+      wiped = true;
+      hasWipedRef.current = true;
+      wiper?.dispose();
+      hideOverlay();
+    };
 
     /**
      * The stand-in pane, drawn synchronously so the hero is never briefly
@@ -511,7 +524,7 @@ const Hero: React.FC = () => {
          Neutral graphite: thin is slate, thick is a soft silver that still leans
    only a hair cool — the reference's blue-grey has been neutralised so the
    photograph behind keeps its own colour. */
-      const FIELD = 4;
+      const FIELD = Math.max(4, Math.sqrt((boxW * boxH) / 100_000));
       const fw = Math.max(2, Math.ceil(boxW / FIELD));
       const fh = Math.max(2, Math.ceil(boxH / FIELD));
 
@@ -701,7 +714,7 @@ const Hero: React.FC = () => {
       /* Runnels — narrow, near-vertical, because the reference reads as a pane
          rain has tracked straight down, not as broad stains. */
       const tracks: Array<{ pts: Pt[]; w: number; len: number }> = [];
-      const runs = Math.max(8, Math.round(boxW / 110));
+      const runs = Math.min(20, Math.max(8, Math.round(boxW / 110)));
       for (let i = 0; i < runs; i++) {
         let x = rnd() * boxW;
         // Never straight down his face.
@@ -793,7 +806,7 @@ const Hero: React.FC = () => {
       // Dense small beads, the way a pane looks in the macro reference: many
       // tiny beads, few large ones. Baked once, so density costs nothing per
       // frame — only the offscreen tile gets bigger.
-      const scattered = Math.min(20000, Math.round((boxW * boxH) / 110));
+      const scattered = Math.min(12000, Math.round((boxW * boxH) / 110));
       for (let i = 0; i < scattered; i++) {
         const x = rnd() * boxW;
         const y = boxH * Math.pow(rnd(), 0.72);
@@ -837,21 +850,29 @@ const Hero: React.FC = () => {
      * underneath in full colour; wiping punches holes in this layer.
      */
     const paintOverlay = () => {
+      if (disposed) return;
       syncBox();
       if (boxW < 8 || boxH < 8) return;
-      // The pane now carries real detail — beads and runnels a couple of
-      // pixels across — so it does want better than half resolution. 1.5 is
-      // the balance: the water stays crisp, and the per-wipe fill cost is
-      // still well under a full Retina buffer.
-      dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      // A sharp native <img> sits BELOW this capped, disposable effect. Large
+      // and Retina displays must not allocate a full-resolution blurred copy.
+      dpr = Math.min(window.devicePixelRatio || 1, 1.5, Math.sqrt(MAX_VAPOR_PIXELS / (boxW * boxH)));
       const pxW = Math.floor(boxW * dpr);
       const pxH = Math.floor(boxH * dpr);
-      if (canvas.width !== pxW || canvas.height !== pxH) {
-        canvas.width = pxW;
-        canvas.height = pxH;
+      const resized = canvas.width !== pxW || canvas.height !== pxH;
+
+      // Image upgrades and late font loads must never repaint wiped glass.
+      // On resize (or remounting the canvas at a breakpoint), finish clearing
+      // rather than stretching a stale blurred photo over the new sharp crop.
+      if (wiped) {
+        if (resized || !ctx) finishWipe();
+        return;
       }
+      cancelDetail();
+      wiper?.dispose();
+      if (resized) { canvas.width = pxW; canvas.height = pxH; }
       canvas.style.width = `${boxW}px`;
       canvas.style.height = `${boxH}px`;
+      canvas.style.visibility = 'visible';
 
       ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -859,115 +880,46 @@ const Hero: React.FC = () => {
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1;
       ctx.clearRect(0, 0, boxW, boxH);
+      if (!vaporEnabled) { hideOverlay(); return; }
 
-      // Once-only: this is a return to `/`, so the canvas stays transparent.
-      // The ring/label still work as a cursor; only the rain-glass impression
-      // is withheld.
-      if (!firstVaporVisit) return;
-
-      // Stage one: the flat pane, immediately.
       paneGradient(ctx);
-      strokes.clear();
-      wiped = false;
       vaporDetailed = false;
       vaporPhoto = false;
+      wiper = createHeroWiper(ctx, {
+        width: boxW,
+        height: boxH,
+        onStart: () => {
+          wiped = true;
+          hasWipedRef.current = true;
+          cancelDetail();
+          releaseVapor();
+        },
+        onComplete: finishWipe,
+      });
 
-      // Stage two: the water, once the browser has drawn a frame.
+      // Build detail once, off the interaction path. A cancelled or obsolete
+      // callback cannot put the filter back after wiping, resizing or leaving.
+      const generation = detailGeneration;
       const detail = () => {
-        // Resized again, or the visitor has already started wiping — either
-        // way, do not stamp a fresh pane over what is on screen. A missing
-        // photograph (still loading) is the one case that may rebuild a pane
-        // that has already been detailed.
+        if (disposed || generation !== detailGeneration) return;
+        detailIdle = null;
+        detailTimer = 0;
         if ((vaporDetailed && vaporPhoto) || wiped || !ctx || boxW < 8) return;
         buildVapor();
-        if (vapor) ctx.drawImage(vapor, 0, 0, boxW, boxH);
+        if (vapor) {
+          ctx.clearRect(0, 0, boxW, boxH);
+          ctx.drawImage(vapor, 0, 0, boxW, boxH);
+        }
       };
-      const ric = (window as Window & {
-        requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
-      }).requestIdleCallback;
-      if (ric) ric(detail, { timeout: 400 });
-      else window.setTimeout(detail, 60);
-    };
-
-    /**
-     * The squeegee.
-     *
-     * A single soft-edged brush sprite, built once, stamped along the path
-     * from the emitter's previous point to (x, y) with destination-out.
-     *
-     * Stamping a pre-rendered radial falloff is what makes the cleared area
-     * look like glass wiped by a hand: the edge is a gradient, so the mist
-     * thins out rather than ending on a circle. It is also the cheapest way
-     * to do it — no per-frame ctx.filter, no multi-pass alpha stack, and the
-     * interpolation means a fast sweep leaves one continuous trail instead
-     * of a dotted line.
-     *
-     * There is no "wet rim" pass. Piling bright alpha around every stroke is
-     * what made the pane look grubby rather than clear.
-     */
-    let brush: HTMLCanvasElement | null = null;
-    let brushR = 0;
-
-    const buildBrush = (r: number) => {
-      const size = Math.ceil(r * 2);
-      if (brush && brushR === r) return brush;
-      brush = brush || document.createElement('canvas');
-      brush.width = size;
-      brush.height = size;
-      const b = brush.getContext('2d');
-      if (!b) return null;
-      b.clearRect(0, 0, size, size);
-      const g = b.createRadialGradient(r, r, 0, r, r, r);
-      g.addColorStop(0, 'rgba(0,0,0,1)');
-      g.addColorStop(0.62, 'rgba(0,0,0,0.98)');
-      g.addColorStop(0.84, 'rgba(0,0,0,0.55)');
-      g.addColorStop(1, 'rgba(0,0,0,0)');
-      b.fillStyle = g;
-      b.fillRect(0, 0, size, size);
-      brushR = r;
-      return brush;
-    };
-
-    const erase = (key: number, x: number, y: number, r: number) => {
-      if (!ctx) return;
-      const prev = strokes.get(key);
-      // Nothing meaningful moved: skip the composite op entirely.
-      if (prev && Math.hypot(x - prev.x, y - prev.y) < 0.6) return;
-
-      wiped = true;
-
-      // Brushes are cached per radius; the ring and the letters use two
-      // sizes between them, so this rebuilds at most twice.
-      const sprite = buildBrush(Math.round(r * 1.18));
-      if (!sprite) return;
-      const br = sprite.width / 2;
-
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.globalAlpha = 1;
-
-      const stamp = (px: number, py: number) => {
-        ctx!.drawImage(sprite, px - br, py - br, sprite.width, sprite.height);
-      };
-
-      if (prev) {
-        const dx = x - prev.x;
-        const dy = y - prev.y;
-        const dist = Math.hypot(dx, dy);
-        // Overlap the stamps by two thirds so the trail is solid, and cap the
-        // count so a huge jump (tab restore, scroll snap) can never stall a
-        // frame drawing hundreds of sprites.
-        const step = Math.max(r * 0.34, 1);
-        const n = Math.min(Math.ceil(dist / step), 48);
-        for (let i = 1; i <= n; i++) stamp(prev.x + (dx * i) / n, prev.y + (dy * i) / n);
+      if (typeof window.requestIdleCallback === 'function') {
+        detailIdle = window.requestIdleCallback(detail, { timeout: 400 });
+      } else {
+        detailTimer = window.setTimeout(detail, 60);
       }
-      stamp(x, y);
-
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 1;
-
-      if (prev) { prev.x = x; prev.y = y; }
-      else strokes.set(key, { x, y });
     };
+
+    const erase = (key: number, x: number, y: number, radius: number) =>
+      wiper?.erase(key, x, y, radius);
 
     // Handed to the physics solver so every displaced letter carves its own
     // path through the overlay, exactly like the ring does.
@@ -991,9 +943,9 @@ const Hero: React.FC = () => {
     const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
     fonts?.ready
       .then(() => {
+        if (disposed) return;
         measureRing();
-        paintOverlay();
-        centre();
+        if (!pointerSeen) centre();
       })
       .catch(() => {});
 
@@ -1042,7 +994,7 @@ const Hero: React.FC = () => {
         // Break only the ring's stroke; re-entering elsewhere must not erase a
         // straight line from the old exit point. Letter trails are keyed
         // separately and are unaffected.
-        strokes.delete(RING_STROKE);
+        wiper?.resetStroke(RING_STROKE);
         centre();
         return;
       }
@@ -1132,7 +1084,11 @@ const Hero: React.FC = () => {
     raf = requestAnimationFrame(frame);
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(raf);
+      cancelDetail();
+      wiper?.dispose();
+      releaseVapor();
       io.disconnect();
       bodyTrailRef.current = null;
       window.clearTimeout(resizeTimer);
@@ -1141,7 +1097,7 @@ const Hero: React.FC = () => {
       window.removeEventListener('pointermove', onPointerMove);
       img?.removeEventListener('load', onImgLoad);
     };
-  }, [interactive, firstVaporVisit]);
+  }, [interactive, vaporEnabled]);
 
   return (
     <section
@@ -1153,17 +1109,19 @@ const Hero: React.FC = () => {
         {/* ONE hero plate. There is no second crop and no <picture> switch:
             the vapor is generated from this exact image, so what you see
             ghosting through the rain glass is always what you uncover
-            underneath. Three widths so a phone never downloads a 2560px
-            file. */}
+            underneath. Responsive widths account for object-cover's real
+            image width (including tall screens), not just the narrow viewport.
+            The largest existing WebP is only about 160 KB; no artificial upscale. */}
         <img
           ref={overlayImgRef}
           src="/images/hero-landscape-1920.webp"
-          srcSet="/images/hero-landscape-1280.webp 1280w, /images/hero-landscape-1920.webp 1920w, /images/hero-landscape-2560.webp 2560w"
-          sizes="100vw"
+          srcSet="/images/hero-landscape-1280.webp 1280w, /images/hero-landscape-1920.webp 1920w, /images/hero-landscape-2560.webp 2559w"
+          sizes="max(100vw, 142svh, 767px)"
           alt="Papi Raborife"
           className="hero-photo absolute inset-0 h-full w-full object-cover"
-          width="2560"
+          width="2559"
           height="1803"
+          loading="eager"
           fetchPriority="high"
           decoding="async"
           onError={(e) => { e.currentTarget.style.display = 'none'; }}
@@ -1183,7 +1141,7 @@ const Hero: React.FC = () => {
             just a photograph you cannot see. Touch, coarse-pointer and
             reduced-motion visitors land on the clean hero image. */}
         {interactive && (
-          <canvas ref={eraserRef} className="absolute inset-0 w-full h-full pointer-events-none z-[2]" aria-hidden />
+          <canvas ref={eraserRef} className="hero-vapor absolute inset-0 w-full h-full pointer-events-none z-[2]" aria-hidden />
         )}
       </div>
 

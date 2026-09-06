@@ -234,16 +234,9 @@ const click = (window, el) =>
     /graphite/.test(vapor) || /blue-grey/.test(vapor));
 }
 
-/* ── 2g. The vapor is a once-per-session first impression only ──────── */
-{
-  const hero = fs.readFileSync(new URL('../../src/components/Hero.tsx', import.meta.url), 'utf8');
-  check('vapor is gated by a per-session flag',
-    /VAPOR_SEEN_KEY/.test(hero) && /sessionStorage/.test(hero));
-  check('a return to `/` withholds the pane',
-    /if \(!firstVaporVisit\) return;/.test(hero));
-  check('mobile/touch never consumes the impression',
-    /\(!interactive \|\| !firstVaporVisit\) return;/.test(hero));
-}
+/* The hero's clear-photo lifecycle is exercised by hero.mjs. The old string
+   checks only found session-storage markers, even when the implementation
+   ignored them; they did not catch glass being repainted after a wipe. */
 
 /* ── 3. The wordmark goes to the hero and nowhere else ─────────────── */
 {
