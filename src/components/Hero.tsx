@@ -3,6 +3,45 @@ import { Link } from 'react-router-dom';
 import { ScribbleX, ScribbleUnderline, FloatingCross, FloatingWave } from './Scribbles';
 import SplitFlapText from './SplitFlapText';
 import { useHeroPhysics, type HeroCursor } from '../hooks/useHeroPhysics';
+import { createHeroWiper, type HeroWiper } from '../utils/heroWipe';
+
+/** Limit only the effect buffer, never the resolution of the photographs. */
+const MAX_PANE_PIXELS = 3_000_000;
+
+/**
+ * Where `object-fit: cover` has actually put the photograph inside a box.
+ *
+ * The rain pane on the canvas must sit EXACTLY over the clear photograph
+ * behind it — a hair of divergence and the wipe reveals a face that has
+ * slipped. Read `object-position` rather than assuming centre, so the CSS
+ * stays the single source of truth — including the mobile override.
+ */
+type Cover = { ox: number; oy: number; dw: number; dh: number; scale: number };
+const coverOf = (img: HTMLImageElement, boxW: number, boxH: number): Cover | null => {
+  if (!img.complete || !img.naturalWidth || boxW < 8 || boxH < 8) return null;
+  const scale = Math.max(boxW / img.naturalWidth, boxH / img.naturalHeight);
+  const dw = img.naturalWidth * scale;
+  const dh = img.naturalHeight * scale;
+  let posX = 50;
+  let posY = 50;
+  const pos = getComputedStyle(img).objectPosition.trim().split(/\s+/);
+  if (pos.length === 2) {
+    const px = parseFloat(pos[0]);
+    const py = parseFloat(pos[1]);
+    if (Number.isFinite(px)) posX = px;
+    if (Number.isFinite(py)) posY = py;
+  }
+  return { ox: (boxW - dw) * (posX / 100), oy: (boxH - dh) * (posY / 100), dw, dh, scale };
+};
+
+/** The stud, in normalised photograph coordinates: the centre of his lobe.
+    Measured against the 1904×1328 plate: the clear photograph was re-rendered
+    once with a lime stud marked on the lobe (verified pixel-stable against the
+    shipped plate by phase correlation), and the stud's centroid is (737, 655).
+    The lobe is the fleshy lower part of the ear — above the jaw, below the
+    tragus. */
+const EAR_U = 737 / 1904;
+const EAR_V = 655 / 1328;
 
 const RING_WORD = 'CULTURE LED CREATIVE';
 /**
@@ -15,6 +54,9 @@ const RING_WORD = 'CULTURE LED CREATIVE';
  * SVG text re-layout per frame.
  */
 const RING_TEXT = `${RING_WORD} `;
+
+/** Eraser stroke key reserved for the cursor ring; bodies use their own keys. */
+const RING_STROKE = -1;
 
 const HeroLetters: React.FC<{ text: string }> = ({ text }) => (
   <>
@@ -34,15 +76,29 @@ const Hero: React.FC = () => {
   const heroRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
   const ringSpinRef = useRef<SVGGElement>(null);
+  const earringRef = useRef<HTMLDivElement>(null);
+  const eraserRef = useRef<HTMLCanvasElement>(null);
+  const rainImgRef = useRef<HTMLImageElement>(null);
+  const clearImgRef = useRef<HTMLImageElement>(null);
+  // Survives responsive interactivity changes: returning to a wide viewport
+  // must not re-fog a window the visitor has already wiped clear.
+  const hasWipedRef = useRef(false);
 
   const [introComplete, setIntroComplete] = useState(false);
   const [interactive, setInteractive] = useState(false);
 
   /**
-   * Shared cursor state. The ring and the physics pusher both read this exact
-   * object, so the two can never disagree about where the cursor "is".
+   * Shared cursor state. The ring, the eraser stroke and the physics pusher
+   * all read this exact object, so the three can never disagree about where
+   * the cursor "is" — that de-sync was the source of the disconnect glitch.
    */
   const cursorRef = useRef<HeroCursor>({ x: 0, y: 0, r: 28, active: false });
+
+  /**
+   * Set by the eraser effect, read by the physics solver. Going through a ref
+   * means the solver is never restarted just because this callback changes.
+   */
+  const bodyTrailRef = useRef<((key: number, x: number, y: number, r: number) => void) | null>(null);
 
   const handleIntroComplete = useCallback(() => setIntroComplete(true), []);
 
@@ -75,13 +131,14 @@ const Hero: React.FC = () => {
   /**
    * Is this the web version?
    *
-   * The ring cursor and the letter physics are one desktop feature, gated
-   * together. A fine pointer that can hover, no reduced-motion preference,
-   * and a viewport wide enough to be a computer. Anything else — every phone,
-   * every tablet — gets the photograph, clean, on landing.
+   * The rain pane and the wipe are one desktop feature, gated together. A
+   * fine pointer that can hover, no reduced-motion preference, and a viewport
+   * wide enough to be a computer. Anything else — every phone, every tablet —
+   * gets the rain-window photograph, clean, on landing: there is nothing to
+   * wipe with, so the reveal would be a photograph they could never see.
    *
    * This re-evaluates, because a desktop browser dragged narrow and back is
-   * the cheapest way to end up with a cursor ring that no longer fits.
+   * the cheapest way to end up with a rain pane and no way to clear it.
    */
   useEffect(() => {
     const fine = window.matchMedia('(pointer: fine)');
@@ -109,7 +166,7 @@ const Hero: React.FC = () => {
 
   // Physics starts only once the headline has finished settling, so the intro
   // is never fighting the solver for the same glyphs.
-  useHeroPhysics(heroRef, introComplete && interactive, { cursorRef });
+  useHeroPhysics(heroRef, introComplete && interactive, { cursorRef, onBodyTrail: bodyTrailRef });
 
   // Safety net: if the split-flap never reports completion (backgrounded tab,
   // throttled timers) hand control over anyway.
@@ -119,24 +176,74 @@ const Hero: React.FC = () => {
   }, []);
 
   /**
-   * The CULTURE LED CREATIVE ring.
+   * The earring.
    *
-   * The hero's cursor ornament: the label orbits an invisible centre that
-   * springs after the pointer, sized to sit inside the "O" of AWESOMENESS.
-   * It no longer erases anything — the rain window is one photograph, so
-   * there is no glass layer to squeegee — it is pure cursor identity, and
-   * the site's own lime cursor circle reads inside the orbit.
+   * A lime cross on the subject's lobe, pinned in IMAGE space so it stays on
+   * his ear at every viewport instead of drifting off his face the moment the
+   * crop changes — and the crop does change: the photograph is framed
+   * differently on a phone so his head survives the portrait cut.
+   *
+   * This lives in its own effect, deliberately. It runs for every visitor,
+   * not only the ones with a cursor, and it is static by design: no float,
+   * no spin, no physics, the same stillness as the PAPI RABORIFE line. On a
+   * desktop it sits under the rain pane — you have to wipe the window to
+   * find it.
    */
   useEffect(() => {
     const hero = heroRef.current;
+    const el = earringRef.current;
+    const img = rainImgRef.current;
+    if (!hero || !el || !img) return;
+
+    const place = () => {
+      const r = hero.getBoundingClientRect();
+      const geo = coverOf(img, r.width, r.height);
+      if (!geo) { el.style.opacity = '0'; return; }
+      const x = geo.ox + geo.dw * EAR_U;
+      const y = geo.oy + geo.dh * EAR_V;
+      // Scales with the picture, so it reads as the same physical stud whether
+      // the hero is a phone or a 2560 display.
+      const size = Math.max(9, Math.min(20, geo.dw * 0.0075));
+      el.style.width = `${size}px`;
+      el.style.height = `${size}px`;
+      el.style.transform =
+        `translate3d(${(x - size / 2).toFixed(1)}px, ${(y - size / 2).toFixed(1)}px, 0)`;
+      // Off the edge of a heavy crop: hide rather than float in the margin.
+      el.style.opacity = x > 0 && y > 0 && x < r.width && y < r.height ? '1' : '0';
+    };
+
+    place();
+    const onLoad = () => place();
+    if (!img.complete) img.addEventListener('load', onLoad);
+
+    let timer = 0;
+    const onResize = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(place, 140);
+    };
+    window.addEventListener('resize', onResize, { passive: true });
+    const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
+    fonts?.ready.then(place).catch(() => {});
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('resize', onResize);
+      img.removeEventListener('load', onLoad);
+    };
+  }, []);
+
+  useEffect(() => {
+    const hero = heroRef.current;
     const ring = ringRef.current;
-    if (!hero || !ring) return;
+    const canvas = eraserRef.current;
+    if (!hero || !ring || !canvas) return;
 
     let boxLeft = 0;
     let boxTop = 0;
     let boxW = 0;
     let boxH = 0;
     let radius = 28;
+    let dpr = 1;
 
     // Ring spring state (hero-local centre).
     let cx = 0;
@@ -147,6 +254,20 @@ const Hero: React.FC = () => {
     let vy = 0;
     let primed = false;
     let pointerSeen = false;
+
+    let ctx: CanvasRenderingContext2D | null = null;
+    let wiper: HeroWiper | null = null;
+    let disposed = false;
+
+    /**
+     * Wiped glass stays wiped.
+     *
+     * There is deliberately no re-fogging pass. Rain creeping back over a
+     * cleared patch fights the visitor for the photograph they just
+     * uncovered, and the hero is a first impression, not a toy that resets
+     * itself. Wipe it once and the portrait is yours for the visit.
+     */
+    let wiped = hasWipedRef.current;
 
     let raf = 0;
     let lastT = 0;
@@ -173,8 +294,7 @@ const Hero: React.FC = () => {
         // element box includes line-height leading.
         const fs = parseFloat(getComputedStyle(o).fontSize) || 0;
         const glyphDiameter = fs * 0.73;
-        // Noticeably smaller than before — user asked to reduce it again.
-        // Now ~0.68× cap height so the CULTURE loop sits tightly inside the O
+        // ~0.68× cap height so the CULTURE loop sits tightly inside the O
         // rather than spilling past it.
         radius = Math.max((glyphDiameter * 0.68) / 2, 20);
       } else {
@@ -191,7 +311,7 @@ const Hero: React.FC = () => {
       if (svg) svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
 
       const px = Math.max(10, Math.min(17, radius * 0.32));
-      // The label orbits the invisible ring centre, and the site's own lime
+      // The label orbits the invisible eraser centre, and the site's own lime
       // cursor circle reads inside the orbit.
       const pr = radius + px * 0.68;
       const c = size / 2;
@@ -233,6 +353,101 @@ const Hero: React.FC = () => {
       }
     };
 
+    /**
+     * ── The rain pane ─────────────────────────────────────────────────
+     *
+     * The wet glass is a real photograph — the rain window — drawn ONCE onto
+     * this canvas at exactly the cover geometry of the clear photograph
+     * underneath. No fields, no runnels, no beads are painted here: the
+     * picture already has them, which is why it reads as a real window. The
+     * cursor ring and every displaced letter squeegee the rain away with
+     * `destination-out` strokes, and the sharp portrait shows through where
+     * they have been.
+     */
+    const hideOverlay = () => {
+      canvas.style.visibility = 'hidden';
+      // Drop the large backing store as well as its compositing layer.
+      canvas.width = 1;
+      canvas.height = 1;
+      bodyTrailRef.current = null;
+    };
+    const finishWipe = () => {
+      wiped = true;
+      hasWipedRef.current = true;
+      wiper?.dispose();
+      hideOverlay();
+    };
+
+    /**
+     * Lay the rain photograph onto the pane. Returns true when the pane is
+     * actually showing rain — false while the plate is still decoding, in
+     * which case the pane stays empty and is repainted on the image's load.
+     */
+    const drawPane = (f: CanvasRenderingContext2D) => {
+      const img = rainImgRef.current;
+      const geo = img ? coverOf(img, boxW, boxH) : null;
+      if (!img || !geo) return false;
+      f.imageSmoothingEnabled = true;
+      f.imageSmoothingQuality = 'high';
+      f.drawImage(img, geo.ox, geo.oy, geo.dw, geo.dh);
+      return true;
+    };
+
+    const paintPane = () => {
+      if (disposed) return;
+      syncBox();
+      if (boxW < 8 || boxH < 8) return;
+      // The photographs stay native and sharp; only this disposable pane is
+      // capped, so large and Retina displays never allocate a full-resolution
+      // copy of the rain window.
+      dpr = Math.min(window.devicePixelRatio || 1, 1.5, Math.sqrt(MAX_PANE_PIXELS / (boxW * boxH)));
+      const pxW = Math.floor(boxW * dpr);
+      const pxH = Math.floor(boxH * dpr);
+      const resized = canvas.width !== pxW || canvas.height !== pxH;
+
+      // A late resize must never re-fog a window the visitor has cleared.
+      if (wiped) {
+        if (resized || !ctx) finishWipe();
+        return;
+      }
+      wiper?.dispose();
+      if (resized) { canvas.width = pxW; canvas.height = pxH; }
+      canvas.style.width = `${boxW}px`;
+      canvas.style.height = `${boxH}px`;
+      canvas.style.visibility = 'visible';
+
+      ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      ctx.clearRect(0, 0, boxW, boxH);
+      const rained = drawPane(ctx);
+
+      // The sharp photograph behind the window stays hidden until the pane is
+      // showing rain — otherwise a slow rain decode would flash the reveal
+      // before the glass had ever been wiped.
+      const clear = clearImgRef.current;
+      if (clear) clear.style.visibility = rained ? '' : 'hidden';
+
+      wiper = createHeroWiper(ctx, {
+        width: boxW,
+        height: boxH,
+        onStart: () => {
+          wiped = true;
+          hasWipedRef.current = true;
+        },
+        onComplete: finishWipe,
+      });
+    };
+
+    const erase = (key: number, x: number, y: number, radius: number) =>
+      wiper?.erase(key, x, y, radius);
+
+    // Handed to the physics solver so every displaced letter carves its own
+    // path through the rain, exactly like the ring does.
+    bodyTrailRef.current = erase;
+
     const centre = () => {
       tx = boxW / 2;
       ty = boxH / 2;
@@ -245,15 +460,21 @@ const Hero: React.FC = () => {
 
     syncBox();
     measureRing();
+    paintPane();
     centre();
 
     const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
     fonts?.ready
       .then(() => {
+        if (disposed) return;
         measureRing();
         if (!pointerSeen) centre();
       })
       .catch(() => {});
+
+    const img = rainImgRef.current;
+    const onImgLoad = () => paintPane();
+    if (img && !img.complete) img.addEventListener('load', onImgLoad);
 
     let resizeTimer = 0;
     const onResize = () => {
@@ -262,6 +483,7 @@ const Hero: React.FC = () => {
         primed = false;
         syncBox();
         measureRing();
+        paintPane();
         centre();
       }, 140);
     };
@@ -284,16 +506,21 @@ const Hero: React.FC = () => {
       const y = e.clientY - boxTop;
 
       // Outside the hero: park the ring back at centre rather than pinning it
-      // to an edge, and hand the cursor back to the site.
+      // to an edge, stop erasing, and hand the cursor back to the site.
       if (x < 0 || y < 0 || x > boxW || y > boxH) {
         pointerSeen = false;
+        // Break only the ring's stroke; re-entering elsewhere must not wipe a
+        // straight line of rain away from the old exit point. Letter trails
+        // are keyed separately and are unaffected.
+        wiper?.resetStroke(RING_STROKE);
         centre();
         return;
       }
 
       if (!pointerSeen) {
         // First frame back inside. Without this the ring would spring across
-        // the whole hero from wherever it was parked.
+        // the whole hero from wherever it was parked, wiping a stripe of rain
+        // on the way — the single ugliest thing the old build did.
         cx = x;
         cy = y;
         vx = 0;
@@ -338,8 +565,8 @@ const Hero: React.FC = () => {
       cx = Math.max(r, Math.min(boxW - r, cx));
       cy = Math.max(r, Math.min(boxH - r, cy));
 
-      // Publish before anything reads it, so ring and physics use one
-      // identical position this frame.
+      // Publish before anything reads it, so ring / eraser / physics all use
+      // one identical position this frame.
       const c = cursorRef.current;
       c.x = cx;
       c.y = cy;
@@ -369,16 +596,23 @@ const Hero: React.FC = () => {
         'transform',
         `rotate(${spin.toFixed(2)} ${ringC} ${ringC})`,
       );
+
+      // The ring is the squeegee: what its path crosses, it clears.
+      if (pointerSeen) erase(RING_STROKE, cx, cy, radius);
     };
     raf = requestAnimationFrame(frame);
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(raf);
+      wiper?.dispose();
       io.disconnect();
+      bodyTrailRef.current = null;
       window.clearTimeout(resizeTimer);
       window.removeEventListener('resize', onResize);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('pointermove', onPointerMove);
+      img?.removeEventListener('load', onImgLoad);
     };
   }, [interactive]);
 
@@ -389,15 +623,12 @@ const Hero: React.FC = () => {
       className="relative h-[100svh] min-h-[540px] flex items-center justify-center overflow-hidden bg-[#000000]"
     >
       <div className="absolute inset-0 z-0">
-        {/* ONE photograph, and the window is IN it. There is no canvas pane,
-            no second blurred copy of the portrait and nothing to wipe: the
-            rain — dense glistening droplets and the soft blur they cast over
-            his face — is part of the picture itself, so it looks like a real
-            window on every device, not an effect laid over a clean photo.
-            The 1904px plate is the full resolution of the source; the 1280
-            candidate serves the portrait phones that render it near-native
-            through object-cover. No invented upscales. */}
+        {/* The rain window — the base photograph every visitor lands on, and
+            the plate the canvas pane draws from. The window, the dense
+            glistening droplets and the soft blur over the face are IN this
+            picture, not painted over it. */}
         <img
+          ref={rainImgRef}
           src="/images/hero-rain-window-1904.webp"
           srcSet="/images/hero-rain-window-1280.webp 1280w, /images/hero-rain-window-1904.webp 1904w"
           sizes="max(100vw, 142svh, 767px)"
@@ -410,6 +641,49 @@ const Hero: React.FC = () => {
           decoding="async"
           onError={(e) => { e.currentTarget.style.display = 'none'; }}
         />
+        {/* The photograph behind the window. Desktop only, and kept hidden
+            until the pane above it is showing rain — the wipe's whole payoff
+            is that you reveal this, so it must never be seen early. Same
+            plate geometry as the rain window (identical intrinsic size, same
+            object-cover class), so what the squeegee uncovers lines up with
+            the droplet blur it replaces, pixel for pixel. */}
+        {interactive && (
+          <img
+            ref={clearImgRef}
+            src="/images/hero-clear-1904.webp"
+            srcSet="/images/hero-clear-1280.webp 1280w, /images/hero-clear-1904.webp 1904w"
+            sizes="max(100vw, 142svh, 767px)"
+            alt=""
+            aria-hidden
+            className="hero-photo absolute inset-0 h-full w-full object-cover z-[1]"
+            width="1904"
+            height="1328"
+            loading="eager"
+            decoding="async"
+            style={{ visibility: 'hidden' }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
+        )}
+        {/* The stud. Positioned in image space by the earring effect, so it
+            stays on the lobe at every viewport. Above the photographs, below
+            the rain pane — on a desktop you have to wipe the window to find
+            it. */}
+        <div
+          ref={earringRef}
+          className="hero-earring absolute top-0 left-0 z-[2]"
+          style={{ opacity: 0 }}
+          aria-hidden
+        />
+        {/* The rain pane is a DESKTOP effect, and only a desktop effect. It
+            is the rain photograph itself, drawn onto a canvas so the cursor
+            ring and the flying letters can squeegee it away and reveal the
+            sharp portrait behind the window. Touch, coarse-pointer and
+            reduced-motion visitors keep the unbroken rain window — there is
+            nothing to wipe with, so an erasable pane is not an effect, it is
+            a photograph they can never uncover. */}
+        {interactive && (
+          <canvas ref={eraserRef} className="hero-rain absolute inset-0 w-full h-full pointer-events-none z-[3]" aria-hidden />
+        )}
       </div>
 
       {/* Ambient floating crosses */}
@@ -472,9 +746,11 @@ const Hero: React.FC = () => {
       </div>
 
       {/* CULTURE LED CREATIVE. No lime rim, no SVG path, no second circle:
-          the label itself is the only body of the ring, orbiting the ring
+          the label itself is the only body of the ring, orbiting the eraser
           centre, and the site's own lime cursor circle reads inside the
-          orbit. Only rendered where there is a real cursor. */}
+          orbit. The ring is still the squeegee — what its path crosses, it
+          clears. No lens, no magnification: the rain wipes away, it does not
+          enlarge. Only rendered where there is a real cursor. */}
       {interactive && (
         <div
           ref={ringRef}
@@ -483,7 +759,7 @@ const Hero: React.FC = () => {
           aria-hidden
         >
           <svg width="100%" height="100%" className="absolute inset-0 overflow-visible block">
-            {/* The label rides a circle around the invisible ring centre. */}
+            {/* The label rides a circle around the invisible eraser centre. */}
             <g ref={ringSpinRef}>
               {/* Inter Black, not the mono. JetBrains Mono's bold is a
                   narrow-stemmed 700 and at this size it simply does not read

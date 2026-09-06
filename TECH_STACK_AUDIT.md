@@ -109,19 +109,24 @@ urgent — those routes are not the first impression.
 
 Two hand-written canvases, zero dependencies, all gated on visibility. What is
 worth noting this pass is that they share **one gesture** — and that the hero
-no longer owns one at all.
+owns it again, without owning any glass paint.
 
-**a) The hero — `Hero.tsx` — has no canvas any more**
-The wet glass is one photograph. The old pane — noise fields, blooms, runnels,
-a blurred second copy of the portrait stamped into an offscreen tile, and the
-whole wipe controller — is deleted. A single image now carries the window, the
-dense glistening droplets and the soft blur they draw over the face, and that
-is the entire hero: a plain `<img>`, preloaded with `fetchpriority="high"`,
-served at two widths, with the CULTURE LED CREATIVE ring cursor and the letter
-physics on top. Nothing is filtered, composited or wiped at runtime, on any
-device. A painted pane reads as painted, and a blurred copy of the photo laid
-over the sharp one reads as two images — which is exactly what the hero was
-told it looked like.
+**a) The hero pane — `Hero.tsx`**
+The wet glass is a real photograph: the rain window, dense glistening
+droplets and the soft blur over the face all live in the picture. On a
+desktop that photograph is drawn **once** onto a canvas pane at exactly the
+cover geometry of the clear photograph of the same scene sitting beneath it,
+and the cursor ring and the flying letters squeegee it away with
+`destination-out` strokes — wiping the rain reveals the sharp portrait
+behind the window, pixel-aligned because both plates are the same
+1904 × 1328 geometry and share one `object-position`.
+
+Nothing procedural survived: no noise fields, no blooms, no runnels, no
+blurred redraw of the photo — that painted pane is what read as fake glass
+and as "two images". The pane is one `drawImage`, so there is no two-stage
+idle build either. The wipe controller caps the pane buffer at 3 MP
+(independently of the sharp native `<img>` plates), caches soft-edged brush
+sprites, and finishes by releasing the whole backing store.
 
 **b) The What I Do rain — `WhatIDo.tsx`**
 Scroll-pinned, drawn on a half-cadence tick (falling code reads as continuous at
@@ -162,17 +167,26 @@ sweeping every consumer — `Navbar`'s `goToHero` now does a plain double
 
 **The rain window is in the picture.** One photograph carries the window, the
 dense glistening droplets, and the soft blur they draw over the face; nothing
-is laid over it at runtime and there is nothing to wipe.
+procedural is painted over it. The reveal is a second photograph — the same
+scene with the glass wiped clean — kept hidden until the pane above it is
+showing rain, so the payoff is never spoiled by a slow decode.
 
-What survived the simplification is the desktop interactivity, still gated as
-one feature: a fine pointer that can hover, no reduced-motion preference, and
-a viewport at least 768 px wide — all re-evaluated when the browser is resized
-across the boundary. Fail any of them and the ring and the letter physics are
-never constructed. The ring no longer erases anything (there is no pane to
-squeegee); it is the hero's cursor identity, and the site's own lime cursor
-circle reads inside the orbit.
+The desktop interactivity is gated as one feature: a fine pointer that can
+hover, no reduced-motion preference, and a viewport at least 768 px wide —
+all re-evaluated when the browser is resized across the boundary. Fail any of
+them and the pane, the reveal layer, the ring and the letter physics are
+never constructed; touch and reduced-motion visitors keep the unbroken rain
+window. The ring is the squeegee — what its path crosses, it clears — and the
+site's own lime cursor circle reads inside the orbit. Wiped glass stays
+wiped: there is no re-fogging pass, and a resize finishes the wipe rather
+than replaying it.
 
-Which means the crop still matters, so the photograph is framed per shape:
+The earring is pinned in image space (its lobe coordinates were measured on
+the plate via a marker edit verified pixel-stable by phase correlation), so
+it stays on his ear at every viewport, under the pane — on a desktop you
+wipe the window to find it.
+
+Which means the crop still matters, so the plates are framed per shape:
 `object-position: 50% 42%` below 768 px, `50% 46%` above.
 
 ---
@@ -185,22 +199,27 @@ Which means the crop still matters, so the photograph is framed per shape:
 |---|---|---|
 | `hero-rain-window-1904.webp` | 1904 × 1328 | 192.2 KB |
 | `hero-rain-window-1280.webp` | 1280 × 893 | 137.5 KB |
+| `hero-clear-1904.webp` | 1904 × 1328 | 127.2 KB |
+| `hero-clear-1280.webp` | 1280 × 893 | 53.2 KB |
 
-That is the whole hero. **One photograph, two widths** — and the window, the
-droplets and the face-blur are inside the picture, not painted over it. The
-1904 px plate is the full resolution of the source; wider screens upscale it
-in the browser rather than shipping an invented 2560 px tier, and portrait
-phones render the 1280 near-native through `object-cover`.
+That is the whole hero. **One scene, two plates** — the rain window and the
+clean glass behind it, both under the 200 KB budget. The rain window is the
+first paint and preloaded with `fetchpriority="high"`; the clear plate is the
+wipe's reveal, preloaded at default priority so it never competes with the
+first paint. The 1904 px plates are the full resolution of the sources; wider
+screens upscale in the browser rather than shipping an invented 2560 px tier,
+and portrait phones render the 1280 near-native through `object-cover`.
 
-It used to be three widths of a clean plate plus the whole canvas pane built
-on top of it. Before that it was two photographs — a 16:9 outpaint for wide
-screens and the original 3:4 portrait for everything else, switched by
-`<picture>`. That was a correctness bug, not just weight: the fog was
+It used to be three widths of a clean plate plus a procedural canvas pane
+painted on top of it. Before that it was two photographs — a 16:9 outpaint
+for wide screens and the original 3:4 portrait for everything else, switched
+by `<picture>`. That was a correctness bug, not just weight: the fog was
 generated *from the `<img>` element*, so on a wide screen the steam was built
 from one crop while the photograph behind it was another — the image appeared
-to change as you wiped it. The final step of that same principle is the
-current hero: if the glass must match the photograph exactly, the only way to
-guarantee it is for the glass to *be* the photograph.
+to change as you wiped it. The governing principle survived both fixes: if
+the glass must match the photograph exactly, the glass must *be* a photograph
+of the same scene — which is what makes the current wipe read as wiping a
+real window.
 
 Every non-hero image is `loading="lazy"` + `decoding="async"`, and
 `assetsInlineLimit: 2048` keeps tiny assets off the network entirely.
@@ -296,8 +315,8 @@ PASS  wordmark from deep in the homepage returns to the hero
 PASS  lime cursor circle is rendered
 PASS  CULTURE LED CREATIVE ring is present
 PASS  the magnifying glass is gone
-PASS  no earring floats over the wet glass
-PASS  the rain window is the photograph itself, with no pane over it
+PASS  the earring is on the photograph
+PASS  the rain pane is the rain photograph on a canvas
 PASS  no matrix canvas portalled loose onto <body>
 PASS  no page-transition panel exists at all
 PASS  clicking through to another page shows no transition panel

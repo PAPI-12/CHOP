@@ -34,13 +34,16 @@ canvas guard is exercised, then reports:
   backgrounds, reduced motion and the rain-free About variant. Its small test
   bundle is built in memory; no browser install is needed.
 
-- `hero.mjs` — mounts the real Hero in StrictMode and guards the
-  one-photograph rain window: a single `<img>` with no canvas pane, earring
-  or deferred pane work over it, the CULTURE LED CREATIVE ring's orbit
-  layout and pointer follow, responsive ring drop/restore, grain exclusion
-  over the photograph, clean touch and reduced-motion modes, and matching
-  cover-aware image/preload candidates. Also checks the WebP headers and
-  payload sizes; no image processing or browser dependency is required.
+- `hero.mjs` — exercises the wipe controller and the real Hero effects in
+  StrictMode: the rain pane is the photograph itself (no computed glass
+  field), the reveal layer stays hidden until the pane shows rain, a fully
+  transparent stroke core, bounded/cached brushes, unique wipe coverage,
+  completion cleanup, no repaint after late image/font/idle callbacks,
+  responsive remounts, grain exclusion over the photo, high-DPI effect
+  budgets, the earring pinned in image space, clean mobile and
+  reduced-motion modes, and matching cover-aware image/preload candidates
+  for both plates. Also checks the WebP headers and payload sizes; no image
+  processing or browser dependency is required.
 
 `bundle.js` is generated and git-ignored. Run focused checks with
 `node tools/smoke/matrix.mjs` or `node tools/smoke/hero.mjs`.

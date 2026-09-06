@@ -53,13 +53,19 @@ const click = (window, el) =>
   const { window } = await boot('/');
   const hero = window.document.getElementById('hero');
   const imgs = [...hero.querySelectorAll('img')];
-  check('hero uses exactly one <img>', imgs.length === 1, `found ${imgs.length}`);
+  // Two plates, never two crops: the rain window and the clear photograph
+  // behind it are layered, not switched by viewport.
+  check('hero layers exactly two <img> plates', imgs.length === 2, `found ${imgs.length}`);
   check('hero has no <picture> art-direction switch',
     hero.querySelectorAll('picture').length === 0 && hero.querySelectorAll('source').length === 0);
-  const srcset = imgs[0]?.getAttribute('srcset') || '';
-  const families = new Set([...srcset.matchAll(/\/images\/([a-z-]+?)-\d+\.webp/g)].map((m) => m[1]));
-  check('every srcset width is the same photograph', families.size === 1,
-    [...families].join(', ') || 'none');
+  check('both plates share one geometry',
+    imgs.every(i => i.getAttribute('width') === '1904' && i.getAttribute('height') === '1328'),
+    imgs.map(i => `${i.getAttribute('width')}x${i.getAttribute('height')}`).join(' | '));
+  for (const img of imgs) {
+    const families = new Set([...(img.getAttribute('srcset') || '').matchAll(/\/images\/([a-z-]+?)-\d+\.webp/g)].map((m) => m[1]));
+    check(`every srcset width of ${families.values().next().value || '?'} is the same photograph`, families.size === 1,
+      [...families].join(', ') || 'none');
+  }
   window.close();
 }
 
@@ -81,9 +87,9 @@ const click = (window, el) =>
   check('the ring has no lime rim of its own', !hero.querySelector('.hero-ring .hero-ring-circle'));
   check('there is no SVG circle/path left in the ring',
     !hero.querySelector('.hero-ring circle') && !hero.querySelector('.hero-ring path'));
-  check('no earring floats over the wet glass', !hero.querySelector('.hero-earring'));
-  check('the rain window is the photograph itself, with no pane over it',
-    hero.querySelectorAll('canvas').length === 0, `${hero.querySelectorAll('canvas').length} canvas`);
+  check('the earring is on the photograph', !!hero.querySelector('.hero-earring'));
+  check('the rain pane is the rain photograph on a canvas',
+    !!hero.querySelector('canvas.hero-rain'), 'no pane');
   window.close();
 }
 
@@ -126,11 +132,14 @@ const click = (window, el) =>
   const { window, errors } = await boot('/', { touch: true });
   const hero = window.document.getElementById('hero');
   check('mobile renders the hero photograph', !!hero.querySelector('img.hero-photo'));
+  check('mobile keeps only the rain window, no reveal layer',
+    hero.querySelectorAll('img.hero-photo').length === 1,
+    `${hero.querySelectorAll('img.hero-photo').length} plates`);
   check('mobile has no vapor overlay at all',
     !hero.querySelector('.hero-glass-static') && hero.querySelectorAll('canvas').length === 0,
     `${hero.querySelectorAll('canvas').length} canvas`);
   check('mobile has no CULTURE LED CREATIVE ring', !hero.querySelector('.hero-ring'));
-  check('mobile has no earring floating over the wet glass', !hero.querySelector('.hero-earring'));
+  check('mobile still wears the earring', !!hero.querySelector('.hero-earring'));
   check('mobile hero throws nothing', errors.length === 0, errors[0] || '');
   window.close();
 }
@@ -215,21 +224,27 @@ const click = (window, el) =>
     offenders.length === 0, offenders.join(', '));
 }
 
-/* ── 2f. The wet glass is one photograph, not a painted pane ────────── */
+/* ── 2f. The pane is the rain photograph, not a painted glass field ─── */
 {
   const hero = fs.readFileSync(new URL('../../src/components/Hero.tsx', import.meta.url), 'utf8');
+  const wipe = fs.readFileSync(new URL('../../src/utils/heroWipe.ts', import.meta.url), 'utf8');
 
-  // The old canvas pane (noise fields, blooms, runnels, a blurred second
-  // copy of the portrait) is what read as fake glass and as "two images".
-  check('no procedural glass is painted over the photograph',
-    !/getContext|createImageData|buildVapor|heroWipe/.test(hero));
-  check('the hero photograph is the rain window',
-    /hero-rain-window-\d+\.webp/.test(hero));
+  // The procedural glass (noise fields, blooms, runnels, a blurred second
+  // copy of the portrait) is what read as fake. The pane must be the rain
+  // photograph itself, drawn once.
+  check('no computed glass field is painted',
+    !/createImageData|octaves|blooms|putImageData/.test(hero));
+  check('the pane is drawn from the rain photograph',
+    /drawImage\(img/.test(hero) && /hero-rain-window-\d+\.webp/.test(hero));
+  check('the reveal layer is the clear photograph behind the window',
+    /hero-clear-\d+\.webp/.test(hero));
+  check('wiping is a destination-out squeegee, never a repaint',
+    /destination-out/.test(wipe) && !/putImageData/.test(wipe));
   check('the droplets and the blur are baked in, not a runtime filter',
     !/filter:\s*(blur|backdrop)/i.test(hero) && !/backdrop-filter/.test(hero));
 }
 
-/* The hero's one-photograph lifecycle is exercised by hero.mjs. */
+/* The hero's wipe lifecycle is exercised by hero.mjs. */
 
 /* ── 3. The wordmark goes to the hero and nowhere else ─────────────── */
 {
