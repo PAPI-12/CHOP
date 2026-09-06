@@ -172,11 +172,12 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
      * arrival —
      *   top >= vh          section still below the viewport  →  dry
      *   0 < top < vh       being pulled up, rain overlaps it  →  FULL
-     *   top <= 0           the section is landing             →  raining
-     *                      itself out over the first sliver
-     *                      of settled scroll
-     * so the raindrops overlap the whole section while it arrives and are
-     * gone exactly when you are ON it — at any scroll speed.
+     *   0 >= top > -0.5vh  you are getting IN to the section  →  FULL,
+     *                      then raining itself out…
+     *   top <= -0.5vh      half-way in                        →  GONE
+     * so the raindrops overlap the whole section while it arrives and
+     * disappear exactly when you are half-way into it — at any scroll
+     * speed.
      */
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
@@ -191,7 +192,10 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
       else if (top >= vh) alpha = 0;
       else if (top > 0) alpha = 1;
       else {
-        alpha = Math.max(0, 1 + top / (vh * 0.22));
+        // Landing: the rain holds full while you get into the section,
+        // then rains itself out — gone at exactly the half-way point.
+        const half = vh * 0.5;
+        alpha = top <= -half ? 0 : Math.min(1, (half + top) / (half - vh * 0.12));
         if (alpha <= 0) rainDone = true;
       }
 

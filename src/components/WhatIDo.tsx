@@ -579,9 +579,11 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       // now, balancing the caption below, and it melts away once the practice
       // has been walked through.
       if (cueRef.current) {
-        // The boot sequence is automatic on Home; no "scroll to move through
-        // the practice" hint while the machine is doing its first read.
-        const o = machineMode ? 0 : 1 - smoothstep(
+        // The hint sits ABOVE the skills in both variants: it is visible
+        // while the practice is being walked through, and it retires before
+        // the motto parks at the front (Home) / before "continue" takes
+        // over (About) — so the machine act never shares the stage with it.
+        const o = 1 - smoothstep(
           (p - T_CUE_FADE_START) / (T_CUE_FADE_END - T_CUE_FADE_START),
         );
         cueRef.current.style.opacity = o.toFixed(3);
@@ -942,11 +944,9 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
         className="sticky top-0 overflow-hidden bg-[#171715]"
         style={{ height: '100vh', minHeight: '480px', boxShadow: '0 -40px 80px rgba(0,0,0,0.45)', borderTop: '1px solid rgba(245,243,238,0.08)' }}
       >
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0"
-          style={{ background: 'radial-gradient(90% 60% at 50% 42%, rgba(215,255,79,0.045), transparent 62%)' }}
-        />
+        {/* The matrix background is SOLID black — the site's own
+            #171715, no ambient washes. The code rain reads against pure
+            black the way it does everywhere else on the site. */}
         <div
           aria-hidden
           className="pointer-events-none absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#d7ff4f]/35 to-transparent"

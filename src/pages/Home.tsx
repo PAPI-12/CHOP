@@ -75,7 +75,7 @@ const Home: React.FC = () => {
 
       <Clients />
 
-      <section className="px-4 sm:px-6 lg:px-12 xl:px-24 py-20 md:py-32">
+      <section className="px-4 sm:px-6 lg:px-12 xl:px-24 py-20 md:py-32 bg-[#171715]">
         <div className="max-w-[1600px] mx-auto text-center">
           <Reveal>
             <p className="hand-note text-[#d7c4aa] text-2xl md:text-4xl mb-4">let's build something unforgettable</p>
