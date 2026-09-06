@@ -1,11 +1,20 @@
-/** Clean-photo and bounded-work regressions; exercises the real wipe controller
- * and Hero effects, including late callbacks that previously repainted glass. */
+/** Rain-pane and bounded-work regressions; exercises the real wipe controller
+ * and Hero effects. The pane is the rain photograph itself — drawn once onto a
+ * canvas, never a computed glass field — so this guards: the pane is a
+ * photograph, the reveal layer stays hidden until rain is showing, the ring
+ * squeegees, opaque wipe cores, cached brushes, unique coverage, completion
+ * cleanup, no re-fog after late loads or resizes, grain exclusion over the
+ * photo, high-DPI effect budgets, clean mobile and reduced-motion modes, and
+ * matching cover-aware image/preload candidates. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as wait } from 'node:timers/promises';
 import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
+
+/** 'CULTURE LED CREATIVE ' — including the seam space — is 21 glyphs. */
+const RING_GLYPHS = 21;
 
 const code = (await build({
   stdin: {
@@ -31,9 +40,9 @@ const code = (await build({
   define: { 'process.env.NODE_ENV': '"development"' }, logLevel: 'silent',
 })).outputFiles[0].text;
 
-async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce = false, query = '', mount = true } = {}) {
+async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce = false, mount = true } = {}) {
   const dom = new JSDOM('<!doctype html><div id="root"></div>', {
-    url: 'https://papi.example/' + query, pretendToBeVisual: true, runScripts: 'outside-only',
+    url: 'https://papi.example/', pretendToBeVisual: true, runScripts: 'outside-only',
   });
   const { window } = dom;
   const doc = window.document;
@@ -61,8 +70,8 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
   let loaded = false;
   Object.defineProperties(window.HTMLImageElement.prototype, {
     complete: { configurable: true, get: () => loaded },
-    naturalWidth: { configurable: true, get: () => loaded ? 2559 : 0 },
-    naturalHeight: { configurable: true, get: () => loaded ? 1803 : 0 },
+    naturalWidth: { configurable: true, get: () => loaded ? 1904 : 0 },
+    naturalHeight: { configurable: true, get: () => loaded ? 1328 : 0 },
   });
   let resolveFonts;
   Object.defineProperty(doc, 'fonts', { value: { ready: new Promise(resolve => { resolveFonts = resolve; }) } });
@@ -78,6 +87,7 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
   Object.defineProperty(window.performance, 'now', { value: () => now });
   const contexts = new Map();
   const gradients = [];
+  let imageDataCalls = 0;
   window.HTMLCanvasElement.prototype.getContext = function () {
     if (contexts.has(this)) return contexts.get(this);
     const stack = [];
@@ -109,7 +119,7 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
         gradients.push(stops);
         return { addColorStop: (offset, color) => stops.push([offset, color]) };
       },
-      createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }),
+      createImageData: (w, h) => { imageDataCalls++; return { data: new Uint8ClampedArray(w * h * 4) }; },
       putImageData() {},
       getImageData() { throw new Error('GPU readback is not allowed in the wipe path'); },
     };
@@ -124,6 +134,7 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
       for (const [key, callback] of [...frames]) if (frames.delete(key)) callback(now);
     }
   };
+  advance();
   const pointer = (x, y) => {
     const event = new window.MouseEvent('pointermove', { clientX: x, clientY: y });
     Object.defineProperty(event, 'pointerType', { value: 'mouse' });
@@ -140,14 +151,14 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
     await wait(220);
     advance();
   };
-  const canvas = () => doc.querySelector('canvas.hero-vapor');
+  const canvas = () => doc.querySelector('canvas.hero-rain');
   const close = () => {
     if (mount) window.heroTest.unmount();
     staleIdle.forEach(cb => cb()); // Even an already-queued callback must be harmless.
     assert.equal(errors.length, 0, errors.join('\n'));
     window.close();
   };
-  return { window, doc, contexts, gradients, pointer, advance, canvas, flushIdle, staleIdle, idle, resolveFonts, imageLoaded, resize, close };
+  return { window, doc, contexts, gradients, pointer, advance, canvas, flushIdle, staleIdle, idle, resolveFonts, imageLoaded, resize, close, imageDataCalls: () => imageDataCalls };
 }
 
 {
@@ -174,7 +185,7 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
   const before = ctx.draws;
   wiper.erase(3, 1200, 200, 30);
   assert.ok(ctx.draws - before <= 48, 'fast sweeps cap sprite work');
-  assert.equal(ctx.core.alpha, 1, 'the continuous path removes every trace of the filter');
+  assert.equal(ctx.core.alpha, 1, 'the continuous path removes every trace of the rain');
   assert.equal(ctx.core.color, '#000000');
   assert.equal(ctx.core.cap, 'round');
   assert.equal(ctx.globalCompositeOperation, 'source-over', 'compositing state is restored');
@@ -194,7 +205,7 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
   wiper.erase(5, 400, 400, 90);
   assert.equal(ctx.draws, finishedDraws, 'completed glass does no further drawing');
   assert.ok([...t.contexts.keys()].filter(c => c !== canvas).every(c => c.width === 1 && c.height === 1), 'brush backing stores are released');
-  assert.equal(ctx.photoDraws, 0, 'wiping never redraws/resamples the high-resolution photograph');
+  assert.equal(ctx.photoDraws, 0, 'wiping never redraws/resamples the high-resolution photographs');
   wiper.dispose();
   t.close();
   console.log('PASS  opaque wipe core, continuous fast strokes, cached brushes, unique coverage and zero work after clearing');
@@ -203,27 +214,45 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
 {
   const t = await boot();
   const canvas = t.canvas();
-  assert.ok(canvas, 'desktop starts with wipeable glass');
-  assert.equal(t.doc.querySelector('.mix-grain').style.getPropertyValue('--hero-grain-inset'), '800px');
+  assert.ok(canvas, 'desktop starts with the rain pane over the photograph');
+  const photos = [...t.doc.querySelectorAll('#hero img.hero-photo')];
+  assert.equal(photos.length, 2, 'the hero layers the rain window and the clear photograph');
+  const [rain, clear] = photos;
+  assert.ok(/hero-rain-window/.test(rain.getAttribute('src')), 'the base plate is the rain window');
+  assert.ok(/hero-clear/.test(clear.getAttribute('src')), 'the reveal layer is the clear photograph');
+  assert.equal(clear.style.visibility, 'hidden', 'the reveal stays hidden until the pane is showing rain');
+  assert.equal(t.imageDataCalls(), 0, 'the pane is a photograph, not a computed glass field');
+  assert.equal(t.idle.size, 0, 'no deferred pane work is scheduled');
+
   const ctx = t.contexts.get(canvas);
+  const drawsBefore = ctx.photoDraws;
+  t.imageLoaded();
+  t.advance();
+  assert.ok(ctx.photoDraws > drawsBefore, 'the pane draws the rain photograph itself');
+  assert.equal(clear.style.visibility, '', 'the reveal is armed once the pane is showing rain');
+  const earring = t.doc.querySelector('.hero-earring');
+  assert.ok(earring, 'the earring is on the photograph');
+  assert.ok(earring.style.transform.length > 0 && earring.style.opacity === '1', 'the earring is pinned on the lobe in image space');
+
+  const paints = ctx.paints;
   t.pointer(180, 160);
   t.pointer(600, 160);
   assert.ok(ctx.erases > 0, 'the real Hero wires its cursor to the wiper');
-  const paints = ctx.paints;
-  assert.equal(t.idle.size, 0, 'first wipe cancels pending detail work');
+  assert.equal(t.idle.size, 0, 'wiping schedules no deferred work');
   t.staleIdle.forEach(cb => cb());
-  t.imageLoaded();
   t.resolveFonts();
   await wait(0);
   t.advance();
-  assert.equal(ctx.paints, paints, 'idle/image/font completion never repaints cleared glass');
+  assert.equal(ctx.paints, paints, 'idle/font completion never repaints cleared glass');
   await t.resize(1000);
-  assert.equal(canvas.style.visibility, 'hidden', 'resize finishes the wipe instead of stretching/reapplying a filter');
+  assert.equal(canvas.style.visibility, 'hidden', 'resize finishes the wipe instead of re-fogging the window');
   assert.equal(canvas.width * canvas.height, 1, 'completed overlay releases its large buffer');
   await t.resize(600);
   assert.equal(t.canvas(), null, 'narrow layout has no interactive overlay');
+  assert.equal(t.doc.querySelectorAll('#hero img.hero-photo').length, 1, 'narrow layout keeps only the rain window');
   await t.resize(1200);
-  assert.equal(t.canvas().style.visibility, 'hidden', 'returning to desktop does not re-fog the original photo');
+  assert.equal(t.canvas().style.visibility, 'hidden', 'returning to desktop does not re-fog the window');
+
   t.window.scrollY = 300;
   t.window.dispatchEvent(new t.window.Event('scroll'));
   t.advance();
@@ -236,54 +265,62 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
   t.window.heroTest.unmount();
   assert.equal(grain.style.getPropertyValue('--hero-grain-inset'), '', 'navigation removes the scoped grain mask');
   t.close();
-  console.log('PASS  StrictMode, late callbacks, responsive remounts and scrolling preserve the clean original photograph');
+  console.log('PASS  photograph pane, hidden reveal, StrictMode, late callbacks, responsive remounts and scrolling preserve the wipe');
 }
 
 {
   const t = await boot({ width: 3840, height: 2160, dpr: 3 });
   const c = t.canvas();
   assert.ok(c.width * c.height <= 3_000_000, '4K/Retina effect buffer stays within its pixel budget');
-  t.flushIdle();
   const ctx = t.contexts.get(c);
   const paints = ctx.paints;
   t.pointer(100, 100);
   t.imageLoaded();
-  assert.equal(ctx.paints, paints, 'a detailed pane is not repainted after a later photo decode either');
+  assert.equal(ctx.paints, paints, 'a late photograph decode never repaints the committed pane');
   t.close();
-  console.log('PASS  high-DPI detail has a fixed pixel budget independent of the sharp photo');
+  console.log('PASS  high-DPI pane has a fixed pixel budget independent of the sharp photographs');
 }
 
-for (const options of [{ touch: true, width: 390 }, { reduce: true }, { query: '?vapor=clear' }]) {
+for (const options of [{ touch: true, width: 390 }, { reduce: true }]) {
   const t = await boot(options);
-  assert.ok(t.doc.querySelector('img.hero-photo'));
-  assert.ok(!t.canvas() || t.canvas().style.visibility === 'hidden');
-  assert.equal(t.idle.size, 0, 'clean-only mode schedules no expensive vapor work');
+  assert.ok(t.doc.querySelector('img.hero-photo'), 'every visitor gets the rain-window photograph');
+  assert.equal(t.doc.querySelectorAll('#hero img.hero-photo').length, 1, 'no reveal layer without a cursor');
+  assert.equal(t.canvas(), null, 'no pane without a cursor');
+  assert.equal(t.doc.querySelector('.hero-ring'), null, 'no ring without a cursor');
+  assert.ok(t.doc.querySelector('.hero-earring'), 'the earring is there too');
+  assert.equal(t.idle.size, 0, 'no deferred work is scheduled');
   t.close();
 }
-console.log('PASS  touch, reduced motion and the clear preview show the original image without glass');
+console.log('PASS  touch and reduced motion land on the unbroken rain window, earring included');
 
 {
-  const t = await boot({ touch: true, width: 390 });
-  const photo = t.doc.querySelector('img.hero-photo');
+  const t = await boot();
+  const photos = [...t.doc.querySelectorAll('img.hero-photo')];
   const head = new JSDOM(fs.readFileSync(new URL('../../index.html', import.meta.url), 'utf8'));
-  const preload = head.window.document.querySelector('link[rel="preload"][as="image"]');
-  assert.equal(preload.getAttribute('imagesrcset'), photo.getAttribute('srcset'), 'preload and image choose the same file');
-  assert.equal(preload.getAttribute('imagesizes'), photo.getAttribute('sizes'));
-  assert.equal(photo.getAttribute('sizes'), 'max(100vw, 142svh, 767px)', 'portrait screens select for the actual object-cover width');
-  assert.equal(photo.getAttribute('width'), '2559');
-  assert.equal(photo.getAttribute('height'), '1803');
-  assert.equal(photo.getAttribute('fetchpriority'), 'high');
-  assert.equal(photo.getAttribute('loading'), 'eager');
-  assert.equal(photo.getAttribute('decoding'), 'async');
-  for (const candidate of photo.getAttribute('srcset').split(',')) {
-    const [url, descriptor] = candidate.trim().split(/\s+/);
-    const file = fs.readFileSync(new URL('../../public' + url, import.meta.url));
-    assert.ok(file.byteLength < 200 * 1024, 'each high-resolution WebP stays below 200 KB');
-    // The existing lossy WebP's VP8 frame header stores its real width here.
-    assert.equal(file.toString('ascii', 12, 16), 'VP8 ');
-    assert.equal(file.readUInt16LE(26) & 0x3fff, parseInt(descriptor), 'srcset width matches the actual file, not an invented upscale');
+  const preloads = [...head.window.document.querySelectorAll('link[rel="preload"][as="image"]')];
+  assert.equal(preloads.length, 2, 'both hero plates are preloaded');
+  for (const photo of photos) {
+    const preload = preloads.find(p => p.getAttribute('imagesrcset') === photo.getAttribute('srcset'));
+    assert.ok(preload, `a preload matches the ${photo.getAttribute('src')} family`);
+    assert.equal(preload.getAttribute('imagesizes'), photo.getAttribute('sizes'));
+    assert.equal(photo.getAttribute('sizes'), 'max(100vw, 142svh, 767px)', 'portrait screens select for the actual object-cover width');
+    assert.equal(photo.getAttribute('width'), '1904');
+    assert.equal(photo.getAttribute('height'), '1328');
+    assert.equal(photo.getAttribute('loading'), 'eager');
+    assert.equal(photo.getAttribute('decoding'), 'async');
+    for (const candidate of photo.getAttribute('srcset').split(',')) {
+      const [url, descriptor] = candidate.trim().split(/\s+/);
+      const file = fs.readFileSync(new URL('../../public' + url, import.meta.url));
+      assert.ok(file.byteLength < 200 * 1024, 'each hero WebP stays below 200 KB');
+      // The existing lossy WebP's VP8 frame header stores its real width here.
+      assert.equal(file.toString('ascii', 12, 16), 'VP8 ');
+      assert.equal(file.readUInt16LE(26) & 0x3fff, parseInt(descriptor), 'srcset width matches the actual file, not an invented upscale');
+    }
   }
+  const [rain, clear] = photos;
+  assert.equal(rain.getAttribute('fetchpriority'), 'high', 'the rain window keeps the high priority');
+  assert.notEqual(clear.getAttribute('fetchpriority'), 'high', 'the reveal never competes with the first paint');
   head.window.close();
   t.close();
-  console.log('PASS  cover-aware responsive image/preload, accurate intrinsic dimensions and small original WebP payloads');
+  console.log('PASS  cover-aware responsive images/preloads, aligned plates, accurate dimensions and small payloads');
 }

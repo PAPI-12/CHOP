@@ -107,43 +107,26 @@ urgent — those routes are not the first impression.
 
 ## Layer 6 — The canvas layer (the fun one)
 
-Three hand-written canvases, zero dependencies, all gated on visibility. What is
-worth noting this pass is that they now share **one gesture**.
+Two hand-written canvases, zero dependencies, all gated on visibility. What is
+worth noting this pass is that they share **one gesture** — and that the hero
+owns it again, without owning any glass paint.
 
 **a) The hero pane — `Hero.tsx`**
-A sheet of glass someone has breathed on. The photograph is redrawn at
-`blur(26px)`, cooled and desaturated, then covered by three broad washes: a
-milky radial veil heaviest where breath lands, seven very large soft clouds at
-3–8% alpha so the veil is not perfectly even, and a grade that buys back the
-contrast the cream headline needs.
+The wet glass is a real photograph: the rain window, dense glistening
+droplets and the soft blur over the face all live in the picture. On a
+desktop that photograph is drawn **once** onto a canvas pane at exactly the
+cover geometry of the clear photograph of the same scene sitting beneath it,
+and the cursor ring and the flying letters squeegee it away with
+`destination-out` strokes — wiping the rain reveals the sharp portrait
+behind the window, pixel-aligned because both plates are the same
+1904 × 1328 geometry and share one `object-position`.
 
-*Deliberately absent:* droplets, beading, runnels, speckle. All four were in the
-previous version and all four read as a **dirty** window rather than a misted
-one. Condensation from breath is diffusion, not detail.
-
-The wipe is one soft-edged brush sprite, built once, stamped along the path
-between frames with `destination-out`. A pre-rendered radial falloff is what
-makes the cleared area look wiped by a hand — the edge is a gradient, so the
-mist thins out instead of ending on a circle.
-
-Performance, because a full-screen canvas is exactly where a site like this
-dies:
-- The fog is rendered **once** into an offscreen tile. Everything after is a
-  single `drawImage`; nothing re-blurs per frame.
-- The buffer is capped at **1.25×** DPR. The fog carries no fine detail, and the
-  sharp pixels come from the DOM `<img>` underneath — a ~2.5× cut in fill cost
-  on a Retina display for no visible difference.
-- Stamps per sweep are capped at 48, so a tab restore cannot stall a frame.
-- Re-fogging is one low-alpha composite every 90 ms on a credit counter. **An
-  idle hero costs zero.**
-- The loop is behind an `IntersectionObserver` and `document.hidden`.
-
-🟢 **Fixed this pass:** the steam used to disappear permanently. Two causes,
-both now gone. A module-level `overlaySpent` flag consumed the whole effect the
-first time you navigated away, so coming back to Home showed bare photograph
-forever. And the re-fog budget stopped about 11% short of full opacity, so every
-wipe left a permanent residue that accumulated until the pane had cleared
-itself. The budget is now sized to land within ~1% of opaque.
+Nothing procedural survived: no noise fields, no blooms, no runnels, no
+blurred redraw of the photo — that painted pane is what read as fake glass
+and as "two images". The pane is one `drawImage`, so there is no two-stage
+idle build either. The wipe controller caps the pane buffer at 3 MP
+(independently of the sharp native `<img>` plates), caches soft-edged brush
+sprites, and finishes by releasing the whole backing store.
 
 **b) The What I Do rain — `WhatIDo.tsx`**
 Scroll-pinned, drawn on a half-cadence tick (falling code reads as continuous at
@@ -180,45 +163,31 @@ sweeping every consumer — `Navbar`'s `goToHero` now does a plain double
 🟢 **Removed in the previous pass:** a viewport-fixed "spill" canvas, portalled to
 `<body>` at `z-[30]`, that kept raining over Featured Work and everything below.
 
-### Layer 5b — The hero pane
+### Layer 5b — The hero photograph
 
-The steam is **procedural — there is no image in the overlay**. One gradient
-sheet, nine radial mist patches, ~7 k single-pixel frost flecks, eight wandering
-runnels and ~6 k beads, all baked into one offscreen canvas and thereafter only
-composited. The wipe is a `destination-out` stamp of a pre-rendered brush sprite,
-and **it does not heal** — glass you have cleared stays clear.
+**The rain window is in the picture.** One photograph carries the window, the
+dense glistening droplets, and the soft blur they draw over the face; nothing
+procedural is painted over it. The reveal is a second photograph — the same
+scene with the glass wiped clean — kept hidden until the pane above it is
+showing rain, so the payoff is never spoiled by a slow decode.
 
-The one performance trap here is that ~14 k draw operations is nothing per frame
-but very much something inside the *first* frame of the site. So the pane is
-built in two stages: `paintOverlay` lays down the flat gradient synchronously
-(instant, visually near-identical) and the water is rendered on the next
-`requestIdleCallback` and swapped in — unless the visitor has already started
-wiping, in which case it is never stamped over their work.
+The desktop interactivity is gated as one feature: a fine pointer that can
+hover, no reduced-motion preference, and a viewport at least 768 px wide —
+all re-evaluated when the browser is resized across the boundary. Fail any of
+them and the pane, the reveal layer, the ring and the letter physics are
+never constructed; touch and reduced-motion visitors keep the unbroken rain
+window. The ring is the squeegee — what its path crosses, it clears — and the
+site's own lime cursor circle reads inside the orbit. Wiped glass stays
+wiped: there is no re-fogging pass, and a resize finishes the wipe rather
+than replaying it.
 
-**The steam is desktop-only, and gated as one feature.** A fine pointer that can
-hover, no reduced-motion preference, and a viewport at least 768 px wide — all
-four, re-evaluated when the browser is resized across the boundary. Fail any of
-them and the whole desktop hero effect is never constructed: no ring, no lens,
-no canvas, and the `useEffect` returns before it allocates anything. The reason
-is simple. The steam exists to be wiped, and wiping needs a cursor. On a phone a
-fogged pane is not an effect, it is a photograph you cannot see. Touch visitors
-land on the clean hero image.
+The earring is pinned in image space (its lobe coordinates were measured on
+the plate via a marker edit verified pixel-stable by phase correlation), so
+it stays on his ear at every viewport, under the pane — on a desktop you
+wipe the window to find it.
 
-Which means the crop matters, so the photograph is framed per shape:
-`object-position: 62% 42%` below 768 px, `50% 46%` above. Dead centre on a
-390 px-wide window into a ~1250 px plate slices his face in half at the right
-edge; 62% puts his head fully in frame with the headline in the clear space
-beside it. Verified against the real asset at 390×700, 390×600 and 430×780.
-
-The earring lives in its own effect for the same reason — it used to be part of
-the desktop steam effect, so the stud vanished on exactly the devices that can
-now see it.
-
-Governing principle, arrived at the hard way over four calibration passes: **a
-runnel must thin the mist, never punch through it.** Clearing all the way to the
-photograph makes the channel pick up skin tone and the whole pane instantly reads
-as grime. Legibility comes from the lit shoulders on either side of the channel —
-water on glass is a lens, not a window.
+Which means the crop still matters, so the plates are framed per shape:
+`object-position: 50% 42%` below 768 px, `50% 46%` above.
 
 ---
 
@@ -228,19 +197,29 @@ water on glass is a lens, not a window.
 
 | Asset | Dimensions | Size |
 |---|---|---|
-| `hero-landscape-2560.webp` | 2560 × 1429 | 90.5 KB |
-| `hero-landscape-1920.webp` | 1920 × 1071 | 62.5 KB |
-| `hero-landscape-1280.webp` | 1280 × 714 | 37.7 KB |
+| `hero-rain-window-1904.webp` | 1904 × 1328 | 192.2 KB |
+| `hero-rain-window-1280.webp` | 1280 × 893 | 137.5 KB |
+| `hero-clear-1904.webp` | 1904 × 1328 | 127.2 KB |
+| `hero-clear-1280.webp` | 1280 × 893 | 53.2 KB |
 
-That is the whole hero. **One photograph, three widths.**
+That is the whole hero. **One scene, two plates** — the rain window and the
+clean glass behind it, both under the 200 KB budget. The rain window is the
+first paint and preloaded with `fetchpriority="high"`; the clear plate is the
+wipe's reveal, preloaded at default priority so it never competes with the
+first paint. The 1904 px plates are the full resolution of the sources; wider
+screens upscale in the browser rather than shipping an invented 2560 px tier,
+and portrait phones render the 1280 near-native through `object-cover`.
 
-It used to be two: a 16:9 outpaint for wide screens and the original 3:4 portrait
-for everything else, switched by `<picture>`. That was a correctness bug, not
-just weight. The fog is generated *from the `<img>` element*, so on a wide screen
-the steam was built from one crop while the photograph behind it was another —
-the image appeared to change as you wiped it. There is now a single asset family
-and a responsive `object-position` instead of a second file, so what ghosts
-through the mist is always exactly what you uncover. Three files, 310 KB, deleted.
+It used to be three widths of a clean plate plus a procedural canvas pane
+painted on top of it. Before that it was two photographs — a 16:9 outpaint
+for wide screens and the original 3:4 portrait for everything else, switched
+by `<picture>`. That was a correctness bug, not just weight: the fog was
+generated *from the `<img>` element*, so on a wide screen the steam was built
+from one crop while the photograph behind it was another — the image appeared
+to change as you wiped it. The governing principle survived both fixes: if
+the glass must match the photograph exactly, the glass must *be* a photograph
+of the same scene — which is what makes the current wipe read as wiping a
+real window.
 
 Every non-hero image is `loading="lazy"` + `decoding="async"`, and
 `assetsInlineLimit: 2048` keeps tiny assets off the network entirely.
@@ -335,8 +314,9 @@ PASS  wordmark lands at the hero, not mid-page
 PASS  wordmark from deep in the homepage returns to the hero
 PASS  lime cursor circle is rendered
 PASS  CULTURE LED CREATIVE ring is present
-PASS  the ring has a magnifier lens
+PASS  the magnifying glass is gone
 PASS  the earring is on the photograph
+PASS  the rain pane is the rain photograph on a canvas
 PASS  no matrix canvas portalled loose onto <body>
 PASS  no page-transition panel exists at all
 PASS  clicking through to another page shows no transition panel

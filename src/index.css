@@ -162,13 +162,14 @@
   .matrix-guide-caret { animation: none; }
 }
 
-/* ── Hero: rain-glass vapor ────────────────────────────────────────────
-   Pointer-driven visitors get the real thing on a canvas (see Hero.tsx): a
-   dark blue-grey vapor pane with dense small beads and near-vertical
-   runnels, lit from the top-left, which the cursor and the letters squeegee
-   clear, and which stays cleared for this view. The effect never filters
-   the underlying photograph. Touch and reduced-motion visitors — who have
-   nothing to wipe with — land on the clean hero image. */
+/* ── Hero: the rain window ─────────────────────────────────────────────
+   The wet glass is not an effect: one photograph carries the window, the
+   dense glistening droplets and the soft blur they draw over the face. On a
+   desktop that rain photograph is drawn onto a canvas pane which the cursor
+   ring and the flying letters squeegee away — `destination-out` strokes
+   reveal the sharp photograph of the same scene underneath. Touch and
+   reduced-motion visitors keep the unbroken rain window; there is nothing
+   to wipe with. */
 /* ── Reserve the scrollbar's lane, permanently ─────────────────────────
    Every modal on this site locks the page with `overflow: hidden`, which on
    any platform drawing a classic scrollbar reclaims ~15px of width — and the
@@ -180,18 +181,21 @@ html {
   scrollbar-gutter: stable;
 }
 
-/* One hero plate for every viewport, re-framed per shape.
+/* Two plates, one geometry. The rain window and the clear photograph behind
+   it share this class, so their object-cover crops can never diverge — the
+   wipe's whole illusion is that the reveal sits exactly under the droplet
+   blur it replaces. The clear plate is only mounted where the pane exists;
+   both are the same 1904×1328 plate, re-framed per shape below.
    On a wide screen, centred, a hair above true centre. On a phone the crop is
    brutal — a 390px window into a ~1250px-wide plate — and dead centre slices
-   his face in half at the right edge. 62% puts his head fully in frame with
-   the headline sitting in the clear space to its left. Verified against the
-   real asset at 390x700, 390x600 and 430x780. */
+   his face in half at the right edge. 42% keeps his head in frame with
+   the headline sitting in the clear space to its left. */
 .hero-photo {
-  /* All blur/tint belongs to the erasable canvas, never the sharp source. */
+  /* The droplets, the wet-glass blur and the reveal are all in the
+     photographs. No runtime filter, ever: a CSS filter here would be a
+     second layer over the picture, which is exactly what made the old
+     painted pane read as fake. */
   filter: none;
-  /* The plate was re-cropped so the subject is centred IN THE IMAGE, so the
-     same 50% position holds on every viewport — a phone keeps his head in
-     frame because the plate itself, not object-position, does the framing. */
   object-position: 50% 42%;
 }
 @media (min-width: 768px) {
@@ -203,7 +207,8 @@ html {
 /* ── The CULTURE LED CREATIVE ring ────────────────────────────────────
    The ring IS the label: CULTURE LED CREATIVE loops around the size of the O
    in AWESOMENESS. There is no lime rim and no second circle — the site's
-   small lime cursor reads inside the loop. */
+   small lime cursor reads inside the loop. The ring is also the squeegee:
+   what its path crosses, it clears. */
 
 /* ── The earring ───────────────────────────────────────────────────────
    A lime cross on the subject's ear. It belongs to the photograph, so it is
