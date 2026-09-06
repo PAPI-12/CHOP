@@ -136,10 +136,20 @@ const buildLineSchedule = (line: string, startAt: number) => {
   return { times, end: t + 0.12 };
 };
 
-/** One lifecycle for both section-scoped canvases; scroll never re-renders React. */
+/**
+ * One lifecycle for both section-scoped canvases; scroll never re-renders React.
+ *
+ * `active` tells the other end the hand-off is live RIGHT NOW. `revealed` is a
+ * one-way latch — once the visitor has crossed into the matrix phase it stays
+ * true for the rest of the visit, so the code can keep raining over Selected
+ * Work even after this section has scrolled out of view, and even if the human
+ * text was rushed past. Selected Work reads it to continue the stream for the
+ * whole of its own section, not just the overlap with What I Do.
+ */
 export type MatrixHandoff = {
   source: HTMLElement | null;
   active: boolean;
+  revealed: boolean;
 };
 
 const WhatIDo: React.FC<{
@@ -172,6 +182,11 @@ const WhatIDo: React.FC<{
   const bootTagRef = useRef<HTMLParagraphElement>(null);
   const lineRefs = useRef<Array<HTMLElement | null>>([]);
   const guideRef = useRef<HTMLDivElement>(null);
+  // About-only: the hero→practice wipe's origin line (a vertical hairline
+  // struck where the hero headline begins), plus the skill stack container
+  // that is revealed through the growing opening.
+  const revealLineRef = useRef<HTMLDivElement>(null);
+  const stackRef = useRef<HTMLDivElement>(null);
 
   // Variant-resolved choreography values, captured by the effects below.
   const SCREENS = machineMode ? SCREENS_HOME : SCREENS_ABOUT;
@@ -215,6 +230,13 @@ const WhatIDo: React.FC<{
      * viewport, or the visitor scrolls back out of the matrix phase.
      */
     let handoffActive = false;
+    /**
+     * After the one-shot machine act is spent, coming back UP into the section
+     * is a return, not a replay. The pin is retired and the section is cut down
+     * to just the skills — no long black runway, no blank spot. `compact` flips
+     * once, when the section re-enters the viewport from below after the act.
+     */
+    let compact = false;
 
     /**
      * The pin's height is measured and written in pixels. Pure-CSS svh
@@ -334,6 +356,60 @@ const WhatIDo: React.FC<{
       resetAct();
     };
 
+    /**
+     * Retire the pin and collapse the section to the skills only. Used when the
+     * visitor comes back UP into the section after the machine act has already
+     * played: the code and rain are wiped, and the tall pinned runway is cut so
+     * the return lands straight on the practice with no blank black space. This
+     * mirrors the reduced-motion layout (which is the same static, readable list)
+     * but keeps the live frame loop alive so Selected Work's own rain is
+     * unaffected.
+     */
+    const enterCompact = () => {
+      if (compact) return;
+      compact = true;
+      consumeRain();
+
+      // Collapse the spacer so the section is only as tall as the skills.
+      root.style.height = 'auto';
+      stage.style.position = 'static';
+      stage.style.height = 'auto';
+      stage.style.overflow = 'visible';
+      stage.style.paddingTop = '6rem';
+      stage.style.paddingBottom = '4rem';
+
+      // Return the absolute-positioned stack to normal flow, stacked.
+      const listOuter = cards[0]?.parentElement?.parentElement;
+      if (listOuter) { listOuter.style.position = 'static'; listOuter.style.padding = '0'; }
+      const listHost = cards[0]?.parentElement;
+      if (listHost) {
+        listHost.style.height = 'auto';
+        listHost.style.display = 'flex';
+        listHost.style.flexDirection = 'column';
+        listHost.style.alignItems = 'center';
+        listHost.style.justifyContent = 'center';
+        listHost.style.gap = '0.35rem';
+      }
+      cards.forEach((c, i) => {
+        if (!c) return;
+        c.style.position = 'relative';
+        c.style.left = 'auto';
+        c.style.top = 'auto';
+        c.style.visibility = 'visible';
+        c.style.opacity = '1';
+        c.style.transform = 'none';
+        // Fill in the plain title (the spans were wired for the encode/glide).
+        const title = c.querySelector('h3');
+        if (title && originals[i]) title.textContent = originals[i].join('');
+      });
+      notes.forEach((nEl) => { if (nEl) nEl.style.visibility = 'hidden'; });
+      if (cueRef.current) cueRef.current.style.visibility = 'hidden';
+      if (guideRef.current) guideRef.current.style.visibility = 'hidden';
+      if (termRef.current) termRef.current.style.visibility = 'hidden';
+      if (initRef.current) initRef.current.style.opacity = '0';
+      if (headerRef.current) headerRef.current.style.opacity = '1';
+    };
+
     /* ── Stack painting ─────────────────────────────────────────────── */
 
     const paint = (p: number, nowMs: number) => {
@@ -398,6 +474,59 @@ const WhatIDo: React.FC<{
 
       // About exit: furniture fades as "continue" takes over the stage.
       const outT = machineMode ? 0 : smoothstep((p - 0.84) / 0.14);
+
+      // About hero→practice wipe: a thin vertical hairline is struck at the
+      // left margin where the hero headline begins, then a band opens out of
+      // it — both edges expanding left and right simultaneously until the
+      // width is ~100% of the viewport while the height is still a small
+      // strip — and that strip then grows vertically until it covers the
+      // viewport. The black is the section's own background (the What I Do
+      // panel); the skills are revealed through the opening, sliding up and
+      // fading 0→1 rather than simply being there. Scroll-driven over the
+      // first slice of the pin. Home uses the matrix strike instead, so this
+      // stays About-only.
+      if (!machineMode) {
+        const revealT = smoothstep(clamp01(p / 0.22));
+        const stageEl = stageRef.current;
+        if (stageEl) {
+          const W = stageEl.clientWidth || window.innerWidth;
+          const H = stageEl.clientHeight || window.innerHeight;
+          // Where the hero headline begins — the About page's lime origin line.
+          const originX = Math.min(96, Math.max(16, W * 0.055));
+          const lineTh = LINE_PX;
+          const phaseW = clamp01(revealT / 0.55);
+          const phaseH = clamp01((revealT - 0.55) / 0.45);
+          // Horizontal: both edges move outward from the origin line, left to
+          // the viewport's left edge, right to its right, until full width.
+          const leftEdge = originX - originX * phaseW;
+          const rightEdge = originX + (W - originX) * phaseW;
+          const pad = (lineTh / 2) * (1 - phaseW);
+          const left = Math.max(0, leftEdge - pad);
+          const right = Math.min(W, rightEdge + pad);
+          // Vertical: a small centred strip, then it grows to cover the viewport.
+          const strip = Math.max(lineTh, H * 0.016);
+          const top = H / 2 - strip / 2 - (H / 2 - strip / 2) * phaseH;
+          const bottom = H / 2 + strip / 2 + (H / 2 - strip / 2) * phaseH;
+          const stack = stackRef.current;
+          if (stack) {
+            if (revealT >= 0.999) {
+              stack.style.clipPath = 'none';
+            } else {
+              stack.style.clipPath = `inset(${Math.max(0, top).toFixed(1)}px ${Math.max(0, W - right).toFixed(1)}px ${Math.max(0, H - bottom).toFixed(1)}px ${Math.max(0, left).toFixed(1)}px)`;
+            }
+            stack.style.opacity = revealT.toFixed(3);
+            stack.style.transform = `translate3d(0, ${((1 - revealT) * 14).toFixed(1)}px, 0)`;
+          }
+          // The origin line itself: a thin vertical lime hairline at the left,
+          // brightest as the wipe is born, gone once the band has opened.
+          const lineEl = revealLineRef.current;
+          if (lineEl) {
+            lineEl.style.left = `${left.toFixed(1)}px`;
+            lineEl.style.opacity = String(Math.max(0, 1 - revealT * 2.6));
+            lineEl.style.height = `${H}px`;
+          }
+        }
+      }
 
       /**
        * The rain is the machine's ANSWER, and it is introduced the same way
@@ -755,6 +884,15 @@ const WhatIDo: React.FC<{
       const p = travel > 0 ? clamp01(-rect.top / travel) : 0;
       const stageVisible = rect.bottom > 0 && rect.top < vh;
 
+      // One-shot reveal latch. Crossing into the machine phase commits the
+      // matrix to this visit: once it is true it stays true, so the code keeps
+      // raining over Selected Work even if the human text was rushed past, and
+      // even after this section has scrolled completely out of view. Selected
+      // Work reads `revealed` to carry the stream for its own whole length.
+      if (machineMode && handoff && p >= T_VANISH_END - 0.02 && !handoff.revealed) {
+        handoff.revealed = true;
+      }
+
       // Progress is clamped at 1 while the stage slides away, so this MUST be
       // checked every frame, not only in paint(). Even one visible pixel of
       // What I Do keeps both canvases raining at full hand-off strength.
@@ -766,9 +904,10 @@ const WhatIDo: React.FC<{
       // Repaint on scroll movement, and repaint continuously ONLY while the
       // machine act is actually playing — it runs on its own clock, not on the
       // scroll. Once it has finished, a parked visitor costs nothing again.
+      // In compact mode the stage is a static skills list, so paint never runs.
       const actLive =
         machineMode && actStart > 0 && (now - actStart) / 1000 <= ACT_DONE + 0.8;
-      if (Math.abs(p - lastProgress) > 0.0002 || actLive) {
+      if (!compact && (Math.abs(p - lastProgress) > 0.0002 || actLive)) {
         lastProgress = p;
         paint(p, now);
       }
@@ -894,7 +1033,20 @@ const WhatIDo: React.FC<{
       ([entry]) => {
         const wasOn = onScreen;
         onScreen = !!entry?.isIntersecting;
-        if (onScreen) { lastT = 0; measure(); setupRain(); lastProgress = -1; }
+        // Coming back UP into the section after the one-shot act has played
+        // (or after the matrix phase was reached) is a return, not a replay:
+        // retire the pin and cut the section down to the skills so there is no
+        // long blank black runway and no spent-machine stage.
+        if (onScreen && !wasOn && machineMode && (machineActSpent || handoff?.revealed)) {
+          enterCompact();
+        }
+        if (onScreen) {
+          lastT = 0;
+          // In compact mode the spacer is auto and the stage is static; the
+          // pinned geometry no longer applies and must not be re-measured.
+          if (!compact) { measure(); setupRain(); }
+          lastProgress = -1;
+        }
         // Also handle a fast jump that skips the last visible frame. The
         // completed hand-off stays consumed when scrolling back or revisiting.
         if (wasOn && !onScreen) consumeRain();
@@ -907,8 +1059,7 @@ const WhatIDo: React.FC<{
     const onResize = () => {
       window.clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(() => {
-        measure();
-        setupRain();
+        if (!compact) { measure(); setupRain(); }
         lastProgress = -1;
       }, 150);
     };
@@ -972,6 +1123,27 @@ const WhatIDo: React.FC<{
           </>
         )}
 
+        {/* About hero→practice wipe: a vertical lime hairline is struck at the
+            left margin where the hero headline begins; a band opens out of it
+            (both edges expanding left and right simultaneously) and that band
+            grows vertically until it covers the viewport. The skills are
+            revealed through the opening against the section's own black.
+            Scroll-driven over the first slice of the pin. */}
+        {!machineMode && (
+          <div
+            ref={revealLineRef}
+            aria-hidden
+            className="reveal-line pointer-events-none absolute top-0 bottom-0 z-[13]"
+            style={{
+              opacity: 0,
+              width: LINE_PX,
+              background:
+                'linear-gradient(180deg, rgba(215,255,79,0) 0%, #f4ffd8 50%, rgba(215,255,79,0) 100%)',
+              boxShadow: '0 0 18px rgba(215,255,79,0.55)',
+            }}
+          />
+        )}
+
         <div
           ref={headerRef}
           className="absolute top-20 md:top-28 left-4 sm:left-6 lg:left-12 xl:left-24 right-4 sm:right-6 lg:right-12 xl:right-24 flex items-center justify-between gap-4 z-20"
@@ -985,7 +1157,7 @@ const WhatIDo: React.FC<{
         {/* Skill stack. Every card occupies the same centre point; depth is
             expressed purely through scale + opacity, so nothing reflows.
             The motto card (Home only) rises after the skills and parks. */}
-        <div className="absolute inset-0 z-10 flex items-center justify-center px-4 sm:px-6 lg:px-12">
+        <div ref={stackRef} className="reveal-stack absolute inset-0 z-10 flex items-center justify-center px-4 sm:px-6 lg:px-12">
           <div className="relative w-full h-full">
             {SKILLS.map((skill, i) => (
               <div

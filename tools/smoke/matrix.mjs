@@ -17,11 +17,16 @@ const fixture = `
   import WhatIDo, { type MatrixHandoff } from '../../src/components/WhatIDo';
   import SelectedWork from '../../src/components/SelectedWork';
 
-  const handoff = { current: { source: null, active: false } as MatrixHandoff };
+  const handoff = { current: { source: null, active: false, revealed: false } as MatrixHandoff };
   const root = createRoot(document.getElementById('root')!);
   let generation = 0;
   const render = (remount = false) => {
-    if (remount) generation++;
+    if (remount) {
+      generation++;
+      // Navigating away and back re-arms the machine: a fresh ref starts dry,
+      // with the matrix not yet revealed and the handoff not yet live.
+      handoff.current = { source: null, active: false, revealed: false };
+    }
     // A fresh projects array deliberately exercises effect re-runs too.
     const projects = ['ONE', 'TWO', 'THREE'].map(title => ({
       title, subtitle: 'DESIGN', image: '/test.webp', link: '/work/' + title,
@@ -169,17 +174,32 @@ function boot({ touch = false, reduce = false, variant = 'home', mode = 'develop
   const stageRain = () => source()?.querySelector('canvas.matrix-rain');
   const workRain = () => doc.querySelector('section canvas.matrix-rain');
   const ink = (canvas) => contexts.get(canvas)?.painted ?? 0;
+  const peak = (canvas) => contexts.get(canvas)?.peakAlpha ?? 0;
+  /**
+   * The What I Do stage is raining and the hand-off is live. `overlap` adds the
+   * guarantee that Selected Work's own canvas is drawing the incoming code at
+   * full strength while the two sections share the viewport.
+   */
   const isRaining = (overlap = false) => {
     assert.equal(harness.handoff.current.active, true, 'handoff remains active');
     assert.equal(source().dataset.matrixActive, 'true', 'grain stays off throughout the handoff');
     assert.equal(stageRain().style.clipPath, 'none', 'outgoing rain is not clipped shut');
     assert.ok(ink(stageRain()) > 0, 'outgoing canvas draws code');
-    assert.ok(contexts.get(stageRain()).peakAlpha > 0.85, 'outgoing code does not fade at the seam');
+    assert.ok(peak(stageRain()) > 0.85, 'outgoing code does not fade at the seam');
     if (overlap) {
       assert.notEqual(workRain().style.display, 'none', 'StrictMode has not hidden the incoming canvas');
       assert.ok(ink(workRain()) > 0, 'Selected Work draws rain during the overlap');
-      assert.ok(contexts.get(workRain()).peakAlpha > 0.9, 'incoming rain stays at full strength');
+      assert.ok(peak(workRain()) > 0.9, 'incoming rain stays at full strength');
     }
+  };
+  /**
+   * The code keeps raining over Selected Work on its own once the matrix has
+   * been revealed — even after the What I Do hand-off has gone quiet (it has
+   * scrolled fully out of view). Driven by `revealed`, not `active`.
+   */
+  const isWorkRaining = () => {
+    assert.ok(ink(workRain()) > 0, 'Selected Work keeps drawing the code on its own');
+    assert.ok(peak(workRain()) > 0.9, 'Selected Work rain stays at full strength');
   };
   const isDry = () => {
     assert.equal(harness.handoff.current.active, false, 'handoff is inactive');
@@ -198,7 +218,7 @@ function boot({ touch = false, reduce = false, variant = 'home', mode = 'develop
     assert.equal(errors.length, 0, errors.join('\n'));
     window.close();
   };
-  return { window, doc, harness, advance, atProgress, atVisibleHeight, stageRain, workRain, isRaining, isDry, play, finish, observations: () => observations };
+  return { window, doc, harness, advance, atProgress, atVisibleHeight, stageRain, workRain, isRaining, isWorkRaining, isDry, play, finish, observations: () => observations };
 }
 
 for (const options of [{}, { touch: true }, { mode: 'production' }]) {
@@ -210,11 +230,13 @@ for (const options of [{}, { touch: true }, { mode: 'production' }]) {
   t.advance();
   t.atProgress(0.68);
   t.isDry();
+  // Sit through the transmission: no code before it finishes, then the stage
+  // opens into the rain.
   t.atProgress(0.82);
   t.advance(1600);
   t.isDry(); // No code before the dialogue finishes.
   t.advance(9500);
-  t.isRaining();
+  t.isRaining(); // The stage opens; Selected Work is still below the fold here.
   for (const canvas of [t.stageRain(), t.workRain()]) {
     assert.equal(t.window.getComputedStyle(canvas).backgroundColor, 'rgb(0, 0, 0)', 'rain background is pure #000000');
   }
@@ -244,17 +266,47 @@ for (const options of [{}, { touch: true }, { mode: 'production' }]) {
   t.isRaining(true);
   t.atVisibleHeight(1);
   t.isRaining(true);
+  // The code does NOT stop at the What I Do boundary. At the exact seam the
+  // stage's hand-off goes quiet, but Selected Work keeps raining on its own.
   t.atVisibleHeight(0);
-  t.isDry(); // Exact boundary, with no extra quarter-viewport fade/linger.
+  t.isWorkRaining();
+  assert.equal(t.harness.handoff.current.active, false,
+    "the source hand-off ends once What I Do has left, but the code carries on");
+  assert.equal(t.doc.querySelector('[data-matrix-active]').dataset.matrixActive, 'false',
+    'grain override is released once What I Do leaves');
+  t.atVisibleHeight(-400); // What I Do fully scrolled out; Selected Work remains.
+  t.isWorkRaining();
   assert.ok([...t.doc.querySelectorAll('.wk-card')].every(c => c.dataset.open === '1'), 'projects stay open');
-  t.atVisibleHeight(400);
+  // Coming back up into What I Do after the act is spent retires the pin: the
+  // section is cut to the skills and the matrix/rain are gone — no blank runway.
+  t.atVisibleHeight(600);
   t.advance(1000);
-  t.isDry(); // No second rain after the completed hand-off.
+  assert.equal(t.doc.querySelector('[data-matrix-active]').style.height, 'auto',
+    'returning to What I Do shortens the section to just the skills');
+  t.isDry();
   t.harness.render(true);
   t.advance(1000);
-  t.isDry(); // Nor after navigating away and remounting Home.
+  t.isDry(); // A fresh mount after navigating away re-arms dry.
   t.finish();
-  console.log(`PASS  ${label}: continuous rain through continue, pin release and overlap; clears only at full exit`);
+  console.log(`PASS  ${label}: rain continues from the reveal through the whole of Selected Work; the stream survives the pin release; returning up cuts the section to the skills`);
+}
+
+{
+  // Rushing the human text must land on the same outcome as waiting: scroll
+  // into the matrix phase, break the courtesy hold with a wheel flick, and
+  // jump straight to Selected Work — the code is already raining there because
+  // the reveal is a latch, not something the dialogue has to finish first.
+  const t = boot();
+  t.atProgress(0.82);
+  t.advance(1600);
+  t.window.dispatchEvent(new t.window.WheelEvent('wheel', { deltaY: 900 }));
+  t.advance();
+  t.atVisibleHeight(400);
+  t.isWorkRaining();
+  assert.equal(t.harness.handoff.current.active, false,
+    'rushing the dialogue leaves the hand-off quiet until the act resolves');
+  t.finish();
+  console.log('PASS  rushing the human text still reveals the code over Selected Work');
 }
 
 {
@@ -273,20 +325,27 @@ for (const options of [{}, { touch: true }, { mode: 'production' }]) {
   t.play();
   t.atVisibleHeight(400);
   t.isRaining(true);
-  t.atVisibleHeight(-900); // Jump beyond the source observer's margin in one frame.
-  t.atVisibleHeight(400);
-  t.isDry();
+  // Jump straight past the source observer's margin into Selected Work, then
+  // bounce within Selected Work (never re-entering What I Do). The reveal latch
+  // means a fast jump never drops the stream: the code keeps raining over the
+  // work, driven by `revealed` not `active`.
+  t.atVisibleHeight(-900);
+  t.isWorkRaining();
+  t.atVisibleHeight(-400);
+  t.isWorkRaining();
   t.finish();
-  console.log('PASS  fast jumps consume the hand-off even when its last visible frame is skipped');
+  console.log('PASS  fast jumps never drop the rain: the reveal latch carries the stream over Selected Work');
 }
 {
   const t = boot();
   t.atVisibleHeight(0); // Skip the entire act, e.g. keyboard End / deep scroll.
   t.advance(1600);
-  t.isDry();
+  // Rushing straight to the end still reveals the code over Selected Work —
+  // the same outcome as waiting through the human text.
+  t.isWorkRaining();
   assert.ok([...t.doc.querySelectorAll('.wk-card')].every(c => c.dataset.open === '1'));
   t.finish();
-  console.log('PASS  skipping the matrix never starts unrelated rain or hides the projects');
+  console.log('PASS  skipping/rushing to the matrix still reveals the code over Selected Work and the projects');
 }
 {
   const t = boot({ touch: true, reduce: true });
@@ -306,4 +365,29 @@ for (const options of [{}, { touch: true }, { mode: 'production' }]) {
   assert.equal(t.stageRain(), null);
   t.finish();
   console.log('PASS  About remains free of the Matrix effect');
+}
+{
+  // The About hero→practice wipe is scroll-driven: a thin vertical origin
+  // line is struck where the hero headline begins, the skills are revealed
+  // through an opening that first grows left-to-right to a full-width band
+  // and then vertically, and the section's own black background is the panel.
+  const t = boot({ variant: 'about' });
+  const line = () => t.doc.querySelector('.reveal-line');
+  const stack = () => t.doc.querySelector('.reveal-stack');
+  t.atProgress(0.01);
+  assert.ok(line(), 'a thin origin line is struck for the About wipe');
+  assert.ok(parseFloat(line().style.opacity) > 0.5, 'the origin line is lit as the wipe is born');
+  assert.notEqual(stack().style.clipPath, 'none', 'the skills are clipped shut at the start');
+  assert.ok(parseFloat(stack().style.opacity) < 0.3, 'the skills start nearly invisible');
+  t.atProgress(0.12);
+  assert.notEqual(stack().style.clipPath, 'none', 'the reveal window is still open mid-wipe');
+  assert.ok(parseFloat(stack().style.opacity) > 0.3, 'the skills are emerging mid-wipe');
+  assert.ok(parseFloat(line().style.opacity) < 1, 'the origin line dims as the band opens');
+  t.atProgress(0.3);
+  assert.equal(stack().style.clipPath, 'none', 'the wipe fully reveals the skills');
+  assert.equal(parseFloat(stack().style.opacity), 1, 'the skills are fully visible at the end');
+  assert.equal(t.stageRain(), null, 'About stays free of the matrix rain');
+  t.isDry();
+  t.finish();
+  console.log('PASS  About hero→practice wipe is scroll-driven: a left origin line opens into the skills against the section black');
 }
