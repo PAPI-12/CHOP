@@ -57,11 +57,15 @@ const rand = (i: number) => {
 };
 
 /* ── Timeline ══════════════════════════════════════════════════════════
-   HOME — the boot sequence opens the section:
-     entry        the stage enters and the machine arms immediately — no skill
-                  glide first. The very first thing on the pinned stage is:
-                  WHAT I DO · INITIALIZING decrypting (1.4s)
-     T_BOOT       INITIALIZING vanishes.
+   HOME — the full arc, scroll-driven then clock-driven:
+     0.00 → 0.60  skills glide — UX/UI, ART DIRECTION … AI CREATIVE — one
+                  after another, continuous, never pausing. ART COMES 1ST
+                  rises last and parks at the front.
+     0.62 → 0.72  ART COMES 1ST encodes — letters churn into matrix glyphs
+                  left-to-right
+     0.72 → 0.80  it browns out — supply gutters, glyphs swell and die
+     T_BOOT       WHAT I DO · INITIALIZING decrypts (1.35s) — auto-played,
+                  scroll-held. Then it vanishes.
      typing       the human lines read in the same place, one after another:
                   OH, HELLO / YOU CAN NOW CONTINUE TO FEATURED WORK /
                   FOLLOW THE MATRIX CODE — jittered cadence, breaths between
@@ -128,8 +132,9 @@ const buildLineSchedule = (line: string, startAt: number) => {
 
 const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' }) => {
   /**
-   * home  — WHAT I DO · INITIALIZING boots first (auto-played, scroll-held),
-   *         vanishes, the human lines read in the same place, then the surge
+   * home  — skills glide → ART COMES 1ST parks and encodes → it browns out,
+   *         then WHAT I DO · INITIALIZING decrypts (auto-played, scroll-held),
+   *         vanishes, the human lines read in the same place, and the surge
    *         reveals the matrix and hands off to Selected Work.
    * about — the practice only: the same glide, AI CREATIVE exits in white,
    *         then "continue" lights and Experience is pulled up. No machine.
@@ -304,11 +309,9 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       // About glides through the skills and lets AI CREATIVE sail off.
       // About runs a hair past the last card so AI CREATIVE finishes its exit
       // instead of freezing half-faded for the rest of the pin.
-      const glideEnd = machineMode ? 1 : 0.86;
-      const glideSpan = machineMode ? N + 0.2 : N + 0.6;
-      // Home opens straight on the boot sequence; the skill stack is already
-      // past the front card so the stage belongs entirely to the terminal.
-      const front = machineMode ? glideSpan : clamp01(p / glideEnd) * glideSpan;
+      const glideEnd = machineMode ? T_SKILLS_END : 0.86;
+      const glideSpan = machineMode ? N + 0.15 : N + 0.6;
+      const front = clamp01(p / glideEnd) * glideSpan;
 
       const codeT =
         machineMode && p > T_CODE_START ? smoothstep((p - T_CODE_START) / (T_CODE_END - T_CODE_START)) : 0;
@@ -319,19 +322,18 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
       const vanishRaw = machineMode ? clamp01((p - T_CODE_END) / (T_VANISH_END - T_CODE_END)) : 0;
 
       /* ── Auto act clock ─────────────────────────────────────────── */
-      // Fire only while the pin genuinely holds the stage (past-travel p≈1
-      // means the stage is already leaving — never re-arm there), and only
-      // once per visit: the transmission is never replayed on re-entry.
-      // INITIALIZING is the very first thing Home shows: the act arms as soon
-      // as the pinned stage is entered, not after a skills glide.
-      if (machineMode && actStart < 0 && !machineActSpent && p >= 0.03 && p <= 0.998) {
+      // Fire only after ART COMES 1ST has been seen and has browned out (the
+      // encode/vanish window), only while the pin genuinely holds the stage,
+      // and only once per page load. INITIALIZING is the first thing the
+      // machine says after the motto, never at section entry.
+      if (machineMode && actStart < 0 && !machineActSpent && p >= T_VANISH_END && p <= 0.995) {
         actStart = nowMs;
         armLock();
       }
       // Scrolled back above the trigger (or past the end) while the machine
       // was mid-act: reset so the section never shows a spent terminal when
       // revisited mid-sequence.
-      if (machineMode && actStart > 0 && (p < 0.02 || p > 0.998)) {
+      if (machineMode && actStart > 0 && (p < T_VANISH_END - 0.05 || p > 0.995)) {
         resetAct();
       }
       const actT = machineMode && actStart > 0 ? (nowMs - actStart) / 1000 : 0;
@@ -448,9 +450,8 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
 
         // Depth: > 0 means still stacked behind, 0 = front, < 0 = passed.
         let depth = i - front;
-        // Home no longer uses the skill glide or the motto card — the stack
-        // stays fully passed and only the boot terminal occupies the stage.
-        const isMotto = false;
+        const isMotto = machineMode && i === N;
+        if (isMotto) depth = Math.max(depth, 0);
 
         let scale: number;
         let opacity: number;
