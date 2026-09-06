@@ -100,6 +100,17 @@ const Hero: React.FC = () => {
         window.sessionStorage.removeItem(VAPOR_SEEN_KEY);
         return true;
       }
+      // A hard reload should always bring the rain back — sessionStorage
+      // survives a reload, so without this you can reload and see a clean
+      // hero with no way to know the glass ever existed.
+      try {
+        const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+        const isReload = nav ? nav.type === 'reload' : (performance as unknown as { navigation?: { type: number } }).navigation?.type === 1;
+        if (isReload) {
+          window.sessionStorage.removeItem(VAPOR_SEEN_KEY);
+          return true;
+        }
+      } catch { /* ignore */ }
       return window.sessionStorage.getItem(VAPOR_SEEN_KEY) !== '1';
     }
     catch { return true; }
