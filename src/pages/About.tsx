@@ -7,7 +7,7 @@ import { ScribbleX } from '../components/Scribbles';
 
 const About: React.FC = () => {
   return (
-    <div className="min-h-screen bg-[#171715] pt-24 md:pt-32">
+    <div className="min-h-screen bg-[#000000] pt-24 md:pt-32">
       {/* ── About hero ────────────────────────────────────────────────
           No gradients, no masks: the portrait is a hard-edged plate that
           bleeds off the right margin, and the copy is set against it like a
@@ -73,7 +73,7 @@ const About: React.FC = () => {
             {/* Portrait plate. Bleeds into the right page margin on desktop so
                 the crop feels like a printed edge, not a floating card. */}
             <figure className="lg:col-span-5 relative -mx-4 sm:-mx-6 lg:mx-0 lg:-mr-12 xl:-mr-24 lg:mt-1">
-              <div className="relative overflow-hidden lg:rounded-l-2xl border-y lg:border-l lg:border-r-0 border-[#f5f3ee]/12 bg-[#171715]">
+              <div className="relative overflow-hidden lg:rounded-l-2xl border-y lg:border-l lg:border-r-0 border-[#f5f3ee]/12 bg-[#000000]">
                 <img
                   loading="eager"
                   decoding="async"
@@ -88,7 +88,7 @@ const About: React.FC = () => {
               {/* Index tab — the single point of overlap between the two
                   columns, in brand lime so the eye ties them together. It
                   lives OUTSIDE the clipped plate so it can cross the edge. */}
-              <span className="absolute z-10 left-4 sm:left-6 lg:-left-5 top-6 md:top-8 rotate-[-2deg] bg-[#d7ff4f] text-[#171715] font-mono text-[9px] md:text-[10px] font-bold tracking-[0.3em] uppercase px-3 py-1.5">
+              <span className="absolute z-10 left-4 sm:left-6 lg:-left-5 top-6 md:top-8 rotate-[-2deg] bg-[#d7ff4f] text-[#000000] font-mono text-[9px] md:text-[10px] font-bold tracking-[0.3em] uppercase px-3 py-1.5">
                 Fig. 01 — the maker
               </span>
 
@@ -132,7 +132,7 @@ const About: React.FC = () => {
         </div>
       </section>
 
-      <section className="px-4 sm:px-6 lg:px-12 xl:px-24 py-14 md:py-24 bg-[#171715]">
+      <section className="px-4 sm:px-6 lg:px-12 xl:px-24 py-14 md:py-24 bg-[#000000]">
         <div className="max-w-[1600px] mx-auto text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
             <p className="hand-note text-[#d7c4aa] text-2xl md:text-4xl mb-5 md:mb-6">ready to collaborate?</p>

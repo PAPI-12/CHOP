@@ -69,7 +69,7 @@ const Navbar: React.FC = () => {
   ];
   return (
     <>
-      <nav id="main-nav" className={`nav-drop fixed top-0 left-0 w-full z-[50] transition-all duration-300 ${isScrolled ? 'bg-[#171715]/95 backdrop-blur-md py-4' : 'bg-transparent py-6 md:py-8'}`}>
+      <nav id="main-nav" className={`nav-drop fixed top-0 left-0 w-full z-[50] transition-all duration-300 ${isScrolled ? 'bg-[#000000]/95 backdrop-blur-md py-4' : 'bg-transparent py-6 md:py-8'}`}>
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 flex justify-between items-center">
           {/* Clicking the brand also re-arms the What I Do machine act — it is
               the explicit "play it again" affordance besides a page reload. */}
@@ -96,7 +96,7 @@ const Navbar: React.FC = () => {
       {/* Kept mounted and translated off-canvas so opening the menu is a pure
           compositor transform — no mount cost, no AnimatePresence runtime. */}
       <div
-        className="mobile-menu fixed inset-0 z-[45] bg-[#171715] pt-32 px-8 md:hidden"
+        className="mobile-menu fixed inset-0 z-[45] bg-[#000000] pt-32 px-8 md:hidden"
         data-open={isMobileMenuOpen ? 'true' : 'false'}
         aria-hidden={!isMobileMenuOpen}
       >

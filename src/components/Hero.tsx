@@ -1147,7 +1147,7 @@ const Hero: React.FC = () => {
     <section
       id="hero"
       ref={heroRef}
-      className="relative h-[100svh] min-h-[540px] flex items-center justify-center overflow-hidden bg-[#171715]"
+      className="relative h-[100svh] min-h-[540px] flex items-center justify-center overflow-hidden bg-[#000000]"
     >
       <div className="absolute inset-0 z-0">
         {/* ONE hero plate. There is no second crop and no <picture> switch:

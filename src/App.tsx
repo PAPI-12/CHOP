@@ -73,7 +73,7 @@ const ScrollToTop: React.FC = () => {
 };
 
 const PageFallback = () => (
-  <div className="min-h-screen bg-[#171715]" aria-hidden />
+  <div className="min-h-screen bg-[#000000]" aria-hidden />
 );
 
 /**
@@ -176,7 +176,7 @@ const AppContent: React.FC = () => {
   useEffect(() => { firstPaint.current = false; }, []);
 
   return (
-    <div className="relative min-h-screen bg-[#171715] mix-grain">
+    <div className="relative min-h-screen bg-[#000000] mix-grain">
       <ScrollProgress />
       <CustomCursor />
       <Navbar />
@@ -206,7 +206,7 @@ const AppContent: React.FC = () => {
           </div>
         </Suspense>
       </main>
-      <footer className="site-footer relative z-10 border-t border-white/10 py-8 text-center text-[11px] uppercase tracking-[0.3em] text-[#8f8f88] bg-[#171715]">
+      <footer className="site-footer relative z-10 border-t border-white/10 py-8 text-center text-[11px] uppercase tracking-[0.3em] text-[#8f8f88] bg-[#000000]">
         <p>© {new Date().getFullYear()} Papi Raborife — Crafted with culture, clarity and motion. <Link to="/privacy" className="hover:text-[#d7ff4f]">Privacy</Link></p>
       </footer>
     </div>

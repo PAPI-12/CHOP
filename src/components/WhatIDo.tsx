@@ -936,16 +936,16 @@ const WhatIDo: React.FC<{ variant?: 'home' | 'about' }> = ({ variant = 'home' })
     // collapsing is how this section used to lose its lock and flash past.
     <div
       ref={rootRef}
-      className="relative z-10 bg-[#171715]"
+      className="relative z-10 bg-[#000000]"
       style={{ height: machineMode ? '820vh' : '560vh' }}
     >
       <div
         ref={stageRef}
-        className="sticky top-0 overflow-hidden bg-[#171715]"
+        className="sticky top-0 overflow-hidden bg-[#000000]"
         style={{ height: '100vh', minHeight: '480px', boxShadow: '0 -40px 80px rgba(0,0,0,0.45)', borderTop: '1px solid rgba(245,243,238,0.08)' }}
       >
         {/* The matrix background is SOLID black — the site's own
-            #171715, no ambient washes. The code rain reads against pure
+            #000000, no ambient washes. The code rain reads against pure
             black the way it does everywhere else on the site. */}
         <div
           aria-hidden

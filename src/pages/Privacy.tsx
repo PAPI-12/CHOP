@@ -2,7 +2,7 @@ import React from 'react';
 import CTAButton from '../components/CTAButton';
 
 const Privacy: React.FC = () => (
-  <div className="min-h-screen bg-[#171715] pt-28 md:pt-36 px-4 sm:px-6 lg:px-12 xl:px-24 pb-20">
+  <div className="min-h-screen bg-[#000000] pt-28 md:pt-36 px-4 sm:px-6 lg:px-12 xl:px-24 pb-20">
     <main className="max-w-4xl mx-auto">
       <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#8f8f88] mb-5">Legal / Privacy</p>
       <h1 className="font-display text-[14vw] sm:text-[10vw] md:text-[6vw] leading-[0.86] text-[#f5f3ee] mb-10">

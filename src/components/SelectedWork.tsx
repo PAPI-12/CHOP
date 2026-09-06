@@ -172,12 +172,13 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
      * arrival —
      *   top >= vh          section still below the viewport  →  dry
      *   0 < top < vh       being pulled up, rain overlaps it  →  FULL
-     *   0 >= top > -0.5vh  you are getting IN to the section  →  FULL,
-     *                      then raining itself out…
-     *   top <= -0.5vh      half-way in                        →  GONE
-     * so the raindrops overlap the whole section while it arrives and
-     * disappear exactly when you are half-way into it — at any scroll
-     * speed.
+     *   0 >= top > -0.7vh  getting IN to the section          →  FULL
+     *   -0.7vh > top > -vh raining itself out toward the
+     *                      full-way point…
+     *   top <= -vh         full-way in (section top at −100%
+     *                      of the viewport)                  →  GONE
+     * so the rain holds full strength the whole way in and rains out only
+     * at the full-way point — one direction, at any scroll speed.
      */
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
@@ -192,11 +193,15 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
       else if (top >= vh) alpha = 0;
       else if (top > 0) alpha = 1;
       else {
-        // Landing: the rain holds full while you get into the section,
-        // then rains itself out — gone at exactly the half-way point.
-        const half = vh * 0.5;
-        alpha = top <= -half ? 0 : Math.min(1, (half + top) / (half - vh * 0.12));
-        if (alpha <= 0) rainDone = true;
+        // Landing: FULL all the way in, then it rains itself out and is
+        // gone at exactly the full-way point — section top at −100% of the
+        // viewport. One direction.
+        const fullWay = vh;
+        const fadeStart = -fullWay * 0.7;
+        alpha = top <= fadeStart
+          ? Math.max(0, (top + fullWay) / (fullWay + fadeStart))
+          : 1;
+        if (top <= -fullWay) rainDone = true;
       }
 
       // The cards are cut out of the code once it is properly over the grid.
@@ -291,7 +296,7 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
   return (
     <section
       ref={rootRef}
-      className="relative z-20 overflow-hidden px-4 sm:px-6 lg:px-12 xl:px-24 py-20 md:py-32 bg-[#171715]"
+      className="relative z-20 overflow-hidden px-4 sm:px-6 lg:px-12 xl:px-24 py-20 md:py-32 bg-[#000000]"
     >
       {/* The code that carried you here. Scoped to this section — it can
           never paint over anything else on the page. Raindrops cover the
@@ -337,7 +342,7 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
                   className="h-full w-full object-cover grayscale brightness-50 transition-all duration-700 group-hover:grayscale-0 group-hover:brightness-75 group-hover:scale-105"
                 />
                 <span aria-hidden className="wk-card-scan" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#171715] via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#000000] via-transparent to-transparent" />
                 <div className="absolute bottom-0 left-0 p-5 md:p-8">
                   <p className="mb-2 text-[9px] md:text-[10px] uppercase tracking-wider text-[#d7ff4f]">
                     {project.subtitle}

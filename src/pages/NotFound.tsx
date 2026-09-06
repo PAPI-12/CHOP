@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import CTAButton from '../components/CTAButton';
 
 const NotFound: React.FC = () => (
-  <div className="min-h-[80vh] flex items-center justify-center px-4 py-24 bg-[#171715]">
+  <div className="min-h-[80vh] flex items-center justify-center px-4 py-24 bg-[#000000]">
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-xl text-center">
       <p className="font-mono text-[10px] uppercase tracking-[0.35em] text-[#8f8f88] mb-5 md:mb-6">404 // Signal lost</p>
       <h1 className="font-display text-[28vw] md:text-[14vw] leading-[0.8] text-[#d7ff4f]">404</h1>

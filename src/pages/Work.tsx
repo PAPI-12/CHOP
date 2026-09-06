@@ -144,7 +144,7 @@ const FeaturedProject: React.FC<{ project: Project; reverse?: boolean }> = ({ pr
         className={`col-span-1 lg:col-span-7 ${reverse ? 'lg:order-2' : ''} block relative aspect-[16/10] md:aspect-[16/9] overflow-hidden rounded-2xl md:rounded-[2.5rem]`}
       >
         <img loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={posterFallback} src={project.image} alt={project.title} className="w-full h-full object-cover grayscale brightness-[0.5] group-hover:grayscale-0 group-hover:brightness-[0.65] group-hover:scale-[1.04] transition-all duration-[900ms]" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#171715]/80 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#000000]/80 via-transparent to-transparent" />
         <div className="absolute bottom-4 right-4 md:bottom-5 md:right-5 text-[9px] md:text-[10px] font-black tracking-[0.3em] text-white/50 uppercase">{project.year}</div>
       </Wrapper>
 
@@ -169,7 +169,7 @@ const Work: React.FC = () => {
   const filtered = activeFilter === 'ALL' ? projects : projects.filter((p) => p.tags.some((t) => t.toLowerCase().includes(activeFilter.toLowerCase())) || p.category.toLowerCase().includes(activeFilter.toLowerCase()));
 
   return (
-    <div className="min-h-screen bg-[#171715] pt-24 md:pt-32 pb-20">
+    <div className="min-h-screen bg-[#000000] pt-24 md:pt-32 pb-20">
       <section className="px-4 sm:px-6 lg:px-12 xl:px-24 mb-14 md:mb-24">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-[1600px] mx-auto">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 md:gap-8 mb-8 md:mb-10">
@@ -190,7 +190,7 @@ const Work: React.FC = () => {
               <button
                 key={f}
                 onClick={() => setActiveFilter(f)}
-                className={`px-3 md:px-4 py-2 text-[9px] md:text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all duration-300 ${activeFilter === f ? 'bg-[#d7ff4f] text-[#171715]' : 'border border-white/10 text-[#8f8f88] hover:border-[#d7c4aa] hover:text-[#d7c4aa]'}`}
+                className={`px-3 md:px-4 py-2 text-[9px] md:text-xs font-black uppercase tracking-[0.2em] rounded-full transition-all duration-300 ${activeFilter === f ? 'bg-[#d7ff4f] text-[#000000]' : 'border border-white/10 text-[#8f8f88] hover:border-[#d7c4aa] hover:text-[#d7c4aa]'}`}
               >
                 {f}
               </button>
@@ -211,7 +211,7 @@ const Work: React.FC = () => {
         </div>
       </section>
 
-      <section className="py-8 md:py-12 mb-16 md:mb-32 border-y border-white/10 overflow-hidden bg-[#171715]">
+      <section className="py-8 md:py-12 mb-16 md:mb-32 border-y border-white/10 overflow-hidden bg-[#000000]">
         <div className="flex gap-8 md:gap-16 whitespace-nowrap will-change-transform work-marquee-track">
           {[...Array(2)].map((_, i) => (
             <React.Fragment key={i}>
