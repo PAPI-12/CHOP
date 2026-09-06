@@ -6,18 +6,24 @@ import CTAButton from './CTAButton';
    SELECTED WORK — handed over from What I Do by the code itself.
 
    What I Do ends with the machine's rain. That rain does not stop at the
-   section boundary: while the What I Do stage slides up out of view, the
-   code rains off its bottom edge and continues HERE as this section's own
-   rain — raindrops overlapping the whole section while it is pulled up.
-   At FULL strength the instant the section's leading edge arrives, the
-   three cards are cut out of it one after another — each struck as a lime
-   hairline, opened into a rectangle, its title resolving out of scrambled
-   glyphs. Then, as the section lands, the code rains itself out — gone by
-   the time the visitor is ON the section and it is just the work again.
+   section boundary: after the "continue" guide, while the What I Do stage
+   slides up out of view, the code rains off its bottom edge and carries on
+   HERE as this section's own rain — raindrops overlapping the whole
+   section while it is pulled up, at FULL strength the instant the
+   section's leading edge arrives. The three cards are cut out of it one
+   after another — each struck as a lime hairline, opened into a rectangle,
+   its title resolving out of scrambled glyphs.
 
-   The rain's strength is scroll-driven, not timer-driven: it follows the
-   section's own arrival, so however fast or slow you scroll, it is present
-   for the whole overlap and disappears exactly when you arrive.
+   The rain's life is tied to the What I Do section being on screen: it
+   carries on into this section without disappearing, and it only
+   disappears once the What I Do section has LEFT the viewport completely —
+   the point where you no longer see it. After that the section is just the
+   work again.
+
+   The strength is scroll-driven, not timer-driven: it follows the seam
+   (where the What I Do stage's bottom edge meets this section's top edge),
+   so however fast or slow you scroll, it is present for the whole overlap
+   and is gone exactly when the What I Do section is.
 
    The canvas is scoped INSIDE this section. It cannot leak onto the rest of
    the page the way a viewport-fixed layer can.
@@ -168,17 +174,19 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
 
     /**
      * Scroll-driven, not timer-driven: this is the same stream What I Do
-     * rained off its bottom edge, so its strength follows the section's own
-     * arrival —
-     *   top >= vh          section still below the viewport  →  dry
-     *   0 < top < vh       being pulled up, rain overlaps it  →  FULL
-     *   0 >= top > -0.7vh  getting IN to the section          →  FULL
-     *   -0.7vh > top > -vh raining itself out toward the
-     *                      full-way point…
-     *   top <= -vh         full-way in (section top at −100%
-     *                      of the viewport)                  →  GONE
-     * so the rain holds full strength the whole way in and rains out only
-     * at the full-way point — one direction, at any scroll speed.
+     * rained off its bottom edge, so its strength follows the SEAM — the
+     * line where the What I Do stage's bottom edge meets this section's top
+     * edge. The rain's whole life is tied to the What I Do section being on
+     * screen, so:
+     *   top >= vh          section still below the viewport      →  dry
+     *   0 < top < vh       What I Do stage still visible above,
+     *                      rain overlaps in full into the section →  FULL
+     *   top <= 0           the What I Do section has LEFT the
+     *                      viewport (you no longer see it)       →  raining
+     *                      itself out, one direction
+     * so the code carries on into the section without disappearing, and it
+     * only disappears the instant the What I Do section is fully gone — at
+     * any scroll speed.
      */
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
@@ -193,15 +201,13 @@ const SelectedWork: React.FC<{ projects: Project[] }> = ({ projects }) => {
       else if (top >= vh) alpha = 0;
       else if (top > 0) alpha = 1;
       else {
-        // Landing: FULL all the way in, then it rains itself out and is
-        // gone at exactly the full-way point — section top at −100% of the
-        // viewport. One direction.
-        const fullWay = vh;
-        const fadeStart = -fullWay * 0.7;
-        alpha = top <= fadeStart
-          ? Math.max(0, (top + fullWay) / (fullWay + fadeStart))
-          : 1;
-        if (top <= -fullWay) rainDone = true;
+        // The What I Do section has just left the viewport (top <= 0). The
+        // code carries on for a beat, then rains itself out — one
+        // direction. It does NOT linger down into the Selected Work: its
+        // life is tied to the What I Do section being on screen, so it is
+        // gone by the time the visitor is fully into this section.
+        alpha = Math.max(0, 1 + top / (vh * 0.25));
+        if (alpha <= 0) rainDone = true;
       }
 
       // The cards are cut out of the code once it is properly over the grid.
