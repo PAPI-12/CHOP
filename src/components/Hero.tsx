@@ -85,11 +85,44 @@ const Hero: React.FC = () => {
    * impression, so `/` may play it once. Read synchronously in the state
    * initialiser so the paint effect knows on its very first run.
    */
-  const [firstVaporVisit] = useState<boolean>(() => {
+  const [firstVaporVisit, setFirstVaporVisit] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
-    try { return window.sessionStorage.getItem(VAPOR_SEEN_KEY) !== '1'; }
+    try {
+      // Preview helper: add ?vapor=show to force the rain glass even after it
+      // has been consumed in this session. The guard still expects the
+      // session-gated default, but seeing is believing.
+      const q = window.location.search;
+      if (q.includes('vapor=show')) {
+        window.sessionStorage.removeItem(VAPOR_SEEN_KEY);
+        return true;
+      }
+      if (q.includes('vapor=clear')) {
+        window.sessionStorage.removeItem(VAPOR_SEEN_KEY);
+        return true;
+      }
+      return window.sessionStorage.getItem(VAPOR_SEEN_KEY) !== '1';
+    }
     catch { return true; }
   });
+
+  // Dev helper: pressing `r` replays the rain glass without a full reload.
+  // Helpful while tuning the pane in the preview. Flips false→true so the
+  // paint effect re-runs even when it was already true.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'r' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target && /input|textarea|select/i.test(target.tagName)) return;
+      try { window.sessionStorage.removeItem(VAPOR_SEEN_KEY); } catch {}
+      setFirstVaporVisit(false);
+      requestAnimationFrame(() => {
+        setFirstVaporVisit(true);
+        window.dispatchEvent(new Event('resize'));
+      });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   /**
    * Shared cursor state. The ring, the eraser stroke and the physics pusher
@@ -286,9 +319,11 @@ const Hero: React.FC = () => {
         // element box includes line-height leading.
         const fs = parseFloat(getComputedStyle(o).fontSize) || 0;
         const glyphDiameter = fs * 0.73;
-        radius = Math.max((glyphDiameter * 0.92) / 2, 26);
+        // A touch smaller than before, so the CULTURE LED CREATIVE loop sits
+        // snug inside the counter rather than spilling past it.
+        radius = Math.max((glyphDiameter * 0.80) / 2, 24);
       } else {
-        radius = Math.max(Math.min(boxW, boxH) * 0.045, 30);
+        radius = Math.max(Math.min(boxW, boxH) * 0.040, 26);
       }
       cursorRef.current.r = radius;
 
@@ -300,11 +335,11 @@ const Hero: React.FC = () => {
       const glyphs = Array.from(ring.querySelectorAll<SVGTextElement>('.hero-ring-glyph'));
       if (svg) svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
 
-      const px = Math.max(12, Math.min(24, radius * 0.42));
+      const px = Math.max(11, Math.min(20, radius * 0.36));
       // The label orbits the invisible eraser centre, but there is no lime
       // rim any more: the label is the ring's only visible body, and the
       // site's own lime cursor circle reads inside the orbit.
-      const pr = radius + px * 0.95;
+      const pr = radius + px * 0.78;
       const c = size / 2;
       ringC = c;
       if (glyphs.length) {
@@ -399,10 +434,12 @@ const Hero: React.FC = () => {
       // lit so the top-left reads brightest while the lower-right falls into
       // shadow. The photograph stays legible behind it from the first frame;
       // the dense detail is added by buildVapor() a moment later.
+      // Slightly denser than the previous 0.33/0.42/0.50 so the rain glass is
+      // unmistakably there on first paint, before the beads idle-in.
       const sheet = f.createLinearGradient(0, 0, boxW, boxH);
-      sheet.addColorStop(0, 'rgba(78, 82, 88, 0.33)');
-      sheet.addColorStop(0.45, 'rgba(48, 52, 58, 0.42)');
-      sheet.addColorStop(1, 'rgba(22, 25, 29, 0.50)');
+      sheet.addColorStop(0, 'rgba(78, 82, 88, 0.40)');
+      sheet.addColorStop(0.45, 'rgba(48, 52, 58, 0.48)');
+      sheet.addColorStop(1, 'rgba(22, 25, 29, 0.56)');
       f.fillStyle = sheet;
       f.fillRect(0, 0, boxW, boxH);
 
