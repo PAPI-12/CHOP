@@ -283,7 +283,20 @@ for (const options of [{}, { touch: true }, { mode: 'production' }]) {
   t.advance(1000);
   assert.equal(t.doc.querySelector('[data-matrix-active]').style.height, 'auto',
     'returning to What I Do shortens the section to just the skills');
-  t.isDry();
+  // Nothing may jump: removing the pinned runway ABOVE the viewport is
+  // compensated in the same task, so the seam between What I Do and Selected
+  // Work stays exactly where the visitor was looking — instead of the
+  // document shrinking under them and clamping them to the bottom of Home.
+  assert.equal(Math.round(t.doc.querySelector('[data-matrix-active]').getBoundingClientRect().bottom), 600,
+    'collapsing What I Do above the viewport never moves what is on screen');
+  assert.ok(t.window.scrollY >= 0, 'the corrected offset stays inside the document');
+  // What I Do's own matrix is retired…
+  assert.equal(t.harness.handoff.current.active, false, 'the hand-off is over');
+  assert.equal(t.doc.querySelector('[data-matrix-active]').dataset.matrixActive, 'false', 'grain override is released');
+  if (t.stageRain()) assert.equal(t.stageRain().style.display === 'none' || t.stageRain().style.clipPath !== 'none', true, 'What I Do\'s matrix is closed');
+  // …while Selected Work, still on screen exactly where the visitor left it
+  // (the old build flung them past it to the bottom of Home), keeps its rain.
+  t.isWorkRaining();
   t.harness.render(true);
   t.advance(1000);
   t.isDry(); // A fresh mount after navigating away re-arms dry.

@@ -78,8 +78,14 @@ export function useSmoothScroll() {
       // 0.105 (was 0.14): slightly less aggressive so pinned sections get a
       // beat of stillness at their end stops instead of being rushed past.
       const stepSize = distance * 0.105;
-      // Guarantee forward progress so we can never stall just short.
-      const step = Math.abs(stepSize) < 0.5 ? Math.sign(stepSize) * 0.5 : stepSize;
+      // Guarantee forward progress so we can never stall just short. The
+      // floor is a whole pixel (never more than what is left): on 1x
+      // displays the browser rounds the offset, so a half-pixel step was
+      // rounded away and the glide stalled a few pixels shy of its target —
+      // the top of the page could not be reached with the wheel.
+      const step = Math.abs(stepSize) < 1
+        ? Math.sign(stepSize) * Math.min(1, Math.abs(distance))
+        : stepSize;
 
       const next = before + step;
       selfScrollY = next;
@@ -156,15 +162,32 @@ export function useSmoothScroll() {
       target = clamp(target, 0, maxScroll());
     };
 
+    /**
+     * A section that collapsed above the viewport has already moved the page
+     * by `detail` px to keep the content still. Shift the glide by the same
+     * amount so it carries on from the corrected offset — and so the very
+     * next scroll event is recognised as ours rather than mistaken for the
+     * visitor grabbing the scrollbar.
+     */
+    const onShift = (e: Event) => {
+      const dy = Number((e as CustomEvent<number>).detail) || 0;
+      if (!dy) return;
+      target = clamp(target + dy, 0, maxScroll());
+      if (selfScrollY >= 0) selfScrollY += dy;
+      if (!animating) target = window.scrollY;
+    };
+
     window.addEventListener('wheel', onWheel, { passive: false });
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onResize, { passive: true });
+    window.addEventListener('papi:scroll-shift', onShift);
 
     return () => {
       stop();
       window.removeEventListener('wheel', onWheel);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
+      window.removeEventListener('papi:scroll-shift', onShift);
     };
   }, []);
 }

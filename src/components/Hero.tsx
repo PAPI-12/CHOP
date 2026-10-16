@@ -55,6 +55,20 @@ const RING_TEXT = `${RING_WORD} `;
 /** Eraser stroke key reserved for the cursor ring; bodies use their own keys. */
 const RING_STROKE = -1;
 
+/**
+ * The wipe is remembered in PHOTOGRAPH space, not screen space, so a resize
+ * that re-crops the photograph re-crops the wipe identically. Same aspect as
+ * the 1920×1353 plate the pane is built on.
+ */
+const PANE_MASK_W = 1280;
+const PANE_MASK_H = Math.round((PANE_MASK_W * 1353) / 1920);
+/** A cell counts as already wiped when the mask is (nearly) opaque there. */
+const MASK_COVERED_ALPHA = 230;
+/** The last of the glass lifts away rather than blinking out. */
+const PANE_FADE_MS = 450;
+
+type PaneMemory = { mask: HTMLCanvasElement | null; touched: boolean; cleared: boolean };
+
 const HeroLetters: React.FC<{ text: string }> = ({ text }) => (
   <>
     {Array.from(text).map((ch, i) =>
@@ -77,9 +91,21 @@ const Hero: React.FC = () => {
   const eraserRef = useRef<HTMLCanvasElement>(null);
   const photoRef = useRef<HTMLImageElement>(null);
   const paneImgRef = useRef<HTMLImageElement>(null);
-  // Survives responsive interactivity changes: returning to a wide viewport
-  // must not re-fog a window the visitor has already wiped clear.
-  const hasWipedRef = useRef(false);
+  /**
+   * The memory of the rain pane, for as long as this page is open. Lives
+   * outside the canvas effect so it survives everything that rebuilds the
+   * canvas — resizes, minimise/restore, the responsive gate flipping, a
+   * discarded backing store:
+   *
+   *  - `mask`    — every wiped stroke, in photograph space (see PANE_MASK_W).
+   *  - `touched` — the visitor has wiped at least once.
+   *  - `cleared` — the rain has gone for this visit. Set by THE RULES only:
+   *                (1) the visitor wiped all of it while on the hero, or
+   *                (2) they scrolled down until the hero had fully left the
+   *                    screen. (3) Leaving for another page unmounts it.
+   *                Nothing else may ever set it.
+   */
+  const paneMemoryRef = useRef<PaneMemory>({ mask: null, touched: false, cleared: false });
 
   const [introComplete, setIntroComplete] = useState(false);
   const [interactive, setInteractive] = useState(false);
@@ -134,16 +160,32 @@ const Hero: React.FC = () => {
    * lands on the original photograph, clean: there is nothing to wipe with,
    * so a pane would be a photograph they could never see.
    *
-   * This re-evaluates, because a desktop browser dragged narrow and back is
-   * the cheapest way to end up with a rain pane and no way to clear it.
+   * This re-evaluates, so a desktop browser that becomes eligible later
+   * (resized up from a narrow start) gains the pane — but once a visit has
+   * the pane it is never taken away by the environment (see `established`).
    */
   useEffect(() => {
     const fine = window.matchMedia('(pointer: fine)');
     const hover = window.matchMedia('(hover: hover)');
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
     let timer = 0;
-    const evaluate = () =>
-      setInteractive(fine.matches && hover.matches && !reduce.matches && window.innerWidth >= 768);
+    /**
+     * Once this visit has a real desktop pane, it KEEPS it. A window dragged
+     * narrow, a pointer/hover media query flickering (hybrid laptops,
+     * docking, remote desktops) or a minimise must never take the rain away
+     * — the rules decide when it goes, not the environment. Phones and
+     * tablets never qualify in the first place; an explicit reduced-motion
+     * preference is the only thing that switches it off again.
+     */
+    let established = false;
+    const evaluate = () => {
+      // A minimised or hidden window can report a zero-sized viewport. That
+      // is not a phone, and must never tear the pane down: decide again once
+      // the window is genuinely back.
+      if (document.hidden || window.innerWidth < 1) return;
+      if (fine.matches && hover.matches && window.innerWidth >= 768) established = true;
+      setInteractive(established && !reduce.matches);
+    };
     const settle = () => {
       window.clearTimeout(timer);
       timer = window.setTimeout(evaluate, 160);
@@ -153,11 +195,14 @@ const Hero: React.FC = () => {
     hover.addEventListener('change', evaluate);
     reduce.addEventListener('change', evaluate);
     window.addEventListener('resize', settle, { passive: true });
+    document.addEventListener('visibilitychange', settle);
     return () => {
       window.clearTimeout(timer);
       fine.removeEventListener('change', evaluate);
       hover.removeEventListener('change', evaluate);
       reduce.removeEventListener('change', evaluate);
+      window.removeEventListener('resize', settle);
+      document.removeEventListener('visibilitychange', settle);
     };
   }, []);
 
@@ -257,14 +302,15 @@ const Hero: React.FC = () => {
     let disposed = false;
 
     /**
-     * Wiped glass stays wiped.
+     * Wiped glass stays wiped — and UNWIPED glass stays rained-on.
      *
-     * There is deliberately no re-fogging pass. Rain creeping back over a
-     * cleared patch fights the visitor for the photograph they just
-     * uncovered, and the hero is a first impression, not a toy that resets
-     * itself. Wipe it once and the portrait is yours for the visit.
+     * There is deliberately no re-fogging pass: rain creeping back over a
+     * cleared patch fights the visitor for the photograph they uncovered.
+     * Equally, the rain never disappears on its own. Every rebuild of the
+     * canvas redraws the pane and cuts the remembered wipe back out of it.
      */
-    let wiped = hasWipedRef.current;
+    const memory = paneMemoryRef.current;
+    let fadeTimer = 0;
 
     let raf = 0;
     let lastT = 0;
@@ -363,17 +409,44 @@ const Hero: React.FC = () => {
      * strokes, and the portrait shows through where they have been.
      */
     const hideOverlay = () => {
+      window.clearTimeout(fadeTimer);
+      fadeTimer = 0;
       canvas.style.visibility = 'hidden';
       // Drop the large backing store as well as its compositing layer.
       canvas.width = 1;
       canvas.height = 1;
       bodyTrailRef.current = null;
     };
-    const finishWipe = () => {
-      wiped = true;
-      hasWipedRef.current = true;
+
+    /**
+     * THE ONLY WAY THE RAIN GOES. Called by exactly two rules: the visitor
+     * wiped all of it (`fade`: the last of the glass lifts away), or they
+     * scrolled the hero fully out of view (instant — nobody is looking).
+     * The third rule, leaving for another page, is the unmount itself.
+     */
+    const finishWipe = (fade: boolean) => {
+      if (memory.cleared) return;
+      memory.cleared = true;
       wiper?.dispose();
-      hideOverlay();
+      wiper = null;
+      bodyTrailRef.current = null;
+      // The memory is no longer needed: the pane will never be drawn again.
+      if (memory.mask) { memory.mask.width = 1; memory.mask.height = 1; memory.mask = null; }
+      if (!fade || canvas.style.visibility === 'hidden') { hideOverlay(); return; }
+      canvas.style.transition = `opacity ${PANE_FADE_MS}ms ease`;
+      canvas.style.opacity = '0';
+      fadeTimer = window.setTimeout(hideOverlay, PANE_FADE_MS + 40);
+    };
+
+    /** The wipe's memory, created on first use and kept for the visit. */
+    const maskContext = () => {
+      if (!memory.mask) {
+        const m = document.createElement('canvas');
+        m.width = PANE_MASK_W;
+        m.height = PANE_MASK_H;
+        memory.mask = m;
+      }
+      return memory.mask.getContext('2d');
     };
 
     /**
@@ -395,9 +468,18 @@ const Hero: React.FC = () => {
       return true;
     };
 
+    /**
+     * Build (or rebuild) the glass: the pane, minus everything the visitor
+     * has already wiped. Safe to call at any time and any number of times —
+     * it is how a resize, a restore from a minimised window or a remount
+     * puts back EXACTLY what was on screen, never more and never less.
+     */
     const paintPane = () => {
       if (disposed) return;
+      if (memory.cleared) { hideOverlay(); return; }
       syncBox();
+      // A minimised / zero-sized window: leave everything as it is and
+      // rebuild when there is a real box again.
       if (boxW < 8 || boxH < 8) return;
       // The photographs stay native and sharp; only this disposable pane is
       // capped, so large and Retina displays never allocate a full-resolution
@@ -405,17 +487,14 @@ const Hero: React.FC = () => {
       dpr = Math.min(window.devicePixelRatio || 1, 1.5, Math.sqrt(MAX_PANE_PIXELS / (boxW * boxH)));
       const pxW = Math.floor(boxW * dpr);
       const pxH = Math.floor(boxH * dpr);
-      const resized = canvas.width !== pxW || canvas.height !== pxH;
 
-      // A late resize must never re-fog a window the visitor has cleared.
-      if (wiped) {
-        if (resized || !ctx) finishWipe();
-        return;
-      }
       wiper?.dispose();
-      if (resized) { canvas.width = pxW; canvas.height = pxH; }
+      wiper = null;
+      if (canvas.width !== pxW || canvas.height !== pxH) { canvas.width = pxW; canvas.height = pxH; }
       canvas.style.width = `${boxW}px`;
       canvas.style.height = `${boxH}px`;
+      canvas.style.transition = '';
+      canvas.style.opacity = '1';
       canvas.style.visibility = 'visible';
 
       ctx = canvas.getContext('2d');
@@ -424,17 +503,67 @@ const Hero: React.FC = () => {
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1;
       ctx.clearRect(0, 0, boxW, boxH);
-      drawPane(ctx);
+      const painted = drawPane(ctx);
+
+      // Map hero coordinates into photograph (mask) space with the same
+      // cover geometry that just placed the pane.
+      const photo = photoRef.current;
+      const geo = photo ? coverOf(photo, boxW, boxH) : null;
+      const mctx = geo ? maskContext() : null;
+      if (geo && mctx) {
+        const s = PANE_MASK_W / geo.dw;
+        mctx.setTransform(s, 0, 0, s, -geo.ox * s, -geo.oy * s);
+        if (painted && memory.touched && memory.mask) {
+          // Cut the remembered wipe back out of the freshly drawn pane.
+          ctx.save();
+          ctx.globalCompositeOperation = 'destination-out';
+          ctx.imageSmoothingEnabled = true;
+          ctx.drawImage(memory.mask, geo.ox, geo.oy, geo.dw, geo.dh);
+          ctx.restore();
+        }
+      }
+
+      // Reads the wipe back from the mask: seeds a rebuilt pane, and lets
+      // the completion rule follow the pixels rather than a lagging grid.
+      const sample = geo && memory.mask
+        ? (columns: number, rows: number) => (memory.touched ? sampleMask(geo, columns, rows) : null)
+        : null;
 
       wiper = createHeroWiper(ctx, {
         width: boxW,
         height: boxH,
-        onStart: () => {
-          wiped = true;
-          hasWipedRef.current = true;
-        },
-        onComplete: finishWipe,
+        mirror: mctx,
+        sample,
+        onStart: () => { memory.touched = true; },
+        onComplete: () => finishWipe(true),
       });
+    };
+
+    /**
+     * Which grid cells of the CURRENT view are already wiped, read once from
+     * the mask when the pane is rebuilt (never in the wipe's hot path).
+     */
+    const sampleMask = (geo: Cover, columns: number, rows: number) => {
+      const mask = memory.mask;
+      if (!mask) return null;
+      try {
+        const probe = document.createElement('canvas');
+        probe.width = columns;
+        probe.height = rows;
+        const pctx = probe.getContext('2d', { willReadFrequently: true });
+        if (!pctx) return null;
+        const s = PANE_MASK_W / geo.dw;
+        pctx.imageSmoothingEnabled = true;
+        pctx.drawImage(mask, -geo.ox * s, -geo.oy * s, boxW * s, boxH * s, 0, 0, columns, rows);
+        const data = pctx.getImageData(0, 0, columns, rows).data;
+        const out = new Uint8Array(columns * rows);
+        for (let i = 0; i < out.length; i++) out[i] = data[i * 4 + 3] >= MASK_COVERED_ALPHA ? 1 : 0;
+        probe.width = 1;
+        probe.height = 1;
+        return out;
+      } catch {
+        return null;
+      }
     };
 
     const erase = (key: number, x: number, y: number, radius: number) =>
@@ -496,24 +625,71 @@ const Hero: React.FC = () => {
     const onScroll = () => {
       if (scrollTick) return;
       scrollTick = true;
-      requestAnimationFrame(() => { scrollTick = false; syncBox(); });
+      requestAnimationFrame(() => {
+        scrollTick = false;
+        if (disposed) return;
+        syncBox();
+        // RULE: scrolling down into the next section until the hero has
+        // fully left the screen clears the rain for the rest of the visit.
+        if (!memory.cleared && boxH >= 8 && boxTop + boxH <= 0) finishWipe(false);
+      });
     };
     window.addEventListener('scroll', onScroll, { passive: true });
+
+    /**
+     * Minimising, switching tabs or sleeping the machine can make the browser
+     * discard a canvas's backing store. Coming back, rebuild the glass from
+     * memory — the visitor sees exactly what they left.
+     */
+    const onVisible = () => {
+      if (document.hidden || disposed || memory.cleared) return;
+      paintPane();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('pageshow', onVisible);
+    canvas.addEventListener('contextrestored', onVisible);
+
+    /**
+     * Leaving the hero is a squeegee stroke OFF the glass, not a lift.
+     *
+     * The ring trails the cursor on a spring. If erasing stopped the instant
+     * the cursor crossed the edge, the ring would stop short of the wall
+     * every time and the rim of the pane could never be wiped — the visitor
+     * could never clear ALL of it. So on exit the ring finishes its travel
+     * to the exit point on the wall (still wiping), and only then parks.
+     */
+    let exiting = false;
+    let exitStarted = 0;
+    const EXIT_MAX_MS = 450;
+
+    const park = () => {
+      exiting = false;
+      pointerSeen = false;
+      // Break only the ring's stroke; re-entering elsewhere must not wipe a
+      // straight line of rain away from the old exit point. Letter trails
+      // are keyed separately and are unaffected.
+      wiper?.resetStroke(RING_STROKE);
+      centre();
+    };
+
+    const beginExit = (x: number, y: number) => {
+      if (!pointerSeen) { centre(); return; }
+      if (exiting) return;
+      exiting = true;
+      exitStarted = performance.now();
+      tx = Math.max(0, Math.min(boxW, x));
+      ty = Math.max(0, Math.min(boxH, y));
+    };
 
     const onPointerMove = (e: PointerEvent) => {
       if (e.pointerType === 'touch') return;
       const x = e.clientX - boxLeft;
       const y = e.clientY - boxTop;
 
-      // Outside the hero: park the ring back at centre rather than pinning it
-      // to an edge, stop erasing, and hand the cursor back to the site.
+      // Outside the hero: the ring finishes its stroke to the wall, then
+      // parks back at centre and hands the cursor back to the site.
       if (x < 0 || y < 0 || x > boxW || y > boxH) {
-        pointerSeen = false;
-        // Break only the ring's stroke; re-entering elsewhere must not wipe a
-        // straight line of rain away from the old exit point. Letter trails
-        // are keyed separately and are unaffected.
-        wiper?.resetStroke(RING_STROKE);
-        centre();
+        beginExit(x, y);
         return;
       }
 
@@ -526,11 +702,21 @@ const Hero: React.FC = () => {
         vx = 0;
         vy = 0;
       }
+      exiting = false;
       pointerEver = true;
       pointerSeen = true;
       tx = x;
       ty = y;
     };
+
+    // The cursor left the browser window altogether (no pointermove ever
+    // reports that): same squeegee-off-the-edge exit, instead of a ring
+    // left hanging mid-hero.
+    const onWindowOut = (e: PointerEvent) => {
+      if (e.relatedTarget || e.pointerType === 'touch') return;
+      beginExit(e.clientX - boxLeft, e.clientY - boxTop);
+    };
+    document.addEventListener('pointerout', onWindowOut, { passive: true });
     window.addEventListener('pointermove', onPointerMove, { passive: true });
 
     // Critically-damped-ish spring: fast enough to feel attached to the
@@ -599,6 +785,13 @@ const Hero: React.FC = () => {
 
       // The ring is the squeegee: what its path crosses, it clears.
       if (pointerSeen) erase(RING_STROKE, cx, cy, radius);
+
+      // Exit stroke complete (the ring has reached the wall): park it.
+      if (exiting) {
+        const ex = Math.max(r, Math.min(boxW - r, tx));
+        const ey = Math.max(r, Math.min(boxH - r, ty));
+        if (Math.hypot(cx - ex, cy - ey) < 1.5 || now - exitStarted > EXIT_MAX_MS) park();
+      }
     };
     raf = requestAnimationFrame(frame);
 
@@ -612,6 +805,11 @@ const Hero: React.FC = () => {
       window.removeEventListener('resize', onResize);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerout', onWindowOut);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('pageshow', onVisible);
+      canvas.removeEventListener('contextrestored', onVisible);
+      window.clearTimeout(fadeTimer);
       plates.forEach((el) => el.removeEventListener('load', onImgLoad));
     };
   }, [interactive]);
@@ -629,7 +827,7 @@ const Hero: React.FC = () => {
         <img
           ref={photoRef}
           src="/images/hero-landscape-1920.webp"
-          srcSet="/images/hero-landscape-1280.webp 1280w, /images/hero-landscape-1920.webp 1920w, /images/hero-landscape-2560.webp 2559w"
+          srcSet="/images/hero-landscape-1280.webp 1280w, /images/hero-landscape-1920.webp 1920w, /images/hero-landscape-2560.webp 2559w, /images/hero-landscape-3840.webp 3840w"
           sizes="max(100vw, 142svh, 767px)"
           alt="Papi Raborife"
           className="hero-photo absolute inset-0 h-full w-full object-cover"
@@ -664,7 +862,7 @@ const Hero: React.FC = () => {
             <img
               ref={paneImgRef}
               src="/images/hero-rain-pane-1920.webp"
-              srcSet="/images/hero-rain-pane-1280.webp 1280w, /images/hero-rain-pane-1920.webp 1920w"
+              srcSet="/images/hero-rain-pane-1280.webp 1280w, /images/hero-rain-pane-1920.webp 1920w, /images/hero-rain-pane-2560.webp 2559w"
               sizes="max(100vw, 142svh, 767px)"
               alt=""
               aria-hidden
