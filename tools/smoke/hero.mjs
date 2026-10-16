@@ -3,7 +3,9 @@
  * plate built on it — drawn once onto a canvas, never a computed glass field —
  * so this guards: the base plate is the original, the pane plate is decoded
  * but never shown, the ring squeegees, opaque wipe cores, cached brushes,
- * unique coverage, completion cleanup, no re-fog after late loads or resizes,
+ * unique coverage, completion only when ALL of it is wiped, a remembered wipe
+ * that survives resizes / restores / remounts (never vanishing, never
+ * re-fogging), the scroll-past rule,
  * grain exclusion over the photo, high-DPI effect budgets, clean mobile and
  * reduced-motion modes, and matching cover-aware image/preload candidates. */
 import assert from 'node:assert/strict';
@@ -88,6 +90,7 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
   const contexts = new Map();
   const gradients = [];
   let imageDataCalls = 0;
+  let readbacks = 0;
   window.HTMLCanvasElement.prototype.getContext = function () {
     if (contexts.has(this)) return contexts.get(this);
     const stack = [];
@@ -110,6 +113,7 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
       drawImage(image) {
         this.draws++;
         if (image.tagName === 'IMG') this.photoDraws++;
+        if (image.tagName === 'CANVAS' && image.width === 1280 && this.globalCompositeOperation === 'destination-out') this.maskCuts = (this.maskCuts || 0) + 1;
         if (this.globalCompositeOperation === 'source-over') this.paints++;
         else this.erases++;
       },
@@ -121,7 +125,13 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
       },
       createImageData: (w, h) => { imageDataCalls++; return { data: new Uint8ClampedArray(w * h * 4) }; },
       putImageData() {},
-      getImageData() { throw new Error('GPU readback is not allowed in the wipe path'); },
+      // Only the tiny one-cell-per-pixel coverage probe may be read back;
+      // reading the pane itself would be a GPU stall in the wipe path.
+      getImageData(x, y, w, h) {
+        if (this.canvas.width * this.canvas.height > 20000) throw new Error('GPU readback is not allowed in the wipe path');
+        readbacks++;
+        return { data: new Uint8ClampedArray(w * h * 4) };
+      },
     };
     contexts.set(this, ctx);
     return ctx;
@@ -161,7 +171,7 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
     assert.equal(errors.length, 0, errors.join('\n'));
     window.close();
   };
-  return { window, doc, contexts, gradients, pointer, advance, canvas, flushIdle, staleIdle, idle, resolveFonts, imageLoaded, resize, close, imageDataCalls: () => imageDataCalls };
+  return { window, doc, contexts, gradients, pointer, advance, canvas, flushIdle, staleIdle, idle, resolveFonts, imageLoaded, resize, close, imageDataCalls: () => imageDataCalls, readbacks: () => readbacks };
 }
 
 {
@@ -196,12 +206,42 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
   wiper.resetStroke(3);
   wiper.erase(3, 1100, 700, 30);
   assert.equal(ctx.strokes, strokes, 're-entering the hero never connects an old cursor trail');
+  {
+    // 85–90% wiped is NOT "all of it": the pane must stay. (The old build
+    // cleared itself at 85%, which read as the rain vanishing mid-wipe.)
+    const c2 = t.doc.createElement('canvas');
+    let done = 0;
+    const partial = t.window.heroTest.createHeroWiper(c2.getContext('2d'), {
+      width: 1200, height: 800, onStart() {}, onComplete: () => done++,
+    });
+    for (let y = 20; y < 700; y += 35) {
+      partial.resetStroke(9);
+      partial.erase(9, 0, y, 30);
+      partial.erase(9, 1200, y, 30);
+    }
+    assert.ok(partial.coverage > 0.8 && partial.coverage < 0.95, `a mostly wiped pane (${partial.coverage.toFixed(3)})`);
+    assert.equal(done, 0, 'the rain never vanishes before ALL of it has been wiped');
+    assert.equal(partial.complete, false);
+    // The walls are reachable: a clamped ring pressed against the frame
+    // pushes the rain off the edge, so the last strip can always be wiped.
+    // (The ring's centre is clamped one radius inside the hero: x∈[30,1170],
+    // y∈[30,770] for a 30px ring.)
+    for (const y of [700, 735, 770]) {
+      partial.resetStroke(9);
+      partial.erase(9, 30, y, 30);
+      partial.erase(9, 1170, y, 30);
+    }
+    assert.equal(done, 1, 'wiping the last strip — right up to the walls — clears the pane');
+    partial.dispose();
+    c2.width = 1;
+    c2.height = 1;
+  }
   for (let y = 20; y < 800; y += 35) {
     wiper.resetStroke(4);
     wiper.erase(4, 0, y, 30);
     wiper.erase(4, 1200, y, 30);
   }
-  assert.equal(wiper.complete, true, 'a mostly wiped pane finishes completely clear');
+  assert.equal(wiper.complete, true, 'a fully wiped pane finishes completely clear');
   assert.equal(completions, 1);
   assert.equal(ctx.clears, 1);
   const finishedDraws = ctx.draws;
@@ -250,16 +290,34 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
   await wait(0);
   t.advance();
   assert.equal(ctx.paints, paints, 'idle/font completion never repaints cleared glass');
+  // Resizes, minimise/restore and responsive changes rebuild the glass from
+  // memory: the rain is still there, and what was wiped is cut back out.
   await t.resize(1000);
-  assert.equal(canvas.style.visibility, 'hidden', 'resize finishes the wipe instead of re-fogging the window');
-  assert.equal(canvas.width * canvas.height, 1, 'completed overlay releases its large buffer');
+  assert.equal(canvas.style.visibility, 'visible', 'a resize never makes the rain vanish');
+  assert.ok(canvas.width * canvas.height > 1, 'the pane keeps its buffer through a resize');
+  assert.ok(ctx.maskCuts > 0, 'the remembered wipe is cut back out of the redrawn pane — no re-fog');
+  assert.ok(t.readbacks() > 0, 'the coverage grid resumes from the remembered wipe');
+  let cuts = ctx.maskCuts;
+  t.doc.dispatchEvent(new t.window.Event('visibilitychange'));
+  t.advance();
+  assert.equal(canvas.style.visibility, 'visible', 'restoring a minimised window never makes the rain vanish');
+  assert.ok(ctx.maskCuts > cuts, 'a restore rebuilds the glass exactly as it was left');
   await t.resize(600);
-  assert.equal(t.canvas(), null, 'narrow layout has no interactive overlay');
-  assert.equal(t.doc.querySelector('#hero img.hero-pane-plate'), null, 'narrow layout never fetches the pane plate');
+  assert.ok(t.canvas() && t.canvas().style.visibility === 'visible', 'an established desktop pane survives the window being dragged narrow');
   assert.equal(t.doc.querySelectorAll('#hero img.hero-photo').length, 1, 'narrow layout keeps the original photograph');
   await t.resize(1200);
-  assert.equal(t.canvas().style.visibility, 'hidden', 'returning to desktop does not re-fog the window');
+  const back = t.contexts.get(t.canvas());
+  assert.equal(t.canvas().style.visibility, 'visible', 'returning to full width keeps the rain');
+  assert.ok(back.maskCuts > 0, 'returning to full width does not re-fog the window');
 
+  // RULE: scrolling down until the hero has left the screen clears it.
+  t.window.scrollY = 300;
+  t.window.dispatchEvent(new t.window.Event('scroll'));
+  t.advance();
+  assert.equal(t.canvas().style.visibility, 'visible', 'part of the hero still on screen: the rain stays');
+  t.window.scrollY = 0;
+  t.window.dispatchEvent(new t.window.Event('scroll'));
+  t.advance();
   t.window.scrollY = 300;
   t.window.dispatchEvent(new t.window.Event('scroll'));
   t.advance();
@@ -269,10 +327,16 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
   t.window.dispatchEvent(new t.window.Event('scroll'));
   t.advance();
   assert.equal(grain.style.getPropertyValue('--hero-grain-inset'), '0px', 'other sections retain their texture');
+  assert.equal(t.canvas().style.visibility, 'hidden', 'the hero scrolled fully off screen: the rain is cleared (rule)');
+  t.window.scrollY = 0;
+  t.window.dispatchEvent(new t.window.Event('scroll'));
+  t.advance();
+  await t.resize(1100);
+  assert.equal(t.canvas().style.visibility, 'hidden', 'once cleared by the rules it never comes back on this visit');
   t.window.heroTest.unmount();
   assert.equal(grain.style.getPropertyValue('--hero-grain-inset'), '', 'navigation removes the scoped grain mask');
   t.close();
-  console.log('PASS  original photograph, hidden pane plate, StrictMode, late callbacks, responsive remounts and scrolling preserve the wipe');
+  console.log('PASS  original photograph, hidden pane plate, StrictMode, late callbacks; resizes, restores and responsive remounts never make the rain vanish; scrolling past the hero clears it');
 }
 
 {
@@ -280,10 +344,11 @@ async function boot({ width = 1200, height = 800, dpr = 1, touch = false, reduce
   const c = t.canvas();
   assert.ok(c.width * c.height <= 3_000_000, '4K/Retina effect buffer stays within its pixel budget');
   const ctx = t.contexts.get(c);
-  const paints = ctx.paints;
+  const draws = ctx.photoDraws;
   t.pointer(100, 100);
   t.imageLoaded();
-  assert.equal(ctx.paints, paints, 'a late photograph decode never repaints the committed pane');
+  assert.ok(ctx.photoDraws > draws, 'a late decode lays the rain down as soon as the plate exists');
+  assert.ok(c.width * c.height <= 3_000_000, 'and stays within the pixel budget');
   t.close();
   console.log('PASS  high-DPI pane has a fixed pixel budget independent of the sharp photographs');
 }
@@ -324,7 +389,10 @@ console.log('PASS  touch and reduced motion land on the clean original photograp
     for (const candidate of img.getAttribute('srcset').split(',')) {
       const [url, descriptor] = candidate.trim().split(/\s+/);
       const file = fs.readFileSync(new URL('../../public' + url, import.meta.url));
-      assert.ok(file.byteLength < 200 * 1024, 'each hero WebP stays below 200 KB');
+      // Honest budgets for a true 4K plate: the photograph's 3840 tier is the
+      // heaviest file (only Retina/4K screens select it); panes stop at 2560.
+      const budget = /hero-rain-pane/.test(url) ? 460 : 720;
+      assert.ok(file.byteLength < budget * 1024, `${url} stays below ${budget} KB`);
       // The existing lossy WebP's VP8 frame header stores its real width here.
       assert.equal(file.toString('ascii', 12, 16), 'VP8 ');
       assert.equal(file.readUInt16LE(26) & 0x3fff, parseInt(descriptor), 'srcset width matches the actual file, not an invented upscale');

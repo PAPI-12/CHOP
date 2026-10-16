@@ -1,14 +1,66 @@
 import React, { useLayoutEffect, useRef } from 'react';
 
+/**
+ * Each skill is a spread in a book of the work — the picture is evidence of
+ * the practice, not decoration. `work` labels the spread (FIG. 0n — WORK),
+ * `image` / `image2x` are the standard and high-density plates (true pixel
+ * widths `w` / `w2x`; tools/wid/build-wid-plates.py makes the 2× ones), and `focus`
+ * is the object-position that keeps the subject in frame on every aspect.
+ */
 const SKILLS = [
-  { title: 'UX/UI DESIGN', note: 'interfaces with instinct', color: '#f5f3ee' },
-  { title: 'ART DIRECTION', note: 'visual systems with attitude', color: '#d7ff4f' },
-  { title: 'CINEMATOGRAPHY', note: 'motion shaped by feeling', color: '#d7c4aa' },
-  { title: 'GRAPHIC DESIGN', note: 'culture-led systems & print', color: '#d7ff4f' },
-  { title: 'AI CREATIVE', note: 'future-facing image craft', color: '#f5f3ee' },
+  { title: 'UX/UI DESIGN', note: 'interfaces with instinct', color: '#f5f3ee', image: '/images/tau-hero-phones.webp', image2x: '/images/wid/tau-hero-phones-2x.webp', w: 1800, h: 982, w2x: 3200, work: 'TAU FOODS', focus: '50% 42%' },
+  { title: 'ART DIRECTION', note: 'visual systems with attitude', color: '#d7ff4f', image: '/images/cornetto-truck.webp', image2x: '/images/wid/cornetto-truck-2x.webp', w: 1500, h: 1000, w2x: 3000, work: 'CORNETTO', focus: '50% 56%' },
+  { title: 'CINEMATOGRAPHY', note: 'motion shaped by feeling', color: '#d7c4aa', image: '/images/11-the-throne.webp', image2x: '/images/wid/11-the-throne-2x.webp', w: 1800, h: 866, w2x: 3200, work: 'LOUIS VUITTON', focus: '46% 50%' },
+  { title: 'GRAPHIC DESIGN', note: 'culture-led systems & print', color: '#d7ff4f', image: '/images/hero-collage.webp', image2x: '/images/wid/hero-collage-2x.webp', w: 1600, h: 1067, w2x: 3200, work: 'VODACOM', focus: '52% 50%' },
+  { title: 'AI CREATIVE', note: 'future-facing image craft', color: '#f5f3ee', image: '/images/audi-03.webp', image2x: '/images/wid/audi-03-2x.webp', w: 1800, h: 1008, w2x: 3200, work: 'AUDI', focus: '56% 38%' },
 ];
 
+/* ── The book of work (Home) ──────────────────────────────────────────
+   The stage is a book. Each skill is a full-bleed spread of the work behind
+   it; between skills the page CLOSES — the right-hand leaf turns over on the
+   centre spine, carrying the current picture away and laying the next one
+   down on its back — so every skill change is a page turn, not a cross-fade.
+   A black cover opens as the section slides into place, and a black back
+   cover closes after AI CREATIVE, so ART COMES 1ST stands on clean black.
+   Every leaf rides the SAME scroll-driven `front` as the titles — no timers,
+   no second clock — so the turn can never drift from the type, at any speed
+   or in either direction. */
+/** A turn starts this far past a skill… */
+const TURN_FROM = 0.16;
+/** …and lays the next page flat this far past it (in skills). */
+const TURN_TO = 0.84;
+/** The cover opens over this slice of the section sliding into place. */
+const COVER_FROM = 0.42;
+const COVER_TO = 0.96;
+
 const N = SKILLS.length;
+
+/**
+ * One spread's artwork at full stage size. The flat page and both faces of
+ * the leaves render this same art (a leaf face shows one half of it), so a
+ * turning half always meets its flat partner exactly.
+ */
+const SpreadArt: React.FC<{ index: number }> = ({ index }) => {
+  const skill = SKILLS[index];
+  return (
+    <div className="wid-art" style={{ transform: `translate3d(0, calc(var(--wd${index}, 0) * 1%), 0) scale(1.07)` }}>
+      <img
+        src={skill.image}
+        srcSet={`${skill.image} ${skill.w}w, ${skill.image2x} ${skill.w2x}w`}
+        // object-fit: cover at scale(1.07): on tall screens the picture is
+        // sized by the HEIGHT, so the width it needs is aspect × 107vh.
+        sizes={`max(107vw, ${Math.ceil((skill.w / skill.h) * 107)}vh)`}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        draggable={false}
+        style={{ objectPosition: skill.focus }}
+      />
+      <span className="wid-art-tag">FIG. 0{index + 1} — {skill.work}</span>
+    </div>
+  );
+};
+
 const LAST = N - 1;
 
 /**
@@ -187,6 +239,16 @@ const WhatIDo: React.FC<{
   // that is revealed through the growing opening.
   const revealLineRef = useRef<HTMLDivElement>(null);
   const stackRef = useRef<HTMLDivElement>(null);
+  // Home-only book of work (see TURN_* above).
+  const mediaRef = useRef<HTMLDivElement>(null);
+  const pageRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const leafRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const leafFrontShadeRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const leafBackShadeRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const castLeftRef = useRef<HTMLDivElement>(null);
+  const castRightRef = useRef<HTMLDivElement>(null);
+  const gutterRef = useRef<HTMLDivElement>(null);
+  const scrimRef = useRef<HTMLDivElement>(null);
 
   // Variant-resolved choreography values, captured by the effects below.
   const SCREENS = machineMode ? SCREENS_HOME : SCREENS_ABOUT;
@@ -237,6 +299,9 @@ const WhatIDo: React.FC<{
      * once, when the section re-enters the viewport from below after the act.
      */
     let compact = false;
+    // How far the stage has slid into place (0 = just below the fold, 1 =
+    // pinned). Drives the book's cover; written by frame().
+    let entryT = 0;
 
     /**
      * The pin's height is measured and written in pixels. Pure-CSS svh
@@ -370,6 +435,21 @@ const WhatIDo: React.FC<{
       compact = true;
       consumeRain();
 
+      /**
+       * NOTHING MAY JUMP. When the collapse happens with the section above
+       * (or around) the viewport — i.e. the visitor is down in Selected Work
+       * or Clients and nudges back up — removing ~7 screens of runway above
+       * them used to shrink the document under their feet, and the browser
+       * clamped them to the very bottom of the home page. Measure the height
+       * that is about to disappear and take exactly that much off the scroll
+       * offset in the same task, before anything is painted, so whatever is
+       * on screen stays pixel-for-pixel where it was.
+       */
+      const beforeRect = root.getBoundingClientRect();
+      const beforeTop = beforeRect.top;
+      const beforeHeight = beforeRect.height;
+      const beforeScroll = window.scrollY;
+
       // Collapse the spacer so the section is only as tall as the skills.
       root.style.height = 'auto';
       stage.style.position = 'static';
@@ -408,6 +488,22 @@ const WhatIDo: React.FC<{
       if (termRef.current) termRef.current.style.visibility = 'hidden';
       if (initRef.current) initRef.current.style.opacity = '0';
       if (headerRef.current) headerRef.current.style.opacity = '1';
+      if (mediaRef.current) mediaRef.current.style.display = 'none';
+
+      // Only content ABOVE the viewport moves anything on screen. A section
+      // entered from below collapses out of sight and needs no correction.
+      const removed = beforeHeight - root.getBoundingClientRect().height;
+      if (beforeTop < 0 && removed > 0) {
+        const target = Math.max(0, beforeScroll - removed);
+        const html = document.documentElement;
+        const prevBehavior = html.style.scrollBehavior;
+        html.style.scrollBehavior = 'auto';
+        window.scrollTo(0, target);
+        html.style.scrollBehavior = prevBehavior;
+        // Let an in-flight eased wheel glide continue from the corrected
+        // offset instead of fighting it (see useSmoothScroll).
+        window.dispatchEvent(new CustomEvent('papi:scroll-shift', { detail: target - beforeScroll }));
+      }
     };
 
     /* ── Stack painting ─────────────────────────────────────────────── */
@@ -673,6 +769,82 @@ const WhatIDo: React.FC<{
         }
       }
 
+      /* ── The book: one leaf turning at a time ──────────────────────── */
+      if (machineMode) {
+        // Leaf j turns page j-1 over to page j. Page -1 is the black front
+        // cover, page N the black back cover.
+        let moving = -1;
+        let movingT = 0;
+        let settled = -1;
+        for (let j = 0; j <= N; j++) {
+          const t = j === 0
+            ? smoothstep((entryT - COVER_FROM) / (COVER_TO - COVER_FROM))
+            : smoothstep((front - (j - 1) - TURN_FROM) / (TURN_TO - TURN_FROM));
+          if (t >= 1) settled = j;
+          else if (t > 0 && moving < 0) { moving = j; movingT = t; }
+        }
+        const leftPage = moving >= 0 ? moving - 1 : settled;
+        const rightPage = moving >= 0 ? moving : settled;
+        // The scrim only exists over a picture — never over the matrix rain
+        // or the machine's terminal on the black stage behind the covers.
+        const anyPage = (leftPage >= 0 && leftPage < N) || (rightPage >= 0 && rightPage < N);
+        const scrim = scrimRef.current;
+        if (scrim) scrim.style.visibility = anyPage ? 'visible' : 'hidden';
+        for (let i = 0; i < N; i++) {
+          const page = pageRefs.current[i];
+          if (!page) continue;
+          const left = i === leftPage;
+          const right = i === rightPage;
+          if (!left && !right) {
+            if (page.style.visibility !== 'hidden') page.style.visibility = 'hidden';
+            continue;
+          }
+          page.style.visibility = 'visible';
+          // Both halves of the same page = the whole page, unclipped (no seam).
+          page.style.clipPath = left && right ? 'none' : left ? 'inset(0 50% 0 0)' : 'inset(0 0 0 50%)';
+          // A slow drift through each spread: the picture moves less than the
+          // type, which is what gives the stack its depth. Every copy of a
+          // page (flat or on a leaf) reads the same variable, so the halves
+          // always meet exactly.
+          const d = Math.max(-1.6, Math.min(1.6, front - i));
+          mediaRef.current?.style.setProperty(`--wd${i}`, (-d * 1.6).toFixed(3));
+        }
+        const angle = movingT * 180;
+        const rad = (angle * Math.PI) / 180;
+        for (let j = 0; j <= N; j++) {
+          const leaf = leafRefs.current[j];
+          if (!leaf) continue;
+          if (j !== moving) {
+            if (leaf.style.visibility !== 'hidden') leaf.style.visibility = 'hidden';
+            continue;
+          }
+          leaf.style.visibility = 'visible';
+          leaf.style.transform = `rotateY(${(-angle).toFixed(2)}deg)`;
+          // Light falls from the front: the leaf darkens as it turns edge-on.
+          const fs = leafFrontShadeRefs.current[j];
+          const bs = leafBackShadeRefs.current[j];
+          if (fs) fs.style.opacity = angle < 90 ? (0.9 * Math.pow(angle / 90, 1.1)).toFixed(3) : '0.9';
+          if (bs) bs.style.opacity = angle > 90 ? (0.9 * Math.pow((180 - angle) / 90, 1.1)).toFixed(3) : '0.9';
+        }
+        // The lifted leaf shades the page beneath it, from the spine out —
+        // wide while it is low, narrowing to the gutter as it stands up.
+        const castR = castRightRef.current;
+        const castL = castLeftRef.current;
+        if (castR) {
+          const o = moving >= 0 && angle < 90 ? 0.72 * (1 - angle / 90) * smoothstep(angle / 14) : 0;
+          castR.style.opacity = o.toFixed(3);
+          if (o > 0) castR.style.setProperty('--reach', `${(12 + 88 * Math.cos(rad)).toFixed(1)}%`);
+        }
+        if (castL) {
+          const o = moving >= 0 && angle > 90 ? 0.72 * ((angle - 90) / 90) * (1 - smoothstep((angle - 164) / 16)) : 0;
+          castL.style.opacity = o.toFixed(3);
+          if (o > 0) castL.style.setProperty('--reach', `${(12 + 88 * Math.abs(Math.cos(rad))).toFixed(1)}%`);
+        }
+        if (gutterRef.current) {
+          gutterRef.current.style.opacity = moving >= 0 ? (Math.sin(movingT * Math.PI) * 0.9).toFixed(3) : '0';
+        }
+      }
+
       // Bottom copy follows the front card, with real breathing room.
       for (let i = 0; i < N; i++) {
         const note = notes[i];
@@ -883,6 +1055,13 @@ const WhatIDo: React.FC<{
       const travel = rect.height - vh;
       const p = travel > 0 ? clamp01(-rect.top / travel) : 0;
       const stageVisible = rect.bottom > 0 && rect.top < vh;
+      // The book's cover opens as the stage slides into place, before the
+      // pin's own progress has started to move.
+      const entry = clamp01(1 - rect.top / vh);
+      if (machineMode && Math.abs(entry - entryT) > 0.0005) {
+        entryT = entry;
+        lastProgress = -1;
+      }
 
       // One-shot reveal latch. Crossing into the machine phase commits the
       // matrix to this visit: once it is true it stays true, so the code keeps
@@ -1005,6 +1184,7 @@ const WhatIDo: React.FC<{
       notes.forEach((nEl) => { if (nEl) nEl.style.visibility = 'hidden'; });
       if (cueRef.current) cueRef.current.style.visibility = 'hidden';
       if (guideRef.current) guideRef.current.style.visibility = 'hidden';
+      if (mediaRef.current) mediaRef.current.style.display = 'none';
       // Terminal moves into normal flow beneath the list; leaving it
       // absolutely centred would stack it straight on top of the skills.
       if (termRef.current) {
@@ -1153,6 +1333,48 @@ const WhatIDo: React.FC<{
             <span ref={counterRef} className="text-[#d7ff4f]">01</span> — 0{N}
           </p>
         </div>
+
+        {/* The book of work — Home only. Below the type (z-5 under the
+            stack's z-10), so the ghosted skills stacked behind the front
+            title still read over the picture. Driven by paint(). */}
+        {machineMode && (
+          <div ref={mediaRef} aria-hidden className="wid-media wid-book pointer-events-none absolute inset-0 z-[5]">
+            {SKILLS.map((skill, i) => (
+              <div
+                key={skill.image}
+                ref={(el) => { pageRefs.current[i] = el; }}
+                className="wid-page"
+                style={{ visibility: 'hidden' }}
+              >
+                <SpreadArt index={i} />
+              </div>
+            ))}
+            <div ref={castLeftRef} className="wid-cast wid-cast--left" style={{ opacity: 0 }} />
+            <div ref={castRightRef} className="wid-cast wid-cast--right" style={{ opacity: 0 }} />
+            {/* Leaf j turns page j-1 over onto page j: its front is the right
+                half of the page being closed, its back the left half of the
+                page being opened (black for the covers). */}
+            {Array.from({ length: N + 1 }, (_, j) => (
+              <div
+                key={`leaf-${j}`}
+                ref={(el) => { leafRefs.current[j] = el; }}
+                className={`wid-leaf${j === 0 || j === N ? ' wid-leaf--cover' : ''}`}
+                style={{ visibility: 'hidden' }}
+              >
+                <div className="wid-face wid-face--front">
+                  {j > 0 && <div className="wid-face-art wid-face-art--right"><SpreadArt index={j - 1} /></div>}
+                  <div ref={(el) => { leafFrontShadeRefs.current[j] = el; }} className="wid-face-shade" style={{ opacity: 0 }} />
+                </div>
+                <div className="wid-face wid-face--back">
+                  {j < N && <div className="wid-face-art wid-face-art--left"><SpreadArt index={j} /></div>}
+                  <div ref={(el) => { leafBackShadeRefs.current[j] = el; }} className="wid-face-shade" style={{ opacity: 0.9 }} />
+                </div>
+              </div>
+            ))}
+            <div ref={gutterRef} className="wid-gutter" style={{ opacity: 0 }} />
+            <div ref={scrimRef} className="wid-scrim" style={{ visibility: 'hidden' }} />
+          </div>
+        )}
 
         {/* Skill stack. Every card occupies the same centre point; depth is
             expressed purely through scale + opacity, so nothing reflows.

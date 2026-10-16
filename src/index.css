@@ -256,6 +256,168 @@ html {
   transition: opacity 90ms linear;
 }
 
+/* ── What I Do: the book of work (Home) ────────────────────────────────
+   Every skill is a full-bleed spread; between skills the right-hand leaf
+   turns over on the centre spine like a page closing. All moving values
+   (visibility, clip, leaf angle, shade, cast shadows, drift) are written by
+   WhatIDo's paint() from scroll progress — nothing here animates on its own,
+   so the book can never fall out of step with the type. */
+.wid-book {
+  overflow: hidden;
+  perspective: max(1100px, 115vw);
+  perspective-origin: 50% 50%;
+}
+.wid-page {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+/* The art is always laid out at full stage size, whether it is a flat page or
+   one half of it printed on a leaf — so object-fit crops identically and the
+   halves meet without a seam. */
+.wid-art {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+.wid-art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  /* Kept natural — only a gentle lift of contrast so the work reads crisp
+     under the scrim. */
+  filter: contrast(1.04) saturate(1.02);
+}
+.wid-art-tag {
+  position: absolute;
+  left: max(1rem, 3vw);
+  bottom: max(1.25rem, 4.2vh);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(245, 243, 238, 0.7);
+  white-space: nowrap;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.6);
+}
+.wid-art-tag::before {
+  content: '';
+  display: inline-block;
+  width: 18px;
+  height: 1px;
+  margin-right: 10px;
+  vertical-align: middle;
+  background: #d7ff4f;
+}
+@media (min-width: 768px) {
+  .wid-art-tag { font-size: 10px; }
+}
+/* The leaf: the right half of the stage, hinged on the spine. */
+.wid-leaf {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 50%;
+  transform-origin: 0% 50%;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.wid-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #050505;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+.wid-face--back { transform: rotateY(180deg); }
+/* Each face prints one half of a full-stage spread. */
+.wid-face-art {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 200%;
+}
+.wid-face-art--right { left: -100%; }
+.wid-face-art--left { left: 0; }
+/* Light falls from the front, so the leaf darkens as it turns edge-on — most
+   at the free edge, which is the part bending furthest from the light. */
+.wid-face-shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.wid-face--front .wid-face-shade {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.85) 70%, rgba(0, 0, 0, 0.95) 100%);
+}
+.wid-face--back .wid-face-shade {
+  background: linear-gradient(270deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.85) 70%, rgba(0, 0, 0, 0.95) 100%);
+}
+/* The page's paper edge catches the light while it turns. */
+.wid-face--front::after,
+.wid-face--back::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(245, 243, 238, 0.12), rgba(245, 243, 238, 0.42) 50%, rgba(245, 243, 238, 0.12));
+}
+.wid-face--front::after { right: 0; }
+.wid-face--back::after { left: 0; }
+.wid-leaf--cover .wid-face--front::after,
+.wid-leaf--cover .wid-face--back::after {
+  background: linear-gradient(180deg, rgba(215, 255, 79, 0), rgba(215, 255, 79, 0.85) 50%, rgba(215, 255, 79, 0));
+  box-shadow: 0 0 14px rgba(215, 255, 79, 0.4);
+}
+/* The shadow the lifted leaf throws on the page beneath, from the spine. */
+.wid-cast {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  pointer-events: none;
+  will-change: opacity;
+}
+.wid-cast--right {
+  left: 50%;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.35) calc(var(--reach, 50%) * 0.55), rgba(0, 0, 0, 0) var(--reach, 50%));
+}
+.wid-cast--left {
+  left: 0;
+  background: linear-gradient(270deg, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.35) calc(var(--reach, 50%) * 0.55), rgba(0, 0, 0, 0) var(--reach, 50%));
+}
+/* The gutter: the fold in the binding shows only while a page is turning, so
+   a resting spread is one uninterrupted picture. */
+.wid-gutter {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 14vw;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.32) 42%, rgba(0, 0, 0, 0.6) 50%, rgba(0, 0, 0, 0.32) 58%, rgba(0, 0, 0, 0) 100%);
+}
+/* Keeps the type legible over any spread: deeper at the top (header), the
+   bottom (caption) and the edges, lightest where the subject sits. */
+.wid-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 85% 75% at 50% 50%, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.62) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.22) 26%, rgba(0, 0, 0, 0.3) 60%, rgba(0, 0, 0, 0.78) 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .wid-media { display: none; }
+}
+
 /* The incoming page is revealed through a quick, subtle lift. It deliberately
    starts at a near-visible opacity rather than zero — a fully invisible page
    for 140ms is what read as "blank space" after clicking a work card. It also
