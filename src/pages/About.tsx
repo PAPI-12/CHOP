@@ -4,19 +4,22 @@ import CTAButton from '../components/CTAButton';
 import TimedWordFlip from '../components/TimedWordFlip';
 import WhatIDo from '../components/WhatIDo';
 import { ScribbleX } from '../components/Scribbles';
+import XrayHero from '../components/XrayHero';
 
 /**
  * About.
  *
- * The hero is a full-bleed, edge-to-edge photograph with the copy set ON TOP
- * of it — no gradients, no masks. Readability comes from the photograph itself
- * being reduced to a study (grayscale + a touch of contrast and dimming via a
- * CSS filter, never an overlay gradient), and from a hard-edged left plate (a
- * solid, translucent surface, not a fade) so the headline sits on a clear
- * field while the subject stays visible on the right. A thin lime hairline is
- * struck at the left edge where the headline begins — that line is the origin
- * of the hero→What I Do transition, which grows it into a full-width black
- * panel that reveals the practice.
+ * The hero is a full-bleed, edge-to-edge plate with the copy set ON TOP of it
+ * — no gradients, no masks. It idles on the first frame of the x-ray sequence
+ * (see components/XrayHero), held as a grayscale study exactly the way the
+ * photograph it replaced was; pressing the control runs the sequence in colour
+ * and it settles on its closing x-ray frame. Readability comes from the
+ * hard-edged left plate (a solid, translucent surface, not a fade), so the
+ * headline sits on a clear field while the subject stays visible on the right,
+ * whether the hero is still or running. A thin lime hairline is struck at the
+ * left edge where the headline begins — that line is the origin of the
+ * hero→What I Do transition, which grows it into a full-width black panel
+ * that reveals the practice.
  */
 const About: React.FC = () => {
   const heroRef = useRef<HTMLElement>(null);
@@ -67,17 +70,14 @@ const About: React.FC = () => {
         ref={heroRef}
         className="relative h-[100svh] min-h-[560px] overflow-hidden bg-[#000000]"
       >
-        {/* Full-bleed photograph. Dimmed via filter, never an overlay gradient. */}
+        {/* The hero plate: idles on the opening frame of the sequence, held in
+            the grayscale study treatment. Pressing the control runs the video,
+            which holds on its closing x-ray frame when it ends. */}
+        <XrayHero />
+
+        {/* Plate, hairlines and the origin line sit OVER the video so the copy
+            stays legible whether the hero is still or running. */}
         <div aria-hidden className="absolute inset-0">
-          <img
-            loading="eager"
-            decoding="async"
-            src="/images/about-hero.webp"
-            alt=""
-            width={1500}
-            height={810}
-            className="h-full w-full object-cover object-[58%_32%] grayscale contrast-[1.06] brightness-[0.7]"
-          />
           {/* Hard-edged translucent plate for the copy — a solid scrim, not a
               gradient, so the subject stays visible on the right. */}
           <div className="absolute inset-y-0 left-0 w-[72%] sm:w-[60%] lg:w-[50%] xl:w-[46%] bg-[#000]/55 border-r border-white/10" />

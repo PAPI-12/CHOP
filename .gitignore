@@ -12,3 +12,12 @@ tools/smoke/bundle.js
 __pycache__/
 *.pyc
 tools/hero/source/debug-*.png
+
+# X-ray hero pipeline: the Drive footage, the pass-1 intermediates and any
+# extracted frames are large and all of them are reproducible -- the footage
+# from the Drive folder, the rest by re-running tools/xray/edit.py. Only the
+# delivery encodes in public/videos are tracked.
+assets/xray/source/
+assets/xray/work/
+assets/xray/frames/
+assets/xray/probe*/
