@@ -36,7 +36,7 @@ const Home: React.FC = () => {
             <img loading="lazy"
               src="/images/PAPI RABORIFE ABOUT COVER.webp"
               alt="Papi Raborife"
-              className="w-full h-full object-cover object-center grayscale contrast-[1.05] brightness-[0.55]"
+              className="w-full h-full object-cover object-center brightness-[0.55]"
               decoding="async"
               fetchPriority="low"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}

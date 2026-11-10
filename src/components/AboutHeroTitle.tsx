@@ -22,10 +22,13 @@ import SplitFlapSwap from './SplitFlapSwap';
  * visitor presses Launch Madness and lowers when the film ends:
  *
  *   idle       the title reads MADNESS and holds there — nothing flaps on a
- *              timer, so the madness is simply what the page says
- *   launched   the U and P grow rocket noses, MADNESS flaps into SKELETON,
- *              and the whole block accelerates up and out of frame
- *   returned   the block comes back down, now reading SKELETON
+ *              timer, so the madness is simply what the page says. The U and
+ *              the P sit apart, not yet locked
+ *   launched   the U and P slide together and grow rocket noses, MADNESS
+ *              flaps into SKELETON, and the block lifts off: gradually at
+ *              first, then a slow creep, then it shoots out of frame
+ *   returned   the block comes back down, now reading SKELETON, with the U
+ *              and P left locked together and the noses stood down
  *
  * Colour keeps the homepage's order read top to bottom: bone, bone, tan, tan,
  * lime, lime. No scrim, no drop shadow, no rule.
@@ -52,13 +55,16 @@ const T_UP = 'text-[clamp(2rem,9.1vw,4.43rem)] md:text-[clamp(2.78rem,9.1vw,9.8r
 const SMALL = 'block text-[clamp(1rem,2.4vw,1.75rem)] leading-[1.25] tracking-[-0.01em]';
 const LEAD = 'leading-[0.88] tracking-[-0.04em] whitespace-nowrap';
 
-// The launch: the rockets arm and hold a beat so the change registers, then
-// the block accelerates up and out. It has to clear the frame before the
-// film starts — see LAUNCH_MS in XrayHero, which is this hold plus this
-// flight.
-const HOLD = '[transition-delay:380ms]';
-const FLIGHT = 'duration-[620ms] ease-[cubic-bezier(0.6,0,0.9,0.3)] -translate-y-[62vh] opacity-0';
-const RETURN = 'duration-[700ms] ease-[cubic-bezier(0.16,1,0.3,1)] translate-y-0 opacity-100';
+// The launch runs in three legs — see the hero-launch keyframes: a gradual
+// lift-off, a slower creep, then the shoot. It has to be clear of the frame
+// before the film starts, so LAUNCH_MS in XrayHero is exactly this long.
+const LAUNCH = 'animate-[hero-launch_1700ms_linear_forwards]';
+const RETURN = 'animate-[hero-return_900ms_ease-out_forwards]';
+
+// How far out the P waits before the launch pulls it into the U. Docked it
+// sits at -0.34em; this is clear of the U's right edge at 0.76em, so at rest
+// the two letters read as separate rather than interlocked.
+const P_UNDOCKED = 'translate-x-[0.55em]';
 
 /**
  * The U and P of "UP", woven into one mark.
@@ -79,35 +85,43 @@ const RETURN = 'duration-[700ms] ease-[cubic-bezier(0.16,1,0.3,1)] translate-y-0
  * 0.42em — inside that opening — and swings its bowl across the U's right
  * stem with 0.16em of overlap to weave through.
  *
- * `rocket` grows a nose out of each letter: an arrow off the U's free stem
- * and one off the P's bowl, both rising clear of the cap height.
+ * Two separate things happen here, and they do not end together. `docked`
+ * brings the P in from `P_UNDOCKED` so the letters close on each other — and
+ * stays docked, because the lock is the design and undoing it would put the
+ * pair back where it started. `rocket` grows a nose out of each letter, an
+ * arrow off the U's free stem and one off the P's bowl, both rising clear of
+ * the cap height; those belong to the launch and stand down when it is over.
  */
-const UpLock: React.FC<{ u: string; p: string; rocket?: boolean }> = ({ u, p, rocket }) => (
+const UpLock: React.FC<{ u: string; p: string; docked?: boolean; rocket?: boolean }> = ({ u, p, docked, rocket }) => (
   <span
     className="relative inline-flex items-baseline tracking-normal"
     aria-label="UP"
     data-rocket={rocket ? 'true' : 'false'}
   >
-    <span aria-hidden className={u}>
+    <span aria-hidden className={`relative ${u}`}>
       U
+      {rocket && (
+        <span
+          aria-hidden
+          data-nose="true"
+          className={`${u} absolute -left-[0.035em] bottom-[0.78em] origin-bottom h-0 w-0 border-x-[0.11em] border-b-[0.2em] border-x-transparent border-b-current animate-[nose-pop_260ms_ease-out_180ms_both]`}
+        />
+      )}
     </span>
-    <span aria-hidden className={`${p} -ml-[0.34em]`}>
+    <span
+      aria-hidden
+      data-docked={docked ? 'true' : 'false'}
+      className={`relative ${p} -ml-[0.34em] transition-transform duration-[420ms] ease-out ${docked ? 'translate-x-0' : P_UNDOCKED}`}
+    >
       P
+      {rocket && (
+        <span
+          aria-hidden
+          data-nose="true"
+          className={`${p} absolute left-[0.30em] bottom-[0.78em] origin-bottom h-0 w-0 border-x-[0.11em] border-b-[0.2em] border-x-transparent border-b-current animate-[nose-pop_260ms_ease-out_180ms_both]`}
+        />
+      )}
     </span>
-    {rocket && (
-      <>
-        <span
-          aria-hidden
-          data-nose="true"
-          className={`${u} absolute -left-[0.035em] bottom-[0.78em] h-0 w-0 border-x-[0.11em] border-b-[0.2em] border-x-transparent border-b-current`}
-        />
-        <span
-          aria-hidden
-          data-nose="true"
-          className={`${p} absolute left-[0.72em] bottom-[0.78em] h-0 w-0 border-x-[0.11em] border-b-[0.2em] border-x-transparent border-b-current`}
-        />
-      </>
-    )}
     <span aria-hidden className={`${u} absolute left-0 top-0 [clip-path:inset(25%_0_53%_0)]`}>
       U
     </span>
@@ -132,6 +146,10 @@ const AboutHeroTitle: React.FC<Props> = ({ layout = 'tree', palette = 'homepage'
   useEffect(() => {
     if (launched) setFlipped(true);
   }, [launched]);
+  // Flipped but no longer launched means the film has ended and the block is
+  // on its way back down — that is the only time the return runs, so the
+  // title does not fly in on first paint.
+  const returning = flipped && !launched;
 
   const arch = (
     <span className={`block ${T_ARCH} ${LEAD} ${pal.word}`}>ARCHITECTURE</span>
@@ -153,7 +171,7 @@ const AboutHeroTitle: React.FC<Props> = ({ layout = 'tree', palette = 'homepage'
 
   const closing = (
     <span className={`block ${T_UP} ${LEAD} ${pal.tail}`}>
-      <UpLock u={pal.tail} p={pal.knock} rocket={launched} />
+      <UpLock u={pal.tail} p={pal.knock} docked={flipped} rocket={launched} />
     </span>
   );
 
@@ -199,7 +217,7 @@ const AboutHeroTitle: React.FC<Props> = ({ layout = 'tree', palette = 'homepage'
   return (
     <h1
       data-launched={launched ? 'true' : 'false'}
-      className={`h-full flex flex-col justify-center font-display items-center text-center will-change-[transform,opacity] transition-[transform,opacity] ${launched ? `${HOLD} ${FLIGHT}` : RETURN}`}
+      className={`h-full flex flex-col justify-center font-display items-center text-center will-change-[transform,opacity] ${launched ? LAUNCH : returning ? RETURN : ''}`}
     >
       <span className={`block ${T_THE} ${LEAD} ${pal.word}`}>THE</span>
       {arch}
@@ -209,7 +227,7 @@ const AboutHeroTitle: React.FC<Props> = ({ layout = 'tree', palette = 'homepage'
       <span className="block whitespace-nowrap">{skeleton}</span>
       {/* The stem: narrow, centred, the U and P woven together. */}
       <span className={`block ${T_UP} ${LEAD} ${pal.tail} mt-[1.2vh]`}>
-        <UpLock u={pal.tail} p={pal.knock} rocket={launched} />
+        <UpLock u={pal.tail} p={pal.knock} docked={flipped} rocket={launched} />
       </span>
     </h1>
   );

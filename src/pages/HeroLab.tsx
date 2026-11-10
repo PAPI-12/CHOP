@@ -33,7 +33,7 @@ const HeroLab: React.FC = () => (
           src="/images/about-hero-idle.webp"
           alt=""
           aria-hidden
-          className="absolute inset-0 h-full w-full object-cover grayscale contrast-[1.04] brightness-[0.95]"
+          className="absolute inset-0 h-full w-full object-cover"
         />
         <span className="absolute z-20 top-4 left-4 sm:left-6 lg:left-12 xl:left-24 font-mono text-[10px] tracking-[0.3em] uppercase text-[#d7ff4f]">
           {o.n} — {o.note}

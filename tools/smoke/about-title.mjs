@@ -110,6 +110,9 @@ try {
   assert.equal(uEl.textContent.trim(), 'U', 'the lockup is built from a U');
   assert.equal(pEl.textContent.trim(), 'P', '...and a P');
   assert.ok(/-ml-/.test(pEl.className), 'the P is pulled into the U');
+  // ...but only once launched: at rest the two letters sit apart, and the
+  // launch is what brings them together.
+  assert.equal(pEl.dataset.docked, 'false', 'the P waits clear of the U until the launch');
   assert.ok(weave && /clip-path/.test(weave.className), 'a clipped U weaves back in front of the P');
   // Same size: neither letter is scaled against the other any more.
   const scale = (el) => /text-\[([\d.]+)em\]/.exec(el.className)?.[1] ?? '1';
@@ -208,12 +211,14 @@ try {
   assert.equal(lockup().dataset.rocket, 'true', 'the U and P become rockets on launch');
   assert.equal(lockup().querySelectorAll('[data-nose="true"]').length, 2,
     'an arrow off the U and one off the P');
+  assert.equal(lockup().querySelector('[data-docked]').dataset.docked, 'true',
+    'the U and P have come together');
   const h1 = () => doc.querySelector('h1');
   assert.equal(h1().dataset.launched, 'true', 'the title launches');
   // Nothing rolls until the type has cleared the frame.
   assert.equal(plays.length, 0, 'the film waits for the title to clear');
 
-  await wait(1700);
+  await wait(1900);
   const video = doc.querySelector('video');
   assert.ok(video, 'the page carries the sequence player');
   assert.equal(plays.length, 1, 'once the title has cleared, play() runs the sequence');
@@ -230,6 +235,9 @@ try {
   // ...and it comes back reading SKELETON, with the rockets stood down.
   assert.equal(h1().dataset.launched, 'false', 'the title returns once the film ends');
   assert.equal(lockup().dataset.rocket, 'false', 'the U and P go back to being letters');
+  // ...but the lock stays: they do not spring apart again on the way back.
+  assert.equal(lockup().querySelector('[data-docked]').dataset.docked, 'true',
+    'the U and P stay locked together');
   assert.equal(board('SKELETON'), 'SKELETON', 'the title comes back as SKELETON');
 
   // The hero was stripped back to match the homepage: only the nav is

@@ -24,11 +24,11 @@ const SRC_HERO = '/images/about-hero-idle.webp';
 
 export type Phase = 'idle' | 'launching' | 'loading' | 'playing' | 'ended';
 
-// How long the title takes to arm its rockets and clear the frame. The film
-// does not start until then — it plays into an empty hero, and the type comes
-// back down on top of the closing frame. See AboutHeroTitle: 380ms of hold
-// plus a 620ms flight.
-const LAUNCH_MS = 1000;
+// How long the title takes to dock its letters, arm its rockets and clear
+// the frame. The film does not start until then — it plays into an empty
+// hero, and the type comes back down on top of the closing frame. Matches the
+// hero-launch keyframes in AboutHeroTitle exactly.
+const LAUNCH_MS = 1700;
 
 const LABEL: Record<Phase, string> = {
   idle: 'Launch Madness',
@@ -128,7 +128,7 @@ const XrayHero = forwardRef<XrayHeroHandle, XrayHeroProps>(function XrayHero(
         width={1280}
         height={720}
         aria-hidden
-        className={`absolute inset-0 h-full w-full object-cover grayscale contrast-[1.04] brightness-[0.95] transition-opacity duration-700 ${
+        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${
           phase === 'idle' || phase === 'launching' ? 'opacity-100' : 'opacity-0'
         } ${className}`}
       />
