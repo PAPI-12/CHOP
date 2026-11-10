@@ -13,11 +13,12 @@ import AboutHeroTitle, { type Layout, type Palette } from '../components/AboutHe
  */
 
 const OPTIONS: { n: string; layout: Layout; palette: Palette; note: string }[] = [
-  { n: '01', layout: 'centred', palette: 'homepage', note: 'shipping — bone word, tan lead, lime tail' },
-  { n: '02', layout: 'centred', palette: 'lime', note: 'lime display word, bone tail' },
-  { n: '03', layout: 'centred', palette: 'bone', note: 'bone word + lead, lime tail only' },
-  { n: '04', layout: 'split', palette: 'homepage', note: 'lead/tail in the bottom corners' },
-  { n: '05', layout: 'left', palette: 'homepage', note: 'closing block set left' },
+  { n: '01', layout: 'stack', palette: 'homepage', note: 'shipping — 4-line centred lockup, bone/tan/lime' },
+  { n: '02', layout: 'stack', palette: 'lime', note: 'lime display word, bone tail' },
+  { n: '03', layout: 'stack', palette: 'bone', note: 'bone word + lead, lime tail only' },
+  { n: '04', layout: 'left', palette: 'homepage', note: 'same lockup, flush left' },
+  { n: '05', layout: 'centred', palette: 'homepage', note: 'word high, small block low' },
+  { n: '06', layout: 'split', palette: 'homepage', note: 'lead/tail in the bottom corners' },
 ];
 
 const HeroLab: React.FC = () => (
@@ -37,7 +38,7 @@ const HeroLab: React.FC = () => (
           {o.n} — {o.note}
         </span>
         <div className="relative z-10 h-full px-4 sm:px-6 lg:px-12 xl:px-24">
-          <div className="h-full pt-[16svh] pb-10 md:pb-12 max-w-[1600px] mx-auto">
+          <div className="h-full py-[8svh] max-w-[1600px] mx-auto">
             <AboutHeroTitle onUnlock={() => {}} layout={o.layout} palette={o.palette} />
           </div>
         </div>

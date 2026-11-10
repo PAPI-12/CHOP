@@ -90,12 +90,12 @@ const About: React.FC = () => {
             closing x-ray frame when it ends. */}
         <XrayHero ref={xrayRef} onPhaseChange={setXrayPhase} />
 
-        {/* Copy on top. The display word sits high in the frame and the rest
-            of the line splits to the bottom corners, after the reference. */}
+        {/* Copy on top. The whole line is set as one centred display lockup
+            that fills the frame, after the homepage hero. */}
         <div className="relative z-10 h-full px-4 sm:px-6 lg:px-12 xl:px-24">
           <div
             ref={heroCopyRef}
-            className={`h-full pt-[16svh] pb-10 md:pb-12 max-w-[1600px] mx-auto will-change-[opacity,transform] ${
+            className={`h-full py-[8svh] max-w-[1600px] mx-auto will-change-[opacity,transform] ${
               takeover ? 'pointer-events-none transition-opacity duration-500 ease-out' : ''
             }`}
           >
