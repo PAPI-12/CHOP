@@ -99,11 +99,11 @@ const About: React.FC = () => {
               takeover ? 'pointer-events-none transition-opacity duration-500 ease-out' : ''
             }`}
           >
-            {/* An inverted pyramid: ARCHITECTURE small, OF ART BUILT FROM
-                THE a step bigger, SKELETON as the base, and the U+P lockup
-                last at the bottom. MAAAADNESSS is the only row that flaps;
-                the film runs from the player's own control. */}
-            <AboutHeroTitle layout="pyramid" palette="homepage" />
+            {/* Six rows widening downward — THE, ARCHITECTURE, OF ART, BUILT
+                FROM THE, SKELETON — so the block silhouettes a tree, with the
+                U+P lockup hanging below as the stem. MAAAADNESSS is the only
+                row that flaps; the film runs from the player's control. */}
+            <AboutHeroTitle layout="tree" palette="homepage" />
           </div>
         </div>
       </section>

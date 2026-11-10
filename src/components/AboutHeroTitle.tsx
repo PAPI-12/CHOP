@@ -2,28 +2,32 @@ import React, { useEffect, useState } from 'react';
 import SplitFlapSwap from './SplitFlapSwap';
 
 /**
- * AboutHeroTitle — the hero headline as an inverted pyramid.
+ * AboutHeroTitle — the hero headline as a tree.
  *
- *         ARCHITECTURE      small
- *        OF ART BUILT       a bit bigger
- *        FROM THE
- *          SKELETON         the base
- *             ⒰            bottom
+ *              THE              21% of the measure
+ *          ARCHITECTURE         37%      widening
+ *            OF ART             38%
+ *        BUILT FROM THE         53%
+ *          SKELETON             60%      the widest row
+ *               ⒰               7%      the stem, centred
  *
- * The tiers grow down the stack: 4.5vw, 6.5vw, 6.5vw, 9.5vw, 9.5vw. Rendered
- * that is 40% / 51% / 39% / 57% of the measure, so SKELETON is the widest row
- * and reads as the base the way a pyramid's does. The whole block comes to
- * about 51% of the hero, down from 65%, and the largest size is down from
- * 11vw to 9.5vw.
+ * Every row is set wider than the one above it, so the block silhouettes a
+ * triangle, and UP hangs below the base in the middle like a trunk. The
+ * widths are what is stepped, not the sizes: the rows differ hugely in length
+ * (THE is 3 characters, BUILT FROM THE is 14), so hitting a widening
+ * silhouette means the short rows carry the larger type — 9.5vw, 4.2vw, 9vw,
+ * 5.5vw, 10vw. Anything else and the shape comes out lopsided.
  *
- * Only MAAAADNESSS flaps. UP is the U+P lockup, set last at the bottom.
- * Colour keeps the homepage's order read top to bottom: bone, tan, tan, lime.
- * No scrim, no drop shadow, no rule.
+ * Only MAAAADNESSS flaps, into ARCHITECTURE. UP is the U+P lockup, set at
+ * 6vw so it reads as a stem rather than another row.
+ *
+ * Colour keeps the homepage's order read top to bottom: bone, bone, tan, tan,
+ * lime, lime. No scrim, no drop shadow, no rule.
  */
 
 const FLAP1_START = 1100; // let the headline land before the flip
 
-export type Layout = 'pyramid' | 'sketch' | 'stack' | 'centred' | 'split' | 'left';
+export type Layout = 'tree' | 'pyramid' | 'sketch' | 'stack' | 'centred' | 'split' | 'left';
 export type Palette = 'homepage' | 'lime' | 'bone';
 
 const PALETTES: Record<Palette, { word: string; flip: string; lead: string; tail: string; knock: string }> = {
@@ -32,11 +36,15 @@ const PALETTES: Record<Palette, { word: string; flip: string; lead: string; tail
   bone: { word: 'text-[#f5f3ee]', flip: 'text-[#d7ff4f]', lead: 'text-[#f5f3ee]', tail: 'text-[#d7ff4f]', knock: 'text-[#f5f3ee]' },
 };
 
-// The pyramid's tiers, small at the top and growing to the base.
-const L1 = 'text-[clamp(1rem,4.5vw,2.2rem)] md:text-[clamp(1.4rem,4.5vw,4.9rem)]';
-const L2 = 'text-[clamp(1.4rem,6.5vw,3rem)] md:text-[clamp(2rem,6.5vw,7rem)]';
-const L3 = 'text-[clamp(2rem,9.5vw,4.3rem)] md:text-[clamp(2.9rem,9.5vw,10.3rem)]';
-const L4 = L3;
+// Sizes chosen so each row renders wider than the one above it, not so the
+// type simply gets bigger down the stack — the rows differ too much in
+// length for that to hold a shape.
+const T_THE = 'text-[clamp(2.1rem,9.5vw,4.6rem)] md:text-[clamp(3rem,9.5vw,10.3rem)]';
+const T_ARCH = 'text-[clamp(0.95rem,4.2vw,2.1rem)] md:text-[clamp(1.3rem,4.2vw,4.5rem)]';
+const T_OFART = 'text-[clamp(2rem,9vw,4.4rem)] md:text-[clamp(2.9rem,9vw,9.7rem)]';
+const T_BUILT = 'text-[clamp(1.25rem,5.5vw,2.7rem)] md:text-[clamp(1.8rem,5.5vw,6rem)]';
+const T_SKEL = 'text-[clamp(2.2rem,10vw,4.9rem)] md:text-[clamp(3.1rem,10vw,10.8rem)]';
+const T_UP = 'text-[clamp(1.35rem,6vw,2.9rem)] md:text-[clamp(1.9rem,6vw,6.5rem)]';
 const SMALL = 'block text-[clamp(1rem,2.4vw,1.75rem)] leading-[1.25] tracking-[-0.01em]';
 const LEAD = 'leading-[0.88] tracking-[-0.04em] whitespace-nowrap';
 
@@ -64,7 +72,7 @@ type Props = {
   palette?: Palette;
 };
 
-const AboutHeroTitle: React.FC<Props> = ({ layout = 'pyramid', palette = 'homepage' }) => {
+const AboutHeroTitle: React.FC<Props> = ({ layout = 'tree', palette = 'homepage' }) => {
   const [flap, setFlap] = useState(false);
   const pal = PALETTES[palette];
 
@@ -80,12 +88,12 @@ const AboutHeroTitle: React.FC<Props> = ({ layout = 'pyramid', palette = 'homepa
       run={flap}
       settledClassName={pal.word}
       flippingClassName={pal.flip}
-      className={`block ${L1} ${LEAD}`}
+      className={`block ${T_ARCH} ${LEAD}`}
     />
   );
 
   const closing = (
-    <span className={`block ${L4} ${LEAD} ${pal.tail}`}>
+    <span className={`block ${T_UP} ${LEAD} ${pal.tail}`}>
       SKELETON <UpLock u={pal.tail} p={pal.knock} />
     </span>
   );
@@ -109,8 +117,8 @@ const AboutHeroTitle: React.FC<Props> = ({ layout = 'pyramid', palette = 'homepa
     return (
       <h1 className={cls}>
         <span className="block whitespace-nowrap">{word}</span>
-        <span className={`block ${L3} ${LEAD} ${pal.lead}`}>OF ART BUILT</span>
-        <span className={`block ${L3} ${LEAD} ${pal.lead}`}>FROM THE</span>
+        <span className={`block ${T_SKEL} ${LEAD} ${pal.lead}`}>OF ART BUILT</span>
+        <span className={`block ${T_SKEL} ${LEAD} ${pal.lead}`}>FROM THE</span>
         {closing}
       </h1>
     );
@@ -120,26 +128,27 @@ const AboutHeroTitle: React.FC<Props> = ({ layout = 'pyramid', palette = 'homepa
     return (
       <h1 className="h-full flex flex-col justify-center gap-[0.02em] font-display items-center text-center">
         <span className="block whitespace-nowrap">{word}</span>
-        <span className={`block ${L2} ${LEAD} ${pal.lead}`}>OF ART BUILT</span>
-        <span className={`block ${L3} ${LEAD} ${pal.lead}`}>FROM THE</span>
-        <span className={`block ${L4} ${LEAD} ${pal.tail}`}>SKELETON</span>
-        <span className={`block ${L4} ${LEAD} ${pal.tail}`}>
+        <span className={`block ${T_OFART} ${LEAD} ${pal.lead}`}>OF ART BUILT</span>
+        <span className={`block ${T_SKEL} ${LEAD} ${pal.lead}`}>FROM THE</span>
+        <span className={`block ${T_UP} ${LEAD} ${pal.tail}`}>SKELETON</span>
+        <span className={`block ${T_UP} ${LEAD} ${pal.tail}`}>
           <UpLock u={pal.tail} p={pal.knock} />
         </span>
       </h1>
     );
   }
 
-  // pyramid — the tiers, stacked and centred, smallest first.
+  // tree — six rows widening downward, UP as the stem.
   return (
     <h1 className="h-full flex flex-col justify-center font-display items-center text-center">
+      <span className={`block ${T_THE} ${LEAD} ${pal.word}`}>THE</span>
       <span className="block whitespace-nowrap">{word}</span>
-      <span className={`block ${L2} ${LEAD} ${pal.lead} mt-[1.4vh]`}>OF ART BUILT</span>
-      <span className={`block ${L2} ${LEAD} ${pal.lead}`}>FROM THE</span>
-      {/* The base. */}
-      <span className={`block ${L3} ${LEAD} ${pal.tail} mt-[1.6vh]`}>SKELETON</span>
-      {/* UP, last, at the bottom. */}
-      <span className={`block ${L4} ${LEAD} ${pal.tail}`}>
+      <span className={`block ${T_OFART} ${LEAD} ${pal.lead}`}>OF ART</span>
+      <span className={`block ${T_BUILT} ${LEAD} ${pal.lead}`}>BUILT FROM THE</span>
+      {/* The base — the widest row. */}
+      <span className={`block ${T_SKEL} ${LEAD} ${pal.tail}`}>SKELETON</span>
+      {/* The stem: narrow, centred, the U and P interlocked. */}
+      <span className={`block ${T_UP} ${LEAD} ${pal.tail} mt-[1.2vh]`}>
         <UpLock u={pal.tail} p={pal.knock} />
       </span>
     </h1>

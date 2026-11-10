@@ -103,24 +103,40 @@ try {
   assert.equal(doc.querySelectorAll('h1 button').length, 0, 'the headline carries no control — the film runs from the player');
   assert.equal(doc.querySelectorAll('h1 [aria-hidden].bg-\\[\\#d7ff4f\\]').length, 0,
     'no rule between the rows');
-  // The pyramid: each tier is set larger than the one above it. jsdom has no
-  // Tailwind stylesheet, so the sizes are read off the class rather than
-  // computed — the vw figure inside the clamp is the tier.
+  // The tree: the width of each row, not the size of its type, is what has
+  // to grow — the rows differ hugely in length. jsdom has no Tailwind
+  // stylesheet, so the vw figure is read off the class and multiplied by the
+  // row's width in em to get the rendered width.
+  const W = { A:.72,B:.72,C:.72,D:.78,E:.62,F:.6,G:.78,H:.78,I:.32,J:.5,K:.72,L:.58,
+    M:.92,N:.78,O:.82,P:.68,Q:.82,R:.72,S:.66,T:.62,U:.76,V:.72,W:.98,X:.68,Y:.66,Z:.62,' ':.34 };
+  const em = (t) => (t === 'UP'
+    ? W.U + W.P - 0.34 - 0.08                       // the interlocked lockup
+    : [...t].reduce((a, c) => a + (W[c] ?? 0.62), 0) - 0.04 * t.length);
   const tierOf = (el) => {
     const m = /text-\[clamp\([^,]+,([\d.]+)vw/.exec(el.className);
     return m ? parseFloat(m[1]) : NaN;
   };
   const row = (t) => [...doc.querySelectorAll('h1 span')].find((n) => n.textContent.trim() === t);
-  const tArch = tierOf(doc.querySelector('[aria-label="ARCHITECTURE"]'));
-  const tOfArt = tierOf(row('OF ART BUILT'));
-  const tFrom = tierOf(row('FROM THE'));
-  const tSkel = tierOf(row('SKELETON'));
   const upEl = doc.querySelector('[aria-label="UP"]');
   const upParent = upEl.parentElement;
-  assert.ok(tArch < tOfArt, `ARCHITECTURE (${tArch}vw) is smaller than OF ART BUILT (${tOfArt}vw)`);
-  assert.equal(tOfArt, tFrom, 'OF ART BUILT and FROM THE are the same tier');
-  assert.ok(tSkel > tOfArt, `SKELETON (${tSkel}vw) is the base, larger than the tier above (${tOfArt}vw)`);
-  assert.equal(tierOf(upParent), tSkel, 'UP is set at the base size');
+  const rows = [
+    ['THE', row('THE')],
+    ['ARCHITECTURE', doc.querySelector('[aria-label="ARCHITECTURE"]')],
+    ['OF ART', row('OF ART')],
+    ['BUILT FROM THE', row('BUILT FROM THE')],
+    ['SKELETON', row('SKELETON')],
+    ['UP', upParent],
+  ];
+  for (const [label, el] of rows) assert.ok(el, `the ${label} row is rendered`);
+  const width = ([label, el]) => em(label) * tierOf(el);
+  for (let i = 1; i < rows.length - 1; i += 1) {
+    const [below, w] = [rows[i][0], width(rows[i])];
+    const above = width(rows[i - 1]);
+    assert.ok(w > above, `${below} (${w.toFixed(1)}) is wider than ${rows[i - 1][0]} (${above.toFixed(1)})`);
+  }
+  // UP is the stem: a trunk hanging under the base, so narrower than it.
+  const stem = width(rows[5]);
+  assert.ok(stem < width(rows[4]), `UP (${stem.toFixed(1)}) is narrower than SKELETON — it is the stem`);
   assert.equal(upParent.nextElementSibling, null, 'UP is the last row');
   assert.ok(upParent.compareDocumentPosition(row('SKELETON')) & 2, 'SKELETON precedes UP in the document');
 
@@ -138,7 +154,7 @@ try {
   assert.ok(/f5f3ee/.test(bigFace.className), 'beat 3: the display word is bone');
   assert.ok(/d7ff4f/.test(bigFace.className) === false, 'the display word is not lime — lime is the closing word');
   const leadLines = [...doc.querySelectorAll('h1 span')].filter(
-    (n) => n.textContent.trim() === 'OF ART BUILT' || n.textContent.trim() === 'FROM THE',
+    (n) => n.textContent.trim() === 'OF ART' || n.textContent.trim() === 'BUILT FROM THE',
   );
   assert.equal(leadLines.length, 2, 'the rest of the line is set as display lines, not a caption');
   const bottomLeft = leadLines[0];
@@ -148,7 +164,7 @@ try {
     'only the display word is a split-flap board — the closing line is plain type');
   assert.ok(!/blur/.test(bottomLeft.getAttribute('style') || ''), 'the bottom copy does not recede — the pull-back beat is gone');
 
-  console.log('PASS  the pyramid: ARCHITECTURE small, SKELETON the base, UP last, no rule');
+  console.log('PASS  the tree: six rows widening downward, UP the stem, no rule');
 
   // ── the takeover on the real page ─────────────────────────────────────
   window.titleTest.mountPage();
