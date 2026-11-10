@@ -2,33 +2,28 @@ import React, { useEffect, useState } from 'react';
 import SplitFlapSwap from './SplitFlapSwap';
 
 /**
- * AboutHeroTitle — the hero headline, set after the sketch.
+ * AboutHeroTitle — the hero headline as an inverted pyramid.
  *
- *     MAAAADNESSS → ARCHITECTURE
- *     ──────────────
- *     OF ART BUILT
- *     FROM THE
- *          SKELETON
- *             ⒰
+ *         ARCHITECTURE      small
+ *        OF ART BUILT       a bit bigger
+ *        FROM THE
+ *          SKELETON         the base
+ *             ⒰            bottom
  *
- * Six rows spanning about 65% of the frame, stacked and centred. Only
- * MAAAADNESSS flaps; everything else is set.
+ * The tiers grow down the stack: 4.5vw, 6.5vw, 6.5vw, 9.5vw, 9.5vw. Rendered
+ * that is 40% / 51% / 39% / 57% of the measure, so SKELETON is the widest row
+ * and reads as the base the way a pyramid's does. The whole block comes to
+ * about 51% of the hero, down from 65%, and the largest size is down from
+ * 11vw to 9.5vw.
  *
- * The sizes come from the sketch rather than from a house scale. Measuring its
- * ink gave five rows: 82.5% / 69.1% / 45.1% / 42.9% of the frame wide, with a
- * hairline between the first two. Dividing each measured width by that line's
- * width in em gives the size that reproduces it — 11vw, 10.3vw, 8.8vw, 8.4vw
- * — and those four sizes stack to 65% of the hero height, which is what the
- * sketch measures. The last row is as tall as the first but under half its
- * width, so it is two lines, not one: SKELETON over the U+P lockup.
- *
+ * Only MAAAADNESSS flaps. UP is the U+P lockup, set last at the bottom.
  * Colour keeps the homepage's order read top to bottom: bone, tan, tan, lime.
- * No scrim, no drop shadow.
+ * No scrim, no drop shadow, no rule.
  */
 
 const FLAP1_START = 1100; // let the headline land before the flip
 
-export type Layout = 'sketch' | 'stack' | 'centred' | 'split' | 'left';
+export type Layout = 'pyramid' | 'sketch' | 'stack' | 'centred' | 'split' | 'left';
 export type Palette = 'homepage' | 'lime' | 'bone';
 
 const PALETTES: Record<Palette, { word: string; flip: string; lead: string; tail: string; knock: string }> = {
@@ -37,11 +32,11 @@ const PALETTES: Record<Palette, { word: string; flip: string; lead: string; tail
   bone: { word: 'text-[#f5f3ee]', flip: 'text-[#d7ff4f]', lead: 'text-[#f5f3ee]', tail: 'text-[#d7ff4f]', knock: 'text-[#f5f3ee]' },
 };
 
-// Each size reproduces the width that row measures in the sketch.
-const L1 = 'text-[clamp(2rem,11vw,3.7rem)] md:text-[clamp(3rem,11vw,12rem)]';
-const L2 = 'text-[clamp(1.9rem,10.3vw,3.5rem)] md:text-[clamp(2.9rem,10.3vw,11.3rem)]';
-const L3 = 'text-[clamp(1.6rem,8.8vw,3rem)] md:text-[clamp(2.4rem,8.8vw,9.7rem)]';
-const L4 = 'text-[clamp(1.5rem,8.4vw,2.9rem)] md:text-[clamp(2.3rem,8.4vw,9.2rem)]';
+// The pyramid's tiers, small at the top and growing to the base.
+const L1 = 'text-[clamp(1rem,4.5vw,2.2rem)] md:text-[clamp(1.4rem,4.5vw,4.9rem)]';
+const L2 = 'text-[clamp(1.4rem,6.5vw,3rem)] md:text-[clamp(2rem,6.5vw,7rem)]';
+const L3 = 'text-[clamp(2rem,9.5vw,4.3rem)] md:text-[clamp(2.9rem,9.5vw,10.3rem)]';
+const L4 = L3;
 const SMALL = 'block text-[clamp(1rem,2.4vw,1.75rem)] leading-[1.25] tracking-[-0.01em]';
 const LEAD = 'leading-[0.88] tracking-[-0.04em] whitespace-nowrap';
 
@@ -69,7 +64,7 @@ type Props = {
   palette?: Palette;
 };
 
-const AboutHeroTitle: React.FC<Props> = ({ layout = 'sketch', palette = 'homepage' }) => {
+const AboutHeroTitle: React.FC<Props> = ({ layout = 'pyramid', palette = 'homepage' }) => {
   const [flap, setFlap] = useState(false);
   const pal = PALETTES[palette];
 
@@ -135,27 +130,20 @@ const AboutHeroTitle: React.FC<Props> = ({ layout = 'sketch', palette = 'homepag
     );
   }
 
-  // sketch — five rows and a hairline, stacked and centred.
+  // pyramid — the tiers, stacked and centred, smallest first.
   return (
     <h1 className="h-full flex flex-col justify-center font-display items-center text-center">
       <span className="block whitespace-nowrap">{word}</span>
-
-      {/* The hairline the sketch draws between the first row and the rest. */}
-      <span aria-hidden className="block w-[51%] h-[2px] my-[1.6vh] bg-[#d7ff4f]" />
-
-      <span className={`block ${L2} ${LEAD} ${pal.lead}`}>OF ART BUILT</span>
-      <span className={`block ${L3} ${LEAD} ${pal.lead}`}>FROM THE</span>
-
-      {/* The closing pair: as tall as the display word and under half its
-          width in the sketch, which is two rows, not one. */}
-      <span className="mt-[3vh] flex flex-col items-center">
-        <span className={`block ${L4} ${LEAD} ${pal.tail}`}>SKELETON</span>
-        <span className={`block ${L4} ${LEAD} ${pal.tail}`}>
-          <UpLock u={pal.tail} p={pal.knock} />
-        </span>
+      <span className={`block ${L2} ${LEAD} ${pal.lead} mt-[1.4vh]`}>OF ART BUILT</span>
+      <span className={`block ${L2} ${LEAD} ${pal.lead}`}>FROM THE</span>
+      {/* The base. */}
+      <span className={`block ${L3} ${LEAD} ${pal.tail} mt-[1.6vh]`}>SKELETON</span>
+      {/* UP, last, at the bottom. */}
+      <span className={`block ${L4} ${LEAD} ${pal.tail}`}>
+        <UpLock u={pal.tail} p={pal.knock} />
       </span>
     </h1>
   );
-};
+}
 
 export default AboutHeroTitle;

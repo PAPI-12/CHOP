@@ -99,11 +99,11 @@ const About: React.FC = () => {
               takeover ? 'pointer-events-none transition-opacity duration-500 ease-out' : ''
             }`}
           >
-            {/* Set from the sketch: five rows and a hairline, stacked and
-                centred, spanning about 65% of the frame. MAAAADNESSS flaps
-                to ARCHITECTURE; the rest is set, and the closing pair ends
-                in a U+P lockup. The film runs from the player's control. */}
-            <AboutHeroTitle layout="sketch" palette="homepage" />
+            {/* An inverted pyramid: ARCHITECTURE small, OF ART BUILT FROM
+                THE a step bigger, SKELETON as the base, and the U+P lockup
+                last at the bottom. MAAAADNESSS is the only row that flaps;
+                the film runs from the player's own control. */}
+            <AboutHeroTitle layout="pyramid" palette="homepage" />
           </div>
         </div>
       </section>

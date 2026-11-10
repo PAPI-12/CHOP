@@ -101,8 +101,28 @@ try {
   const [uEl, pEl] = upLock.children;
   assert.ok(/-ml-/.test(pEl.className), 'the P is pulled into the U');
   assert.equal(doc.querySelectorAll('h1 button').length, 0, 'the headline carries no control — the film runs from the player');
-  const rule = doc.querySelector('h1 [aria-hidden].bg-\\[\\#d7ff4f\\]');
-  assert.ok(rule, 'the hairline between the display word and the rest is drawn');
+  assert.equal(doc.querySelectorAll('h1 [aria-hidden].bg-\\[\\#d7ff4f\\]').length, 0,
+    'no rule between the rows');
+  // The pyramid: each tier is set larger than the one above it. jsdom has no
+  // Tailwind stylesheet, so the sizes are read off the class rather than
+  // computed — the vw figure inside the clamp is the tier.
+  const tierOf = (el) => {
+    const m = /text-\[clamp\([^,]+,([\d.]+)vw/.exec(el.className);
+    return m ? parseFloat(m[1]) : NaN;
+  };
+  const row = (t) => [...doc.querySelectorAll('h1 span')].find((n) => n.textContent.trim() === t);
+  const tArch = tierOf(doc.querySelector('[aria-label="ARCHITECTURE"]'));
+  const tOfArt = tierOf(row('OF ART BUILT'));
+  const tFrom = tierOf(row('FROM THE'));
+  const tSkel = tierOf(row('SKELETON'));
+  const upEl = doc.querySelector('[aria-label="UP"]');
+  const upParent = upEl.parentElement;
+  assert.ok(tArch < tOfArt, `ARCHITECTURE (${tArch}vw) is smaller than OF ART BUILT (${tOfArt}vw)`);
+  assert.equal(tOfArt, tFrom, 'OF ART BUILT and FROM THE are the same tier');
+  assert.ok(tSkel > tOfArt, `SKELETON (${tSkel}vw) is the base, larger than the tier above (${tOfArt}vw)`);
+  assert.equal(tierOf(upParent), tSkel, 'UP is set at the base size');
+  assert.equal(upParent.nextElementSibling, null, 'UP is the last row');
+  assert.ok(upParent.compareDocumentPosition(row('SKELETON')) & 2, 'SKELETON precedes UP in the document');
 
   // Beat 2 — MAAAADNESSS flaps into ARCHITECTURE, and the board grows by one.
   await wait(2300);
@@ -128,7 +148,7 @@ try {
     'only the display word is a split-flap board — the closing line is plain type');
   assert.ok(!/blur/.test(bottomLeft.getAttribute('style') || ''), 'the bottom copy does not recede — the pull-back beat is gone');
 
-  console.log('PASS  the hero is set after the sketch: flap, hairline, closing pair with the U+P lockup');
+  console.log('PASS  the pyramid: ARCHITECTURE small, SKELETON the base, UP last, no rule');
 
   // ── the takeover on the real page ─────────────────────────────────────
   window.titleTest.mountPage();
