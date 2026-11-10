@@ -3,9 +3,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 /**
  * XrayHero — the moving layer of the About hero.
  *
- * The hero idles on a still: the first frame of the sequence, held in the
- * site's grayscale study treatment so it reads exactly like the photograph it
- * replaces. Nothing is fetched beyond that poster until the visitor asks for
+ * The hero idles on 1.webp, held in the site's grayscale study treatment so
+ * it reads like the photograph it replaces. Nothing is fetched beyond that poster until the visitor asks for
  * it — the encode is ~5.5 MB and it should never sit in front of first paint.
  * Pressing the control engages "x-ray mode": the video fades up in colour,
  * runs the sequence, and then HOLDS on its last frame, which is the end card
@@ -18,7 +17,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 const SRC_WEBM = '/videos/about-hero-xray.webm';
 const SRC_MP4 = '/videos/about-hero-xray.mp4';
-const SRC_POSTER = '/videos/about-hero-xray-poster.jpg';
+// The hero image the page idles on. Not a frame of the video: the
+// video opens on a close-up, which is the wrong thing to greet someone
+// with, so the idle state is the wide plate instead.
+const SRC_HERO = '/images/about-hero-idle.webp';
 
 type Phase = 'idle' | 'loading' | 'playing' | 'ended';
 
@@ -75,12 +77,12 @@ const XrayHero: React.FC<{ className?: string }> = ({ className = '' }) => {
 
   return (
     <>
-      {/* The idle state: frame one, held as a grayscale study. Matches the
-          treatment the photograph it replaces was carrying. */}
+      {/* The idle state: 1.webp, held as a grayscale study. */}
       <img
         loading="eager"
         decoding="async"
-        src={SRC_POSTER}
+        fetchPriority="high"
+        src={SRC_HERO}
         alt=""
         width={1280}
         height={720}
@@ -93,7 +95,7 @@ const XrayHero: React.FC<{ className?: string }> = ({ className = '' }) => {
       {/* The sequence. Holds its last frame when it ends. */}
       <video
         ref={videoRef}
-        poster={SRC_POSTER}
+        poster={SRC_HERO}
         preload="none"
         muted
         playsInline

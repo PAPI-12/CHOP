@@ -78,10 +78,11 @@ const About: React.FC = () => {
         {/* Plate, hairlines and the origin line sit OVER the video so the copy
             stays legible whether the hero is still or running. */}
         <div aria-hidden className="absolute inset-0">
-          {/* Hard-edged translucent plate for the copy — a solid scrim, not a
-              gradient, so the subject stays visible on the right. */}
-          <div className="absolute inset-y-0 left-0 w-[72%] sm:w-[60%] lg:w-[50%] xl:w-[46%] bg-[#000]/55 border-r border-white/10" />
-          {/* Contact-sheet hairlines framing the plate. */}
+          {/* The left scrim plate the copy used to sit on is gone — it cut the
+              frame in half and pushed the subject off to one side. Legibility
+              now comes from a text shadow on the copy itself, so the image
+              reads edge to edge. */}
+          {/* Contact-sheet hairlines framing the hero. */}
           <div className="absolute inset-x-0 top-0 h-px bg-white/10" />
           <div className="absolute inset-x-0 bottom-0 h-px bg-white/10" />
           {/* The transition's origin line: a thin lime vertical hairline where
@@ -97,9 +98,13 @@ const About: React.FC = () => {
 
         {/* Copy on top. Contained to the hard-edged left plate. */}
         <div className="relative z-10 h-full flex items-center px-4 sm:px-6 lg:px-12 xl:px-24">
+          {/* With the scrim gone the copy sits straight on the photograph, so
+              it carries its own shadow instead of a plate behind it. One
+              drop-shadow on the container covers every line, rather than a
+              shadow per element that would double up where they overlap. */}
           <div
             ref={heroCopyRef}
-            className="max-w-[1600px] w-full mx-auto will-change-[opacity,transform]"
+            className="max-w-[1600px] w-full mx-auto will-change-[opacity,transform] [filter:drop-shadow(0_2px_12px_rgba(0,0,0,0.8))_drop-shadow(0_1px_2px_rgba(0,0,0,0.9))]"
           >
             <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
               <div className="flex items-center gap-4 mb-6 md:mb-10">
