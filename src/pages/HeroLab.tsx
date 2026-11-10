@@ -16,6 +16,7 @@ const OPTIONS: { n: string; layout: Layout; palette: Palette; note: string }[] =
   { n: '01', layout: 'stack', palette: 'homepage', note: 'shipping — 4-line centred lockup, bone/tan/lime' },
   { n: '02', layout: 'stack', palette: 'lime', note: 'lime display word, bone tail' },
   { n: '03', layout: 'stack', palette: 'bone', note: 'bone word + lead, lime tail only' },
+  { n: '07', layout: 'left', palette: 'lime', note: 'flush left, lime display word' },
   { n: '04', layout: 'left', palette: 'homepage', note: 'same lockup, flush left' },
   { n: '05', layout: 'centred', palette: 'homepage', note: 'word high, small block low' },
   { n: '06', layout: 'split', palette: 'homepage', note: 'lead/tail in the bottom corners' },
@@ -39,7 +40,7 @@ const HeroLab: React.FC = () => (
         </span>
         <div className="relative z-10 h-full px-4 sm:px-6 lg:px-12 xl:px-24">
           <div className="h-full py-[8svh] max-w-[1600px] mx-auto">
-            <AboutHeroTitle onUnlock={() => {}} layout={o.layout} palette={o.palette} />
+            <AboutHeroTitle layout={o.layout} palette={o.palette} />
           </div>
         </div>
       </section>

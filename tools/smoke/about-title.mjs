@@ -27,7 +27,7 @@ const fixture = `
   (window as any).titleTest = {
     unlocks,
     mountTitle: () => flushSync(() => root.render(
-      <StrictMode><AboutHeroTitle onUnlock={() => unlocks.push('unlock')} /></StrictMode>
+      <StrictMode><AboutHeroTitle /></StrictMode>
     )),
     mountPage: () => flushSync(() => root.render(
       <StrictMode><MemoryRouter><About /></MemoryRouter></StrictMode>
@@ -91,18 +91,15 @@ try {
   await wait(250);
 
   assert.equal(board('ARCHITECTURE'), 'MAAAADNESSS', 'beat 1: the board opens on MAAAADNESSS, not on the target');
-  assert.equal(board('UNLOCK SKELETON'), 'SKELETON UP', 'beat 1: the tail of the line reads SKELETON UP');
-  const btn = () => doc.querySelector('button[aria-label]');
-  assert.equal(btn().disabled, true, 'the control is inert while it is still flipping');
-
-  // Sampled mid-flap-1: the second word must not have started moving yet.
-  // (The gap between the two flips is only 250ms, far too narrow to sample
-  // reliably, so prove the ordering here instead.)
-  await wait(1250);
-  assert.equal(board('UNLOCK SKELETON'), 'SKELETON UP', 'beat 2: SKELETON UP holds while the display word flaps');
+  // The closing line is set, not flapped, and ends in the U+P lockup.
+  const closing = [...doc.querySelectorAll('h1 span')].find((n) => /^SKELETON/.test(n.textContent.trim()));
+  assert.ok(closing, 'the closing line reads SKELETON …');
+  assert.ok(closing.querySelector('[aria-label="UP"]'), 'the line ends in the U+P lockup');
+  assert.equal(closing.querySelector('[aria-label="UP"]').textContent.replace(/\s/g, ''), 'UP', 'the lockup is built from U and P');
+  assert.equal(doc.querySelectorAll('h1 button').length, 0, 'the headline carries no control — the film runs from the player');
 
   // Beat 2 — MAAAADNESSS flaps into ARCHITECTURE, and the board grows by one.
-  await wait(1050);
+  await wait(2300);
   assert.equal(board('ARCHITECTURE'), 'ARCHITECTURE', 'beat 2: MAAAADNESSS has flapped into ARCHITECTURE');
   assert.equal(tiles('ARCHITECTURE'), 'ARCHITECTURE'.length, 'the board grew to fit ARCHITECTURE');
 
@@ -120,28 +117,19 @@ try {
   assert.equal(leadLines.length, 2, 'the rest of the line is set as display lines, not a caption');
   const bottomLeft = leadLines[0];
   assert.ok(/d7c4aa/.test(bottomLeft.className), 'the lead is tan');
-  const tailFace = () => doc.querySelector('[aria-label="UNLOCK SKELETON"] [data-face]');
-  assert.ok(/d7ff4f/.test(tailFace().className), 'the closing word is lime');
+  assert.ok(/d7ff4f/.test(closing.className), 'the closing line is lime');
+  assert.equal(doc.querySelectorAll('[data-face]').length, 'ARCHITECTURE'.length,
+    'only the display word is a split-flap board — the closing line is plain type');
   assert.ok(!/blur/.test(bottomLeft.getAttribute('style') || ''), 'the bottom copy does not recede — the pull-back beat is gone');
 
-  // Beat 4 — SKELETON UP flaps into UNLOCK SKELETON (11 -> 15 tiles).
-  await wait(2400);
-  assert.equal(board('UNLOCK SKELETON'), 'UNLOCK SKELETON', 'beat 4: SKELETON UP has flapped into UNLOCK SKELETON');
-  assert.equal(tiles('UNLOCK SKELETON'), 'UNLOCK SKELETON'.length, 'the board grew to fit all 15 tiles');
-  assert.equal(btn().disabled, false, 'the control is live once it has finished flipping');
-
-  btn().dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-  // The array is constructed inside the jsdom realm, so compare its
-  // contents (deepStrictEqual would fail on the differing prototype).
-  assert.deepEqual([...window.titleTest.unlocks], ['unlock'], 'clicking UNLOCK SKELETON starts the film');
-  console.log('PASS  the display word flaps to ARCHITECTURE and the last word starts the film');
+  console.log('PASS  the display word flaps to ARCHITECTURE and the closing line ends in the U+P lockup');
 
   // ── the takeover on the real page ─────────────────────────────────────
   window.titleTest.mountPage();
-  await wait(5200);
-  const unlock = doc.querySelector('button[aria-label="Unlock skeleton — play the x-ray sequence"]');
-  assert.ok(unlock, 'the real About page exposes UNLOCK SKELETON as a control');
-  assert.equal(unlock.disabled, false, 'the control is live on the real page');
+  await wait(2400);
+  const unlock = [...doc.querySelectorAll('button')].find((b) => /X-ray mode/i.test(b.textContent || ''));
+  assert.ok(unlock, 'the player exposes its own control');
+  assert.ok(doc.querySelector('[aria-label="UP"]'), 'the shipped hero ends in the U+P lockup');
 
   const copy = doc.querySelector('.will-change-\\[opacity\\,transform\\]');
   assert.ok(parseFloat(copy.style.opacity) > 0.5, 'the hero copy is up before the film runs');
@@ -169,7 +157,7 @@ try {
     assert.ok(!heroText.includes(gone), `the hero no longer carries "${gone}"`);
   }
   assert.ok(!/\+/.test(heroText.replace(/\s/g, '')), 'the corner registrations are gone');
-  console.log('PASS  clicking it runs the film, the hero copy clears for the takeover, and returns on ended');
+  console.log('PASS  the player control runs the film, the hero copy clears for the takeover, and returns on ended');
   console.log('PASS  the hero is stripped back to the photograph, the headline and the nav');
 } finally {
   assert.deepEqual(errors, [], 'no runtime errors or warnings: ' + errors.join(' | '));

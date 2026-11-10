@@ -2,120 +2,96 @@ import React, { useEffect, useState } from 'react';
 import SplitFlapSwap from './SplitFlapSwap';
 
 /**
- * AboutHeroTitle — the hero headline, and the control that starts the film.
- *
- * The whole line is set as one stacked display lockup, the way the homepage
- * hero sets CRAFTING / AWESOMENESS / SINCE 2015. A single word at the top
- * with a small block at the bottom left a hole through the middle of the
- * frame; stacking it fills the hero, and centring it keeps the space above
- * and below balanced rather than stranded.
+ * AboutHeroTitle.
  *
  *     MAAAADNESSS → ARCHITECTURE
  *     OF ART BUILT
  *     FROM THE
- *     SKELETON UP → UNLOCK SKELETON
+ *     SKELETON ⒰
  *
- * Four lines, because the longest is UNLOCK SKELETON at fifteen characters —
- * that is what sets the size ceiling, and four lines at that scale is what
- * fills the frame. Colour follows the homepage's order read top to bottom:
- * bone, tan, tan, lime. Both flips pass through lime.
+ * Four lines, centred, filling the frame the way the homepage hero's stack
+ * does. Only MAAAADNESSS flaps — the closing line is set and left alone.
  *
- * No scrim, no drop shadow: the type sits straight on the plate.
+ * The last line ends in a lockup built from the U and the P of "UP": the P is
+ * pulled left by 0.34em so its stem lands at 0.42em, inside the U's counter,
+ * and the bowl sits in the U's opening. The two letters share the same
+ * baseline and interlock rather than collide. The P is knocked out in bone
+ * against the lime U so the join reads as one mark instead of a pile-up.
  */
 
-const FLAP1_START = 1100; // let the headline land before the first flip
-const GAP_MS = 250; // a beat between the two flips
+const FLAP1_START = 1100; // let the headline land before the flip
 
 export type Layout = 'stack' | 'centred' | 'split' | 'left';
 export type Palette = 'homepage' | 'lime' | 'bone';
 
-const PALETTES: Record<Palette, { word: string; flip: string; lead: string; tail: string }> = {
-  homepage: { word: 'text-[#f5f3ee]', flip: 'text-[#d7ff4f]', lead: 'text-[#d7c4aa]', tail: 'text-[#d7ff4f]' },
-  lime: { word: 'text-[#d7ff4f]', flip: 'text-[#f5f3ee]', lead: 'text-[#d7c4aa]', tail: 'text-[#f5f3ee]' },
-  bone: { word: 'text-[#f5f3ee]', flip: 'text-[#d7ff4f]', lead: 'text-[#f5f3ee]', tail: 'text-[#d7ff4f]' },
+const PALETTES: Record<Palette, { word: string; flip: string; lead: string; tail: string; knock: string }> = {
+  homepage: { word: 'text-[#f5f3ee]', flip: 'text-[#d7ff4f]', lead: 'text-[#d7c4aa]', tail: 'text-[#d7ff4f]', knock: 'text-[#f5f3ee]' },
+  lime: { word: 'text-[#d7ff4f]', flip: 'text-[#f5f3ee]', lead: 'text-[#d7c4aa]', tail: 'text-[#d7ff4f]', knock: 'text-[#f5f3ee]' },
+  bone: { word: 'text-[#f5f3ee]', flip: 'text-[#d7ff4f]', lead: 'text-[#f5f3ee]', tail: 'text-[#d7ff4f]', knock: 'text-[#f5f3ee]' },
 };
 
-// Sized to the longest line rather than to the homepage's scale: fifteen
-// characters is the width ceiling, and this is as large as that allows.
 const LINE =
   'block text-[clamp(1.8rem,8.5vw,3.6rem)] md:text-[clamp(3rem,8vw,8.5rem)] leading-[0.86] tracking-[-0.04em]';
 const SMALL = 'block text-[clamp(1rem,2.4vw,1.75rem)] leading-[1.25] tracking-[-0.01em]';
 
-type Phase = 'intro' | 'flap1' | 'gap' | 'flap2' | 'ready';
+/**
+ * The U and P of "UP", locked into one mark.
+ *
+ * The overlap is the whole trick and it is a measurement, not a guess: at
+ * -0.34em the P's stem sits at 0.42em across the U, which is the middle of
+ * its counter (the opening runs about 0.15em to 0.60em). Anything looser and
+ * they simply sit next to each other; anything tighter and the P rides up
+ * onto the U's left stem.
+ */
+const UpLock: React.FC<{ u: string; p: string }> = ({ u, p }) => (
+  <span className="inline-flex items-baseline" aria-label="UP">
+    <span aria-hidden className={u}>
+      U
+    </span>
+    <span aria-hidden className={`${p} -ml-[0.34em]`}>
+      P
+    </span>
+  </span>
+);
 
 type Props = {
-  onUnlock: () => void;
+  /** start the x-ray film */
+  onUnlock?: () => void;
+  /** true while the film owns the hero */
   suppressed?: boolean;
   layout?: Layout;
   palette?: Palette;
 };
 
 const AboutHeroTitle: React.FC<Props> = ({
-  onUnlock,
-  suppressed = false,
   layout = 'stack',
   palette = 'homepage',
 }) => {
-  const [phase, setPhase] = useState<Phase>('intro');
-  const ready = phase === 'ready';
+  const [flap, setFlap] = useState(false);
   const pal = PALETTES[palette];
 
   useEffect(() => {
-    const t = window.setTimeout(() => setPhase('flap1'), FLAP1_START);
+    const t = window.setTimeout(() => setFlap(true), FLAP1_START);
     return () => window.clearTimeout(t);
   }, []);
-
-  useEffect(() => {
-    if (phase !== 'gap') return;
-    const t = window.setTimeout(() => setPhase('flap2'), GAP_MS);
-    return () => window.clearTimeout(t);
-  }, [phase]);
-
-  const onFlap1Done = () => setPhase((p) => (p === 'flap1' ? 'gap' : p));
-  const onFlap2Done = () => setPhase((p) => (p === 'flap2' ? 'ready' : p));
 
   const word = (
     <SplitFlapSwap
       from="MAAAADNESSS"
       to="ARCHITECTURE"
-      run={phase !== 'intro'}
+      run={flap}
       settledClassName={pal.word}
       flippingClassName={pal.flip}
-      onComplete={onFlap1Done}
       className={LINE}
     />
   );
 
-  const tailControl = (
-    <button
-      type="button"
-      onClick={ready && !suppressed ? onUnlock : undefined}
-      disabled={!ready || suppressed}
-      aria-label={ready ? 'Unlock skeleton — play the x-ray sequence' : 'Skeleton up'}
-      className={`relative inline-block align-baseline whitespace-nowrap text-left transition-opacity duration-300 ${
-        ready && !suppressed ? 'cursor-pointer focus-visible:outline-none' : 'cursor-default'
-      } ${suppressed ? 'opacity-0' : 'opacity-100'}`}
-    >
-      <SplitFlapSwap
-        from="SKELETON UP"
-        to="UNLOCK SKELETON"
-        run={phase === 'flap2' || phase === 'ready'}
-        settledClassName={pal.tail}
-        flippingClassName={pal.flip}
-        onComplete={onFlap2Done}
-        className={LINE}
-      />
-      {/* The affordance: a lime hairline that draws under the word once it is
-          live, so it reads as a control without recolouring the tiles
-          (changing their settled class mid-life would restart the flap). */}
-      <span
-        aria-hidden
-        className={`absolute -bottom-[0.06em] left-0 h-[2px] bg-[#d7ff4f] origin-left transition-transform duration-500 ease-out ${
-          ready && !suppressed ? 'scale-x-100' : 'scale-x-0'
-        }`}
-        style={{ width: '100%' }}
-      />
-    </button>
+  // Set, not flapped. The closing word is the one thing in the hero that
+  // stays still.
+  const closing = (
+    <span className={`${LINE} ${pal.tail}`}>
+      SKELETON <UpLock u={pal.tail} p={pal.knock} />
+    </span>
   );
 
   const leadLines = (
@@ -125,15 +101,13 @@ const AboutHeroTitle: React.FC<Props> = ({
     </>
   );
 
-  const h1 = 'h-full flex flex-col justify-center gap-[0.02em] font-display';
-
   if (layout === 'split') {
     return (
       <h1 className="h-full flex flex-col justify-between gap-10 md:gap-14 font-display">
         <span className="block whitespace-nowrap">{word}</span>
         <span className="flex items-end justify-between gap-6 md:gap-10">
           <span className={`${SMALL} ${pal.lead}`}>OF ART BUILT FROM THE</span>
-          {tailControl}
+          {closing}
         </span>
       </h1>
     );
@@ -141,10 +115,10 @@ const AboutHeroTitle: React.FC<Props> = ({
 
   if (layout === 'left') {
     return (
-      <h1 className={`${h1} items-start text-left`}>
+      <h1 className="h-full flex flex-col justify-center gap-[0.02em] font-display items-start text-left">
         <span className="block whitespace-nowrap">{word}</span>
         {leadLines}
-        {tailControl}
+        {closing}
       </h1>
     );
   }
@@ -155,7 +129,7 @@ const AboutHeroTitle: React.FC<Props> = ({
         <span className="block whitespace-nowrap">{word}</span>
         <span className="flex flex-col items-center gap-1.5 md:gap-2">
           <span className={`${SMALL} ${pal.lead}`}>OF ART BUILT FROM THE</span>
-          {tailControl}
+          {closing}
         </span>
       </h1>
     );
@@ -163,10 +137,10 @@ const AboutHeroTitle: React.FC<Props> = ({
 
   // stack — the whole line as one centred display lockup.
   return (
-    <h1 className={`${h1} items-center text-center`}>
+    <h1 className="h-full flex flex-col justify-center gap-[0.02em] font-display items-center text-center">
       <span className="block whitespace-nowrap">{word}</span>
       {leadLines}
-      {tailControl}
+      {closing}
     </h1>
   );
 };

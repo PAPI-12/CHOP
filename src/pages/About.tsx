@@ -99,15 +99,10 @@ const About: React.FC = () => {
               takeover ? 'pointer-events-none transition-opacity duration-500 ease-out' : ''
             }`}
           >
-            {/* The headline is also the trigger: MAAAADNESSS flaps to
-                ARCHITECTURE, SKELETON UP flaps to UNLOCK SKELETON, and that
-                last word starts the film. */}
-            <AboutHeroTitle
-              onUnlock={() => xrayRef.current?.engage()}
-              suppressed={takeover}
-              layout="centred"
-              palette="homepage"
-            />
+            {/* MAAAADNESSS flaps to ARCHITECTURE; the closing line is set,
+                not flapped, and ends in a U+P lockup. The film is run from
+                the player's own control. */}
+            <AboutHeroTitle layout="stack" palette="homepage" />
           </div>
         </div>
       </section>
