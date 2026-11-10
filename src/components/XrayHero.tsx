@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from 'react';
 
 /**
  * XrayHero — the moving layer of the About hero.
@@ -22,7 +22,7 @@ const SRC_MP4 = '/videos/about-hero-xray.mp4';
 // with, so the idle state is the wide plate instead.
 const SRC_HERO = '/images/about-hero-idle.webp';
 
-type Phase = 'idle' | 'loading' | 'playing' | 'ended';
+export type Phase = 'idle' | 'loading' | 'playing' | 'ended';
 
 const LABEL: Record<Phase, string> = {
   idle: 'X-ray mode',
@@ -31,10 +31,29 @@ const LABEL: Record<Phase, string> = {
   ended: 'Run it again',
 };
 
-const XrayHero: React.FC<{ className?: string }> = ({ className = '' }) => {
+export type XrayHeroHandle = { engage: () => void };
+
+type XrayHeroProps = {
+  className?: string;
+  /** lets the hero copy react to the film taking over */
+  onPhaseChange?: (phase: Phase) => void;
+};
+
+const XrayHero = forwardRef<XrayHeroHandle, XrayHeroProps>(function XrayHero(
+  { className = '', onPhaseChange },
+  ref,
+) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [progress, setProgress] = useState(0);
+
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  const notifyRef = useRef(onPhaseChange);
+  notifyRef.current = onPhaseChange;
+  useEffect(() => {
+    notifyRef.current?.(phaseRef.current);
+  }, [phase]);
 
   // Warm the file once the main thread is idle. The poster carries first
   // paint; the encode only starts when there is genuinely spare capacity, so
@@ -74,6 +93,8 @@ const XrayHero: React.FC<{ className?: string }> = ({ className = '' }) => {
       setPhase('idle');
     }
   }, [phase]);
+
+  useImperativeHandle(ref, () => ({ engage }), [engage]);
 
   return (
     <>
@@ -149,6 +170,6 @@ const XrayHero: React.FC<{ className?: string }> = ({ className = '' }) => {
       </div>
     </>
   );
-};
+});
 
 export default XrayHero;

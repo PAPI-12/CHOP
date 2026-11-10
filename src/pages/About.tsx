@@ -1,10 +1,10 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import CTAButton from '../components/CTAButton';
-import TimedWordFlip from '../components/TimedWordFlip';
+import AboutHeroTitle from '../components/AboutHeroTitle';
 import WhatIDo from '../components/WhatIDo';
 import { ScribbleX } from '../components/Scribbles';
-import XrayHero from '../components/XrayHero';
+import XrayHero, { type XrayHeroHandle, type Phase } from '../components/XrayHero';
 
 /**
  * About.
@@ -24,32 +24,44 @@ import XrayHero from '../components/XrayHero';
 const About: React.FC = () => {
   const heroRef = useRef<HTMLElement>(null);
   const heroCopyRef = useRef<HTMLDivElement>(null);
+  const xrayRef = useRef<XrayHeroHandle>(null);
+
+  // While the film is running it owns the hero outright: every piece of page
+  // furniture clears so the sequence plays edge to edge, and it all comes
+  // back when the video ends. That takeover is the intent, not a side effect
+  // — so it is driven from the player's own phase rather than left to chance.
+  const [xrayPhase, setXrayPhase] = useState<Phase>('idle');
+  const takeover = xrayPhase === 'loading' || xrayPhase === 'playing';
+  const takeoverRef = useRef(takeover);
+  takeoverRef.current = takeover;
+
+  const applyHeroCopy = useCallback(() => {
+    const hero = heroRef.current;
+    const copy = heroCopyRef.current;
+    if (!hero || !copy) return;
+    const h = hero.offsetHeight || window.innerHeight;
+    const rect = hero.getBoundingClientRect();
+    const p = h > 0 ? Math.min(1, Math.max(0, -rect.top / h)) : 0;
+    // Ease the tail so the copy is mostly gone before the panel fully covers.
+    const t = 1 - Math.pow(1 - p, 3);
+    const dim = takeoverRef.current ? 0 : 1;
+    copy.style.opacity = String((1 - t * 0.94) * dim);
+    const scale = 1 - t * 0.05;
+    const y = -t * 26;
+    copy.style.transform = `translate3d(0, ${y.toFixed(1)}px, 0) scale(${scale.toFixed(4)})`;
+    copy.style.willChange = 'opacity, transform';
+  }, []);
 
   // The hero "contracts" as it scrolls away: the copy scales down a touch,
   // lifts, and fades to nothing as the What I Do black panel grows over it.
   // Scroll-linked, passive — the intro runs once, the contract follows the
   // scroll so it never fights the pinned section underneath.
   useEffect(() => {
-    const hero = heroRef.current;
-    const copy = heroCopyRef.current;
-    if (!hero || !copy) return;
     let raf = 0;
-    const write = () => {
-      raf = 0;
-      const h = hero.offsetHeight || window.innerHeight;
-      const rect = hero.getBoundingClientRect();
-      const p = h > 0 ? Math.min(1, Math.max(0, -rect.top / h)) : 0;
-      // Ease the tail so the copy is mostly gone before the panel fully covers.
-      const t = 1 - Math.pow(1 - p, 3);
-      const opacity = String(1 - t * 0.94);
-      const scale = 1 - t * 0.05;
-      const y = -t * 26;
-      copy.style.opacity = opacity;
-      copy.style.transform = `translate3d(0, ${y.toFixed(1)}px, 0) scale(${scale.toFixed(4)})`;
-      copy.style.willChange = 'opacity, transform';
+    const queue = () => {
+      if (!raf) raf = requestAnimationFrame(() => { raf = 0; applyHeroCopy(); });
     };
-    const queue = () => { if (!raf) raf = requestAnimationFrame(write); };
-    write();
+    applyHeroCopy();
     window.addEventListener('scroll', queue, { passive: true });
     window.addEventListener('resize', queue, { passive: true });
     return () => {
@@ -57,7 +69,10 @@ const About: React.FC = () => {
       window.removeEventListener('scroll', queue);
       window.removeEventListener('resize', queue);
     };
-  }, []);
+  }, [applyHeroCopy]);
+
+  // The takeover is not scroll-linked, so it gets its own pass.
+  useEffect(() => { applyHeroCopy(); }, [takeover, applyHeroCopy]);
 
   return (
     <div className="min-h-screen bg-[#000000]">
@@ -73,7 +88,7 @@ const About: React.FC = () => {
         {/* The hero plate: idles on the opening frame of the sequence, held in
             the grayscale study treatment. Pressing the control runs the video,
             which holds on its closing x-ray frame when it ends. */}
-        <XrayHero />
+        <XrayHero ref={xrayRef} onPhaseChange={setXrayPhase} />
 
         {/* Plate, hairlines and the origin line sit OVER the video so the copy
             stays legible whether the hero is still or running. */}
@@ -104,7 +119,9 @@ const About: React.FC = () => {
               shadow per element that would double up where they overlap. */}
           <div
             ref={heroCopyRef}
-            className="max-w-[1600px] w-full mx-auto will-change-[opacity,transform] [filter:drop-shadow(0_2px_12px_rgba(0,0,0,0.8))_drop-shadow(0_1px_2px_rgba(0,0,0,0.9))]"
+            className={`max-w-[1600px] w-full mx-auto will-change-[opacity,transform] [filter:drop-shadow(0_2px_12px_rgba(0,0,0,0.8))_drop-shadow(0_1px_2px_rgba(0,0,0,0.9))] ${
+              takeover ? 'pointer-events-none transition-opacity duration-500 ease-out' : ''
+            }`}
           >
             <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
               <div className="flex items-center gap-4 mb-6 md:mb-10">
@@ -113,27 +130,14 @@ const About: React.FC = () => {
                 <p className="font-mono text-[10px] md:text-xs tracking-[0.3em] text-[#8f8f88]">JHB · SA</p>
               </div>
 
-              {/* The headings with timed, synchronized, non-jitter transitions on load */}
-              <h1 className="text-[10.5vw] sm:text-[8.5vw] lg:text-[5vw] font-display leading-[0.88] text-[#f5f3ee]">
-                I'M A{' '}
-                <TimedWordFlip
-                  startWord="FUUUUUUCKEN"
-                  targetWord="SELECTIVELY"
-                  delayMs={1000}
-                  settledClassName="text-[#d7ff4f]"
-                  flippingClassName="text-[#d7ff4f]"
-                />{' '}
-                SKILLED{' '}
-                <TimedWordFlip
-                  startWord="DOPEASS"
-                  targetWord="PRODUCT"
-                  delayMs={1000}
-                  settledClassName="text-[#d7c4aa]"
-                  flippingClassName="text-[#d7ff4f]"
-                />{' '}
-                DESIGNER WITH A STRONG FOCUS ON PRODUCING HIGH QUALITY &amp; IMPACTFUL{' '}
-                <span className="text-[#d7ff4f]">DIGITAL EXPERIENCES.</span>
-              </h1>
+              {/* The headline is also the trigger: it runs its own four-beat
+                  sequence (MAAAADNESSS -> ARCHITECTURE, the line pulls back,
+                  SKELETON UP -> UNLOCK SKELETON) and the last word starts
+                  the film. Type matches the homepage hero. */}
+              <AboutHeroTitle
+                onUnlock={() => xrayRef.current?.engage()}
+                suppressed={takeover}
+              />
 
               <motion.div className="mt-6 md:mt-9 inline-block" style={{ transform: 'rotate(-4deg)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
                 <span className="hand-note text-[#d7c4aa] text-lg md:text-3xl">design that moves people</span>

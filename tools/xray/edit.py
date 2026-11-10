@@ -60,23 +60,30 @@ GRAIN = 7
 SEG = {
     "mx":  dict(src="minimax.mp4", t0=0.00, t1=3.00, move="stepprint"),
     "td":  dict(src="topdown.png", still=True, dur=1.80, move="push"),
-    "sn":  dict(src="sneaker.webp", still=True, dur=1.60, move="step"),
+    "sn":  dict(src="sneaker.webp", still=True, dur=1.60, move="drift"),
     "su":  dict(src="standingup.mp4", t0=1.50, t1=4.50, move="none"),
-    "cl":  dict(src="closeup-white.png", still=True, dur=1.80, move="snap"),
-    "gc":  dict(src="hand-goldband.png", still=True, dur=2.00, move="drift"),
+    "cl":  dict(src="closeup-white.png", still=True, dur=1.80, move="pull"),
+    "gc":  dict(src="hand-goldband.png", still=True, dur=2.00, move="lift"),
     "sb":  dict(src="5.mp4", t0=1.50, t1=5.60, move="none"),
     "blk": dict(black=True, dur=0.50),
     "gx":  dict(src="groundlevel-xray.png", still=True, dur=1.80, move="push"),
-    "s6":  dict(src="6.mp4", t0=5.00, t1=7.70, move="settle"),
+    # The holster. Measured: over 6.mp4 0.2-2.1s the right-hand waist band
+    # runs 9.6 -> 25.8 while the left sits at 0.2-2.8 and the upper body
+    # stays near 8-10. That is a one-handed action at the hip with the rest
+    # of the frame comparatively still, which is a holster, and it was in
+    # the part of 6.mp4 that used to be trimmed off.
+    "tk":  dict(src="6.mp4", t0=0.20, t1=2.10, move="none"),
+    "s6":  dict(src="6.mp4", t0=4.90, t1=7.70, move="settle"),
     "en":  dict(src="endframe-macro-xray.png", still=True, dur=2.60, move="creep"),
 }
 
-ORDER = ["mx", "td", "sn", "su", "cl", "gc", "sb", "blk", "gx", "s6", "en"]
+ORDER = ["mx", "td", "sn", "su", "cl", "gc", "sb", "blk", "gx", "tk", "s6", "en"]
 
 # Dissolve into each key. The gun cutaway is a hard cut -- it is the load, an
 # action beat, and a dissolve there softens the one moment that should snap.
 XF = {"td": 0.30, "sn": 0.30, "su": 0.35, "cl": 0.30, "gc": 0.08,
-      "sb": 0.35, "blk": 0.30, "gx": 0.35, "s6": 0.30, "en": 0.55}
+      "sb": 0.35, "blk": 0.30, "gx": 0.35, "tk": 0.30, "s6": 0.30,
+      "en": 0.55}
 
 
 def dur_of(key):
@@ -89,43 +96,49 @@ def dur_of(key):
 # ---------------------------------------------------------------------------
 
 def still_move(kind, W, H, n):
-    """Camera move for a still, as a zoompan filter.
+    """Camera move for a still, smooth-eased, as a two-layer parallax.
 
-    `n` is the shot length in frames. zoompan runs with d=1 so one output
-    frame per input frame, and `on` counts output frames, which is what the
-    expressions key off.
+    Every move is a smoothstep of the frame counter, so nothing steps and
+    nothing stops: the earlier 'step' move quantised the zoom into six
+    jumps, and the 'snap' move reached full zoom in the first third then
+    held dead still, which read as the picture freezing rather than as a
+    camera settling. Both are gone.
+
+    The parallax is two renders of the same plate at different zooms and
+    drift rates, composited through a long-feathered mask: a sharp centre
+    moving faster over a softer, slower edge. With one flat image that is
+    the only way to get genuine differential motion, and the feather is
+    long enough that it reads as focus falloff rather than a border.
     """
-    cen_x = "iw/2-(iw/zoom/2)"
-    cen_y = "ih/2-(ih/zoom/2)"
-    z = "1"
-    x, y = cen_x, cen_y
+    # z0 -> z1 zoom, and dx/dy drift as a fraction of the slack the zoom
+    # opens up. Varied per shot so they do not all read the same.
+    M = {
+        #            z0    z1    dx     dy
+        "push":   (1.02, 1.13,  0.06,  0.00),
+        "pull":   (1.13, 1.02, -0.05,  0.02),
+        "drift":  (1.03, 1.15,  0.10,  0.05),
+        "lift":   (1.04, 1.16, -0.07, -0.04),
+        "creep":  (1.01, 1.06,  0.03,  0.00),
+    }
+    z0, z1, dx, dy = M.get(kind, M["push"])
+    # smoothstep, so acceleration is continuous at both ends
+    t = f"(0.5-0.5*cos(PI*on/{n}))"
+    zf = f"{z0}+({z1 - z0})*{t}"
+    # Background: a shallower version of the same zoom, drifting less, so the
+    # edges lag behind the centre. 0.70 / 0.62 rather than a bigger split --
+    # at 0.55 the surround was sliding 5-16px against a near-locked centre
+    # (20-64px full-res), which stopped reading as depth and started reading
+    # as a soft halo dragging around a frozen picture.
 
-    if kind == "push":
-        # slow continuous dolly in
-        z = f"1+0.10*on/{n}"
-    elif kind == "creep":
-        # barely there, for a frame that is going to be held
-        z = f"1+0.045*on/{n}"
-    elif kind == "step":
-        # quantised push: the zoom advances in six discrete jumps, which
-        # reads as stop motion rather than a smooth glide
-        q = 6
-        z = f"1+0.15*floor({q}*on/{n})/{q}"
-    elif kind == "snap":
-        # fast push that lands in the first third, then holds
-        z = f"1+0.17*min(1,3*on/{n})"
-    elif kind == "drift":
-        # push with a lateral slide: pan across the slack the zoom opens up
-        z = f"1+0.12*on/{n}"
-        x = f"(iw-iw/zoom)*(0.50+0.20*on/{n})"
-        y = "(ih-ih/zoom)*0.42"
-    elif kind == "stepprint":
-        z = "1"
-    else:
-        z = "1"
+    zb = f"{1.0 + (z0 - 1.0) * 0.70}+({(z1 - z0) * 0.70})*{t}"
+    fx = f"(iw-iw/zoom)*(0.50+{dx}*{t})"
+    fy = f"(ih-ih/zoom)*(0.50+{dy}*{t})"
+    bx = f"(iw-iw/zoom)*(0.50+{dx * 0.62}*{t})"
+    by = f"(ih-ih/zoom)*(0.50+{dy * 0.62}*{t})"
 
-    return (f"zoompan=z='{z}':x='{x}':y='{y}'"
-            f":d=1:s={W}x{H}:fps={FPS}")
+    fg = (f"zoompan=z='{zf}':x='{fx}':y='{fy}':d=1:s={W}x{H}:fps={FPS}")
+    bg = (f"zoompan=z='{zb}':x='{bx}':y='{by}':d=1:s={W}x{H}:fps={FPS}")
+    return fg, bg
 
 
 def clip_move(kind, W, H, n):
@@ -145,13 +158,12 @@ def clip_move(kind, W, H, n):
 # ---------------------------------------------------------------------------
 
 def finish(W, H, vig_in, scale=1.0):
-    """clarity -> light halation -> vignette.
+    """micro-contrast -> light halation -> vignette.
 
     Deliberately no curves, gamma, hue, saturation or colour balance: the
-    instruction was no grading, and these three only touch local contrast,
-    bloom and edge falloff.
+    instruction was no grading. Micro-contrast is luma-only, so it cannot
+    shift colour; the glow and vignette only touch bloom and edge falloff.
     """
-    g = f"gblur=sigma={8 * scale:.1f}"
     glow = f"gblur=sigma={11 * scale:.1f}"
     small = "scale=iw/6:ih/6"
     back = f"scale={W}:{H}:flags=lanczos"
@@ -167,9 +179,14 @@ def finish(W, H, vig_in, scale=1.0):
     # so that one multiplies in RGB.
     return (
         f"format=gbrp,"
-        f"split=2[cl_a][cl_b];[cl_b]{g}[cl_bl];"
-        f"[cl_a][cl_bl]blend=all_mode=normal:all_expr='A+0.16*(A-B)'[cl];"
-        f"[cl]format=gbrp16le,split=2[bl_a][bl_b];[bl_b]{small},{glow},{back},"
+        # Luma-only unsharp, replacing the old clarity. That was a blend with
+        # all_expr='A+k*(A-B)', and it put magenta fringes around every
+        # high-contrast edge: the source endframe peaks at +1 magenta, that
+        # filter took it to +233 over 1.1% of the frame. That was the pink
+        # outline around the bones. Unsharp with a zero chroma amount cannot
+        # touch colour at all, and measures +1.0 -- clean.
+        f"unsharp=5:5:0.35:5:5:0.0,"
+        f"format=gbrp16le,split=2[bl_a][bl_b];[bl_b]{small},{glow},{back},"
         f"curves=r='{thr}':g='{thr}':b='{thr}'[bl_g];"
         f"[bl_a][bl_g]blend=all_mode=normal:all_expr='A+0.22*(B-A*B/65535)'[li];"
         f"[{vig_in}]scale={W}:{H}:flags=lanczos,format=gbrp16le[vg];"
@@ -199,9 +216,19 @@ def seg_graph(key, W, H, scale):
     vig_in = "1:v"
 
     if s.get("still"):
-        move = still_move(s.get("move", "push"), W, H, n)
-        head = (f"[0:v]fps={FPS},format=yuv420p10le,{move},"
-                f"setsar=1,settb=1/{FPS}[cv]")
+        fg, bg = still_move(s.get("move", "push"), W, H, n)
+        # maskedmerge, not a blend with all_expr: this is the same filter
+        # family that produced the magenta fringes, so the composite goes
+        # through a mask input instead.
+        head = (
+            f"[0:v]fps={FPS},format=yuv420p10le,split=2[fg_in][bg_in];"
+            f"[fg_in]{fg},format=gbrp[fg];"
+            f"[bg_in]{bg},format=gbrp,gblur=sigma={5 * scale:.1f},"
+            f"eq=brightness=-0.05[bg];"
+            f"[2:v]scale={W}:{H}:flags=lanczos,format=gray[mk];"
+            f"[bg][fg][mk]maskedmerge,setsar=1,settb=1/{FPS}[cv]"
+        )
+        extra.append(os.path.join(PLATES, "parallax_mask.png"))
     else:
         cm = clip_move(s.get("move", "none"), W, H, n)
         pre = f"fps={FPS},trim={s['t0']}:{s['t1']:.3f},setpts=PTS-STARTPTS,"
