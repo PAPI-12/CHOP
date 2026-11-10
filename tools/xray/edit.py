@@ -8,9 +8,9 @@ movement, grain, a light vignette and clarity, none of which change
 colour relationships.
 
 The stills get camera moves so they are not dead frames: continuous
-dollies, quantised (stop-motion) pushes, snap-ins and drifts. Two of the
-clips carry speed ramps -- the cock decelerates into the mechanism, the
-back shot accelerates out of it.
+dollies, quantised (stop-motion) pushes, snap-ins and drifts. Three of
+the clips carry speed ramps -- the cock decelerates into the mechanism,
+the back shot accelerates out of it, the bullet eases down over the drop.
 
 Two passes, because a single filter graph with fourteen inputs gets
 OOM-killed on a 4 GB box: pass 1 renders each segment to a 10-bit
@@ -50,21 +50,25 @@ GRAIN = 7
 #   back shot      Back shot.mp4, ramped up, slow then fast
 #   soft box       Soft box shooting.mp4, the shot, then the lights go out
 #   black          the darkness
-#   bullet falls   Bullet falls.mp4, opens the dark scene
-#   sit down       6.mp4
-#   sit down       6.mp4
+#   bullet falls   Bullet falls.mp4, opens the dark scene, whole clip
+#   the tuck       6.mp4, 0.20-4.90 unbroken
+#   the settle     6.mp4
 #   end            extreme close up x-ray.png, held, becomes X-ray mode
 #
 # In/out points come from measured motion, not guesswork:
 #   Standing Up   motion climbs 4.9 -> 12.1 peaking at 2.75-3.12s, so 1.5-4.5
 #   Soft box      motion peaks 18.7 at 3.6-4.0s, luma 140 -> 1 by 5.0s
-#   6.mp4         motion decays 15.7 -> 2.0; the settle is at the end
 #   Cocking       a cut at 3.5s (motion 9.97 against a 0.5-1.2 baseline), the
 #                 action then builds from 5.5s and is still climbing at the
 #                 end -- so 5.5-8.75 is the usable half
 #   Back shot     only 3.2s; motion decays 5.7 -> 2.7 and luma 78 -> 48
-#   Bullet falls  luma bottoms at 10 near 3.0s and climbs to 63 by 4.6s, so
-#                 2.9-4.72 starts in the dark and reveals
+#   Bullet falls  tracking the small bright speck (frame minus a 19x19 mean)
+#                 puts the drop at 2.45-2.85: it sits near row 41, drops to
+#                 row 98 by 2.83, then holds there while luma bottoms at 10
+#                 around 3.0s and climbs to 63 by 4.6s. The whole clip is
+#                 used, 0.00-4.75, eased down over the drop
+#   6.mp4         action runs to ~5.7s then settles out by 7.7s; the tuck
+#                 is the 2.67-3.33 motion peak, so 0.20-4.90 is contiguous
 # ---------------------------------------------------------------------------
 SEG = {
     "mx":  dict(src="minimax.mp4", t0=0.00, t1=3.00, move="stepprint"),

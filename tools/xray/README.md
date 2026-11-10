@@ -5,8 +5,9 @@ poster. **32.19 s**, 1280×720, 24 fps, no audio.
 
 The sequence: it opens on a super close-up, the subject thinks and stands,
 draws, cocks the gun, we cut behind him, he shoots the light box, the room goes
-dark, a bullet falls through the darkness and the light comes back up on it. He holsters
-and settles back into the crouch, and the piece ends on a still in x-ray.
+dark, a bullet falls through the darkness and the light comes back up on it. He
+tucks the gun away — unhurried, nothing skipped — settles back into the crouch,
+and the piece ends on the lime x-ray still.
 
 **Original colour.** There is no grade anywhere in the chain — no curves, no
 gamma, no hue rotation, no saturation, no colour balance, no black and white.
@@ -35,7 +36,7 @@ between sessions, so run it first every time.**
 
 ## The cut
 
-Fourteen segments, cross-dissolved. Durations are output durations, so the two
+Twelve segments, cross-dissolved. Durations are output durations, so the
 ramped shots are not their source lengths.
 
 | key | source | in–out | out dur | notes |
@@ -44,7 +45,6 @@ ramped shots are not their source lengths.
 | `td`  | `topdown.png`             | still     | 1.80 | push |
 | `sn`  | `sneaker.webp`            | still     | 1.60 | push |
 | `su`  | `standingup.mp4`          | 1.50–4.50 | 3.00 | cut as he rises |
-| `cl`  | `closeup-white.png`       | still     | 1.80 | push |
 | `ck`  | `cocking.mp4`             | 5.50–8.75 | 2.89 | **ramp 1.9× → 0.8×** |
 | `bs`  | `backshot.mp4`            | 0.00–3.16 | 2.89 | **ramp 0.7× → 2.5×** |
 | `sb`  | `5.mp4`                   | 1.50–5.60 | 4.10 | the shot; lights go out |
@@ -59,7 +59,6 @@ quick probe in the notes below):
 
 - **Standing Up** — motion climbs 4.9 → 12.1 peaking at 2.75–3.12 s, so 1.5–4.5
 - **Soft box** — motion peaks 18.7 at 3.6–4.0 s, luma 140 → 1 by 5.0 s
-- **6.mp4** — motion decays 15.7 → 2.0; the settle is at the end
 - **Cocking** — a cut at 3.5 s (motion 9.97 against a 0.5–1.2 baseline); the
   action then builds from 5.5 s and is still climbing when the clip ends, so
   5.5–8.75 is the usable half
@@ -80,8 +79,8 @@ quick probe in the notes below):
 
 ## Speed ramps
 
-`ck`, `bs` and `bf` carry a `ramp=(r0, r1)` pair — playback rate at the head and tail
-of the clip. `ramp_pts()` turns that into a `setpts` expression.
+`ck`, `bs`, `bf` and `tk` carry a `ramp=(r0, r1)` pair — playback rate at the
+head and tail of the clip. `ramp_pts()` turns that into a `setpts` expression.
 
 Output time is **quadratic** in source time, which makes `1/rate` linear: the
 speed changes by the same amount every second instead of lurching. The obvious
@@ -168,7 +167,7 @@ footage from reading as plastic. Measured on the flat tiles: 4.4 at CRF 22,
 ## Delivery
 
 VP9 first, H.264 second. At equal quality VP9 holds the grain that x264
-discards, in about 40 % of the bytes: 4.0 MB against 10.3 MB. **Both are
+discards, in about 44 % of the bytes: 5.2 MB against 11.9 MB. **Both are
 encoded from the pass-1 intermediates** — encoding the webm from the finished
 mp4 inherits x264's losses and doubles the damage.
 
