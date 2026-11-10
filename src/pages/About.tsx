@@ -99,11 +99,11 @@ const About: React.FC = () => {
               takeover ? 'pointer-events-none transition-opacity duration-500 ease-out' : ''
             }`}
           >
-            {/* Six rows widening downward — THE, ARCHITECTURE, ART BUILT,
-                FROM THERE, SKELETON — so the block silhouettes a tree, with
-                the U+P lockup hanging below as the stem. SKELETON is the only
-                row that flaps, out of MADNESS; the film runs from the
-                player's own control. */}
+            {/* Six rows widening downward — THE, ARCHITECTURE, OF ART BUILT,
+                FROM THE, SKELETON — so the block silhouettes a tree, with the
+                U+P lockup hanging below as the stem. SKELETON is the only row
+                that flaps, out of MADNESS; the film runs from the player's
+                own control. */}
             <AboutHeroTitle layout="tree" palette="homepage" />
           </div>
         </div>

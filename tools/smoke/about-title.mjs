@@ -93,6 +93,11 @@ try {
   // ARCHITECTURE is plain type now; the only board is SKELETON, and it opens
   // on MADNESS.
   assert.equal(board('SKELETON'), 'MADNESS', 'beat 1: the board opens on MADNESS, not on the target');
+  // MADNESS must not be crushed into SKELETON's spacing. The M (0.92em) is
+  // wider than the S it will become (0.66em), so if the tile took only the
+  // target's width the glyph would overflow into the A beside it.
+  const tileW = (i) => doc.querySelectorAll('[aria-label="SKELETON"] .splitflap-tile')[i].style.width;
+  assert.equal(tileW(0), '0.92em', 'the M sets the first tile\'s width, not the S it becomes');
   const arch = [...doc.querySelectorAll('h1 span')].find((n) => n.textContent.trim() === 'ARCHITECTURE');
   assert.ok(arch, 'ARCHITECTURE is on the board');
   assert.equal(doc.querySelectorAll('[aria-label="ARCHITECTURE"]').length, 0,
@@ -106,7 +111,9 @@ try {
   assert.equal(pEl.textContent.trim(), 'P', '...and a P');
   assert.ok(/-ml-/.test(pEl.className), 'the P is pulled into the U');
   assert.ok(weave && /clip-path/.test(weave.className), 'a clipped U weaves back in front of the P');
-  assert.ok(/1\.3em/.test(uEl.className), 'the U is the bigger of the two');
+  // Same size: neither letter is scaled against the other any more.
+  const scale = (el) => /text-\[([\d.]+)em\]/.exec(el.className)?.[1] ?? '1';
+  assert.equal(scale(uEl), scale(pEl), 'the U and the P are the same size');
   assert.equal(doc.querySelectorAll('h1 button').length, 0, 'the headline carries no control — the film runs from the player');
   assert.equal(doc.querySelectorAll('h1 [aria-hidden].bg-\\[\\#d7ff4f\\]').length, 0,
     'no rule between the rows');
@@ -116,9 +123,12 @@ try {
   // row's width in em to get the rendered width.
   const W = { A:.72,B:.72,C:.72,D:.78,E:.62,F:.6,G:.78,H:.78,I:.32,J:.5,K:.72,L:.58,
     M:.92,N:.78,O:.82,P:.68,Q:.82,R:.72,S:.66,T:.62,U:.76,V:.72,W:.98,X:.68,Y:.66,Z:.62,' ':.34 };
-  const em = (t) => (t === 'UP'
-    ? W.U * 1.3 + W.P - 0.57                        // the woven lockup
-    : [...t].reduce((a, c) => a + (W[c] ?? 0.62), 0) - 0.04 * t.length);
+  const sum = (t) => [...t].reduce((a, c) => a + (W[c] ?? 0.62), 0);
+  const em = (t) => (t === 'SKELETON'
+    ? sum(t)                                        // the flap board carries no tracking
+    : t === 'UP'
+      ? W.U + W.P - 0.34                            // the woven lockup
+      : sum(t) - 0.04 * t.length);
   const tierOf = (el) => {
     const m = /text-\[clamp\([^,]+,([\d.]+)vw/.exec(el.className);
     return m ? parseFloat(m[1]) : NaN;
@@ -129,8 +139,8 @@ try {
   const rows = [
     ['THE', row('THE')],
     ['ARCHITECTURE', arch],
-    ['ART BUILT', row('ART BUILT')],
-    ['FROM THERE', row('FROM THERE')],
+    ['OF ART BUILT', row('OF ART BUILT')],
+    ['FROM THE', row('FROM THE')],
     // SKELETON is the flap board, so the size class sits on the board's own
     // root rather than on the row wrapper around it.
     ['SKELETON', doc.querySelector('[aria-label="SKELETON"]')],
@@ -150,9 +160,12 @@ try {
   assert.ok(upParent.compareDocumentPosition(row('SKELETON')) & 2, 'SKELETON precedes UP in the document');
 
   // Beat 2 — MAAAADNESSS flaps into ARCHITECTURE, and the board grows by one.
-  await wait(2300);
+  await wait(2900);
   assert.equal(board('SKELETON'), 'SKELETON', 'beat 2: MADNESS has flapped into SKELETON');
   assert.equal(tiles('SKELETON'), 'SKELETON'.length, 'the board grew to fit SKELETON');
+  // ...and the board closes back down, so the settled word is kerned to its
+  // own letters rather than carrying the wider M.
+  assert.equal(tileW(0), '0.66em', 'the tiles tighten to SKELETON once it has landed');
 
   // Beat 3 — no pull-back any more: both words hold their ground. The
   // display word carries the lime and the bottom copy stays bone and still.
@@ -164,7 +177,7 @@ try {
   assert.ok(/f5f3ee/.test(arch.className), 'ARCHITECTURE is bone');
   assert.ok(/d7ff4f/.test(arch.className) === false, 'ARCHITECTURE is not lime — lime is the closing word');
   const leadLines = [...doc.querySelectorAll('h1 span')].filter(
-    (n) => n.textContent.trim() === 'ART BUILT' || n.textContent.trim() === 'FROM THERE',
+    (n) => n.textContent.trim() === 'OF ART BUILT' || n.textContent.trim() === 'FROM THE',
   );
   assert.equal(leadLines.length, 2, 'the rest of the line is set as display lines, not a caption');
   const bottomLeft = leadLines[0];

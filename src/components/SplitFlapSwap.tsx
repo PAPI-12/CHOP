@@ -34,6 +34,23 @@ const FACE_CLASS = 'absolute inset-0 flex items-center justify-center transition
 const widthOf = (ch: string) => WIDTH[ch] ?? 0.62;
 const display = (ch: string) => (ch === ' ' ? '\u00A0' : ch);
 
+/**
+ * How wide a tile has to be while the opening word is on the board.
+ *
+ * A tile sized only for its target letter crushes the letter that is sitting
+ * in it beforehand: MADNESS in SKELETON's tiles puts an M (0.92em) into an
+ * S-width tile (0.66em), where the glyph overflows both sides and collides
+ * with the A beside it. So the tile takes the wider of the two letters that
+ * will occupy it, and closes back down to the target's width once the board
+ * has landed — see `tighten` below.
+ *
+ * Letters that exist only in the longer target get nothing yet: a tile of
+ * zero width holds the extra card closed until it is needed, which keeps the
+ * shorter opening word centred instead of shoved to one side.
+ */
+const tileWidth = (from: string | undefined, to: string) =>
+  from === undefined ? 0 : Math.max(widthOf(to), widthOf(from));
+
 type Props = {
   /** the word on the board before the flip */
   from: string;
@@ -68,6 +85,7 @@ const SplitFlapSwap: React.FC<Props> = ({
   onComplete,
 }) => {
   const tileRefs = useRef<Array<HTMLSpanElement | null>>([]);
+  const src = Array.from(from);
   const faceRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
@@ -90,6 +108,18 @@ const SplitFlapSwap: React.FC<Props> = ({
       });
     };
 
+    // Close every tile back down to the width its own letter needs. Left at
+    // the opening word's widths, the settled word would carry the wider
+    // letters' spacing — SKELETON would sit visibly tracked out.
+    const tighten = () => {
+      target.forEach((ch, i) => {
+        const tile = tiles[i];
+        if (!tile) return;
+        tile.style.transition = 'width 420ms cubic-bezier(0.4, 0, 0.2, 1)';
+        tile.style.width = `${widthOf(ch)}em`;
+      });
+    };
+
     // Not running yet: the board simply shows the opening word. Tiles that
     // only exist in the longer target stay empty, so a growing board reads as
     // new cards arriving rather than as a row of stray characters.
@@ -100,6 +130,7 @@ const SplitFlapSwap: React.FC<Props> = ({
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       settle(target);
+      tighten();
       onCompleteRef.current?.();
       return;
     }
@@ -160,6 +191,7 @@ const SplitFlapSwap: React.FC<Props> = ({
         if (!finished) {
           finished = true;
           settle(target);
+          tighten();
           onCompleteRef.current?.();
         }
         return;
@@ -172,7 +204,10 @@ const SplitFlapSwap: React.FC<Props> = ({
     return () => {
       cancelAnimationFrame(raf);
       // Leaving mid-flight must never strand a scrambled glyph on screen.
-      if (!finished) settle(target);
+      if (!finished) {
+        settle(target);
+        tighten();
+      }
     };
   }, [run, from, to, step, interval, steps, startDelay, settledClassName, flippingClassName]);
 
@@ -184,7 +219,7 @@ const SplitFlapSwap: React.FC<Props> = ({
           ref={(el) => { tileRefs.current[i] = el; }}
           data-flipping="false"
           className="splitflap-tile splitflap-hero relative inline-block align-baseline"
-          style={{ width: `${widthOf(t)}em` }}
+          style={{ width: `${tileWidth(src[i], t)}em` }}
         >
           <span aria-hidden className="invisible select-none">
             {display(t)}
@@ -194,7 +229,7 @@ const SplitFlapSwap: React.FC<Props> = ({
             data-face="true"
             className={`${FACE_CLASS} ${settledClassName}`}
           >
-            {display(Array.from(from)[i] ?? '')}
+            {display(src[i] ?? '')}
           </span>
         </span>
       ))}
