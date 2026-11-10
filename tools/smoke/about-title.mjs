@@ -91,12 +91,18 @@ try {
   await wait(250);
 
   assert.equal(board('ARCHITECTURE'), 'MAAAADNESSS', 'beat 1: the board opens on MAAAADNESSS, not on the target');
-  // The closing line is set, not flapped, and ends in the U+P lockup.
-  const closing = [...doc.querySelectorAll('h1 span')].find((n) => /^SKELETON/.test(n.textContent.trim()));
-  assert.ok(closing, 'the closing line reads SKELETON …');
-  assert.ok(closing.querySelector('[aria-label="UP"]'), 'the line ends in the U+P lockup');
-  assert.equal(closing.querySelector('[aria-label="UP"]').textContent.replace(/\s/g, ''), 'UP', 'the lockup is built from U and P');
+  // The closing pair is set, not flapped: SKELETON over the U+P lockup.
+  const closing = [...doc.querySelectorAll('h1 span')].find((n) => n.textContent.trim() === 'SKELETON');
+  assert.ok(closing, 'the closing pair opens on SKELETON');
+  const upLock = doc.querySelector('[aria-label="UP"]');
+  assert.ok(upLock, 'the closing pair ends in the U+P lockup');
+  assert.equal(upLock.textContent.replace(/\s/g, ''), 'UP', 'the lockup is built from U and P');
+  // The U and P must actually overlap, or it is not a lockup.
+  const [uEl, pEl] = upLock.children;
+  assert.ok(/-ml-/.test(pEl.className), 'the P is pulled into the U');
   assert.equal(doc.querySelectorAll('h1 button').length, 0, 'the headline carries no control — the film runs from the player');
+  const rule = doc.querySelector('h1 [aria-hidden].bg-\\[\\#d7ff4f\\]');
+  assert.ok(rule, 'the hairline between the display word and the rest is drawn');
 
   // Beat 2 — MAAAADNESSS flaps into ARCHITECTURE, and the board grows by one.
   await wait(2300);
@@ -122,7 +128,7 @@ try {
     'only the display word is a split-flap board — the closing line is plain type');
   assert.ok(!/blur/.test(bottomLeft.getAttribute('style') || ''), 'the bottom copy does not recede — the pull-back beat is gone');
 
-  console.log('PASS  the display word flaps to ARCHITECTURE and the closing line ends in the U+P lockup');
+  console.log('PASS  the hero is set after the sketch: flap, hairline, closing pair with the U+P lockup');
 
   // ── the takeover on the real page ─────────────────────────────────────
   window.titleTest.mountPage();

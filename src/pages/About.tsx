@@ -99,10 +99,11 @@ const About: React.FC = () => {
               takeover ? 'pointer-events-none transition-opacity duration-500 ease-out' : ''
             }`}
           >
-            {/* MAAAADNESSS flaps to ARCHITECTURE; the closing line is set,
-                not flapped, and ends in a U+P lockup. The film is run from
-                the player's own control. */}
-            <AboutHeroTitle layout="stack" palette="homepage" />
+            {/* Set from the sketch: five rows and a hairline, stacked and
+                centred, spanning about 65% of the frame. MAAAADNESSS flaps
+                to ARCHITECTURE; the rest is set, and the closing pair ends
+                in a U+P lockup. The film runs from the player's control. */}
+            <AboutHeroTitle layout="sketch" palette="homepage" />
           </div>
         </div>
       </section>
