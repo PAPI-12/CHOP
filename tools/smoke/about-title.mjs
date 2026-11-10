@@ -108,12 +108,17 @@ try {
 
   // Beat 3 — no pull-back any more: both words hold their ground. The
   // display word carries the lime and the bottom copy stays bone and still.
-  // The colour sits on the tile faces, not on the flap's root span.
+  // The colour sits on the tile faces, not on the flap's root span. The
+  // hierarchy is the homepage hero's, read top to bottom: display word bone,
+  // lead tan, closing word lime.
   const bigFace = doc.querySelector('[aria-label="ARCHITECTURE"] [data-face]');
-  assert.ok(/d7ff4f/.test(bigFace.className), 'beat 3: the display word carries the lime');
+  assert.ok(/f5f3ee/.test(bigFace.className), 'beat 3: the display word is bone');
+  assert.ok(/d7ff4f/.test(bigFace.className) === false, 'the display word is not lime — lime is the closing word');
   const bottomLeft = [...doc.querySelectorAll('h1 span')].find((n) => n.textContent.trim() === 'OF ART BUILT FROM THE');
   assert.ok(bottomLeft, 'the rest of the line sits bottom-left');
-  assert.ok(/f5f3ee/.test(bottomLeft.className), 'the bottom copy is bone, not lime');
+  assert.ok(/d7c4aa/.test(bottomLeft.className), 'the lead is tan');
+  const tailFace = () => doc.querySelector('[aria-label="UNLOCK SKELETON"] [data-face]');
+  assert.ok(/d7ff4f/.test(tailFace().className), 'the closing word is lime');
   assert.ok(!/blur/.test(bottomLeft.getAttribute('style') || ''), 'the bottom copy does not recede — the pull-back beat is gone');
 
   // Beat 4 — SKELETON UP flaps into UNLOCK SKELETON (11 -> 15 tiles).

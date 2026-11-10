@@ -14,8 +14,8 @@ import XrayHero, { type XrayHeroHandle, type Phase } from '../components/XrayHer
  * photograph it replaced was; pressing the control runs the sequence in colour
  * and it settles on its closing x-ray frame. The hero carries nothing but the
  * photograph, the headline and the site's nav, so it reads as the same page as
- * the homepage hero; legibility comes from a shadow on the copy itself rather
- * than a plate behind it.
+ * the homepage hero. No scrim and no drop shadow: the type sits straight on
+ * the plate.
  */
 const About: React.FC = () => {
   const heroRef = useRef<HTMLElement>(null);
@@ -95,7 +95,7 @@ const About: React.FC = () => {
         <div className="relative z-10 h-full px-4 sm:px-6 lg:px-12 xl:px-24">
           <div
             ref={heroCopyRef}
-            className={`h-full pt-[16svh] pb-10 md:pb-12 max-w-[1600px] mx-auto will-change-[opacity,transform] [filter:drop-shadow(0_2px_12px_rgba(0,0,0,0.8))_drop-shadow(0_1px_2px_rgba(0,0,0,0.9))] ${
+            className={`h-full pt-[16svh] pb-10 md:pb-12 max-w-[1600px] mx-auto will-change-[opacity,transform] ${
               takeover ? 'pointer-events-none transition-opacity duration-500 ease-out' : ''
             }`}
           >
@@ -105,6 +105,8 @@ const About: React.FC = () => {
             <AboutHeroTitle
               onUnlock={() => xrayRef.current?.engage()}
               suppressed={takeover}
+              layout="centred"
+              palette="homepage"
             />
           </div>
         </div>
