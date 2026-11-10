@@ -191,6 +191,7 @@ const SplitFlapSwap: React.FC<Props> = ({
           </span>
           <span
             ref={(el) => { faceRefs.current[i] = el; }}
+            data-face="true"
             className={`${FACE_CLASS} ${settledClassName}`}
           >
             {display(Array.from(from)[i] ?? '')}
