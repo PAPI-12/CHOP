@@ -8,9 +8,11 @@ movement, grain, a light vignette and clarity, none of which change
 colour relationships.
 
 The stills get camera moves so they are not dead frames: continuous
-dollies, quantised (stop-motion) pushes, snap-ins and drifts.
+dollies, quantised (stop-motion) pushes, snap-ins and drifts. Two of the
+clips carry speed ramps -- the cock decelerates into the mechanism, the
+back shot accelerates out of it.
 
-Two passes, because a single filter graph with eleven inputs gets
+Two passes, because a single filter graph with fourteen inputs gets
 OOM-killed on a 4 GB box: pass 1 renders each segment to a 10-bit
 intermediate, pass 2 assembles and applies the shared film pass.
 
@@ -45,9 +47,11 @@ GRAIN = 7
 #   sneaker        a_Sneaker_detail_shot
 #   standing up    Standing Up.mp4, cut as he rises
 #   close up left  extreme close up left.png
-#   gun cutaway    Extreme close up gun cutaway.png, as he loads
+#   cocking        Cocking.mp4, ramped down into the mechanism
+#   back shot      Back shot.mp4, ramped up, slow then fast
 #   soft box       Soft box shooting.mp4, the shot, then the lights go out
 #   black          the darkness
+#   bullet falls   Bullet falls.mp4, opens the dark scene
 #   shoes x-ray    Extreme close shoes x-ray.png
 #   sit down       6.mp4
 #   end            extreme close up x-ray.png, held, becomes X-ray mode
@@ -56,6 +60,12 @@ GRAIN = 7
 #   Standing Up   motion climbs 4.9 -> 12.1 peaking at 2.75-3.12s, so 1.5-4.5
 #   Soft box      motion peaks 18.7 at 3.6-4.0s, luma 140 -> 1 by 5.0s
 #   6.mp4         motion decays 15.7 -> 2.0; the settle is at the end
+#   Cocking       a cut at 3.5s (motion 9.97 against a 0.5-1.2 baseline), the
+#                 action then builds from 5.5s and is still climbing at the
+#                 end -- so 5.5-8.75 is the usable half
+#   Back shot     only 3.2s; motion decays 5.7 -> 2.7 and luma 78 -> 48
+#   Bullet falls  luma bottoms at 10 near 3.0s and climbs to 63 by 4.6s, so
+#                 2.9-4.72 starts in the dark and reveals
 # ---------------------------------------------------------------------------
 SEG = {
     "mx":  dict(src="minimax.mp4", t0=0.00, t1=3.00, move="stepprint"),
@@ -63,9 +73,18 @@ SEG = {
     "sn":  dict(src="sneaker.webp", still=True, dur=1.60, move="drift"),
     "su":  dict(src="standingup.mp4", t0=1.50, t1=4.50, move="none"),
     "cl":  dict(src="closeup-white.png", still=True, dur=1.80, move="pull"),
-    "gc":  dict(src="hand-goldband.png", still=True, dur=2.00, move="lift"),
+    # The cock. Ramped 1.9x down to 0.8x: it arrives at speed and
+    # decelerates into the mechanism, so the slide going back is legible
+    # rather than a blur. The back shot after it ramps the other way, which
+    # gives the pair a breath-in / breath-out instead of two identical lurches.
+    "ck":  dict(src="cocking.mp4", t0=5.50, t1=8.75, move="none", ramp=(1.9, 0.8)),
+    # From behind, slow at first then fast at the end, as asked.
+    "bs":  dict(src="backshot.mp4", t0=0.00, t1=3.16, move="none", ramp=(0.7, 2.5)),
     "sb":  dict(src="5.mp4", t0=1.50, t1=5.60, move="none"),
     "blk": dict(black=True, dur=0.50),
+    # The dark scene opens on the bullet: starts near black and reveals,
+    # which is the hand-off into the x-ray.
+    "bf":  dict(src="bulletfalls.mp4", t0=2.90, t1=4.72, move="none"),
     "gx":  dict(src="groundlevel-xray.png", still=True, dur=1.80, move="push"),
     # The holster. Measured: over 6.mp4 0.2-2.1s the right-hand waist band
     # runs 9.6 -> 25.8 while the left sits at 0.2-2.8 and the upper body
@@ -77,18 +96,48 @@ SEG = {
     "en":  dict(src="endframe-macro-xray.png", still=True, dur=2.60, move="creep"),
 }
 
-ORDER = ["mx", "td", "sn", "su", "cl", "gc", "sb", "blk", "gx", "tk", "s6", "en"]
+ORDER = ["mx", "td", "sn", "su", "cl", "ck", "bs", "sb", "blk", "bf",
+         "gx", "tk", "s6", "en"]
 
-# Dissolve into each key. The gun cutaway is a hard cut -- it is the load, an
-# action beat, and a dissolve there softens the one moment that should snap.
-XF = {"td": 0.30, "sn": 0.30, "su": 0.35, "cl": 0.30, "gc": 0.08,
-      "sb": 0.35, "blk": 0.30, "gx": 0.35, "tk": 0.30, "s6": 0.30,
-      "en": 0.55}
+# Dissolve into each key. The cock is a hard cut -- it is the load, an action
+# beat, and a dissolve there softens the one moment that should snap.
+XF = {"td": 0.30, "sn": 0.30, "su": 0.35, "cl": 0.30, "ck": 0.08,
+      "bs": 0.30, "sb": 0.35, "blk": 0.30, "bf": 0.30, "gx": 0.35,
+      "tk": 0.30, "s6": 0.30, "en": 0.55}
+
+
+def ramp_pts(t0, t1, r0, r1):
+    """setpts expression for a constant-acceleration speed ramp.
+
+    The rate runs at r0 where the clip is cut in and r1 where it leaves, so
+    output time is quadratic in source time -- which makes 1/rate linear,
+    meaning the speed changes by the same amount every second rather than
+    lurching. Doing it linearly in the rate instead needs a log and produces
+    a visible knee at the head of the clip.
+
+    PTS arrives in timebase units: convert to seconds, apply, convert back.
+    Safe because fps= has already run, so TB is 1/FPS by this point.
+
+    No pow(x,2): a comma separates filters in a filtergraph, so pow() would
+    end the setpts filter halfway through the expression.
+    """
+    d = t1 - t0
+    a = 1.0 / r0
+    b = (1.0 / r1 - 1.0 / r0) / (2.0 * d)
+    src = "((PTS-STARTPTS)*TB)"
+    return f"({a:.6f}*{src}+{b:.8f}*{src}*{src})/TB"
 
 
 def dur_of(key):
     s = SEG[key]
-    return s["dur"] if ("still" in s or "black" in s) else s["t1"] - s["t0"]
+    if "still" in s or "black" in s:
+        return s["dur"]
+    if "ramp" in s:
+        # Output time is the average of the two reciprocal rates, so a ramp
+        # from 0.7x to 2.5x does not simply run for the source duration.
+        r0, r1 = s["ramp"]
+        return (s["t1"] - s["t0"]) * (1.0 / r0 + 1.0 / r1) / 2.0
+    return s["t1"] - s["t0"]
 
 
 # ---------------------------------------------------------------------------
@@ -231,7 +280,12 @@ def seg_graph(key, W, H, scale):
         extra.append(os.path.join(PLATES, "parallax_mask.png"))
     else:
         cm = clip_move(s.get("move", "none"), W, H, n)
-        pre = f"fps={FPS},trim={s['t0']}:{s['t1']:.3f},setpts=PTS-STARTPTS,"
+        pre = f"fps={FPS},trim={s['t0']}:{s['t1']:.3f},"
+        if "ramp" in s:
+            r0, r1 = s["ramp"]
+            pre += f"setpts={ramp_pts(s['t0'], s['t1'], r0, r1)},"
+        else:
+            pre += "setpts=PTS-STARTPTS,"
         head = (f"[0:v]{pre}format=yuv420p10le,{cm},"
                 f"{flat_canvas(0, 0, W, H)},setsar=1,settb=1/{FPS}[cv]")
 
