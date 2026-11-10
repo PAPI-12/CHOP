@@ -22,12 +22,19 @@ const SRC_MP4 = '/videos/about-hero-xray.mp4';
 // with, so the idle state is the wide plate instead.
 const SRC_HERO = '/images/about-hero-idle.webp';
 
-export type Phase = 'idle' | 'loading' | 'playing' | 'ended';
+export type Phase = 'idle' | 'launching' | 'loading' | 'playing' | 'ended';
+
+// How long the title takes to arm its rockets and clear the frame. The film
+// does not start until then — it plays into an empty hero, and the type comes
+// back down on top of the closing frame. See AboutHeroTitle: 380ms of hold
+// plus a 620ms flight.
+const LAUNCH_MS = 1000;
 
 const LABEL: Record<Phase, string> = {
-  idle: 'X-ray mode',
+  idle: 'Launch Madness',
+  launching: 'Launching',
   loading: 'Warming up',
-  playing: 'X-ray live',
+  playing: 'Madness live',
   ended: 'Run it again',
 };
 
@@ -46,6 +53,7 @@ const XrayHero = forwardRef<XrayHeroHandle, XrayHeroProps>(function XrayHero(
   const videoRef = useRef<HTMLVideoElement>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [progress, setProgress] = useState(0);
+  const launchTimer = useRef<number | undefined>(undefined);
 
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
@@ -80,19 +88,31 @@ const XrayHero = forwardRef<XrayHeroHandle, XrayHeroProps>(function XrayHero(
     };
   }, []);
 
+  // Pressing the control launches the headline first: the U and P grow
+  // rocket noses, MADNESS flaps into SKELETON, and the whole block
+  // accelerates out of frame. Only once it has cleared does the film roll.
   const engage = useCallback(async () => {
     const v = videoRef.current;
-    if (!v || phase === 'playing') return;
+    if (!v || phase === 'playing' || phase === 'launching') return;
     if (phase === 'ended') v.currentTime = 0;
-    setPhase('loading');
-    try {
-      await v.play();
-    } catch {
-      // Autoplay refused or the source is unavailable — fall back to the
-      // still rather than leaving a dead control on the page.
-      setPhase('idle');
-    }
+    setPhase('launching');
+    launchTimer.current = window.setTimeout(async () => {
+      const el = videoRef.current;
+      if (!el) return;
+      setPhase('loading');
+      try {
+        await el.play();
+      } catch {
+        // Autoplay refused or the source is unavailable — fall back to the
+        // still rather than leaving a dead control on the page.
+        setPhase('idle');
+      }
+    }, LAUNCH_MS);
   }, [phase]);
+
+  useEffect(() => () => {
+    if (launchTimer.current !== undefined) window.clearTimeout(launchTimer.current);
+  }, []);
 
   useImperativeHandle(ref, () => ({ engage }), [engage]);
 
@@ -109,7 +129,7 @@ const XrayHero = forwardRef<XrayHeroHandle, XrayHeroProps>(function XrayHero(
         height={720}
         aria-hidden
         className={`absolute inset-0 h-full w-full object-cover grayscale contrast-[1.04] brightness-[0.95] transition-opacity duration-700 ${
-          phase === 'idle' ? 'opacity-100' : 'opacity-0'
+          phase === 'idle' || phase === 'launching' ? 'opacity-100' : 'opacity-0'
         } ${className}`}
       />
 
@@ -150,7 +170,7 @@ const XrayHero = forwardRef<XrayHeroHandle, XrayHeroProps>(function XrayHero(
             aria-hidden
             className={`h-1.5 w-1.5 shrink-0 rounded-full bg-[#d7ff4f] group-hover:bg-[#000000] ${
               phase === 'playing' ? 'animate-pulse' : ''
-            } ${phase === 'loading' ? 'opacity-40' : ''}`}
+            } ${phase === 'launching' || phase === 'loading' ? 'opacity-40' : ''}`}
           />
           {LABEL[phase]}
         </button>

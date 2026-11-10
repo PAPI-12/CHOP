@@ -1,5 +1,5 @@
 /**
- * Exercise the About hero title sequence and the takeover that goes with it.
+ * Exercise the About hero title and the launch that goes with it.
  *
  * `tsc` and `vite build` cannot see any of this: the sequence is a chain of
  * timers and rAF callbacks that only resolves at runtime, and the takeover
@@ -160,12 +160,12 @@ try {
   assert.ok(upParent.compareDocumentPosition(row('SKELETON')) & 2, 'SKELETON precedes UP in the document');
 
   // Beat 2 — MAAAADNESSS flaps into ARCHITECTURE, and the board grows by one.
-  await wait(2900);
-  assert.equal(board('SKELETON'), 'SKELETON', 'beat 2: MADNESS has flapped into SKELETON');
-  assert.equal(tiles('SKELETON'), 'SKELETON'.length, 'the board grew to fit SKELETON');
-  // ...and the board closes back down, so the settled word is kerned to its
-  // own letters rather than carrying the wider M.
-  assert.equal(tileW(0), '0.66em', 'the tiles tighten to SKELETON once it has landed');
+  // The flap is no longer on a timer. MADNESS is what the page says, and it
+  // says it until the visitor launches — the flip is exercised on the real
+  // page below, where the launch is what drives it.
+  await wait(1400);
+  assert.equal(board('SKELETON'), 'MADNESS', 'MADNESS holds — nothing flaps until the launch');
+  assert.equal(tiles('SKELETON'), 'SKELETON'.length, 'the board is cut to SKELETON from the start');
 
   // Beat 3 — no pull-back any more: both words hold their ground. The
   // display word carries the lime and the bottom copy stays bone and still.
@@ -188,30 +188,49 @@ try {
 
   console.log('PASS  the tree: six rows widening downward, UP the stem, no rule');
 
-  // ── the takeover on the real page ─────────────────────────────────────
+  // ── the launch, on the real page ──────────────────────────────────────
   window.titleTest.mountPage();
   await wait(2400);
-  const unlock = [...doc.querySelectorAll('button')].find((b) => /X-ray mode/i.test(b.textContent || ''));
-  assert.ok(unlock, 'the player exposes its own control');
+  const unlock = [...doc.querySelectorAll('button')].find((b) => /Launch Madness/i.test(b.textContent || ''));
+  assert.ok(unlock, 'the player control reads Launch Madness');
   assert.ok(doc.querySelector('[aria-label="UP"]'), 'the shipped hero ends in the U+P lockup');
 
   const copy = doc.querySelector('.will-change-\\[opacity\\,transform\\]');
   assert.ok(parseFloat(copy.style.opacity) > 0.5, 'the hero copy is up before the film runs');
+  // The page opens on madness and stays there.
+  assert.equal(board('SKELETON'), 'MADNESS', 'the hero opens on MADNESS, before any split flap');
 
   plays.length = 0;
   unlock.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-  await wait(200);
+  await wait(300);
+  // The rockets arm the instant it is launched, and the block starts out.
+  const lockup = () => doc.querySelector('[aria-label="UP"]');
+  assert.equal(lockup().dataset.rocket, 'true', 'the U and P become rockets on launch');
+  assert.equal(lockup().querySelectorAll('[data-nose="true"]').length, 2,
+    'an arrow off the U and one off the P');
+  const h1 = () => doc.querySelector('h1');
+  assert.equal(h1().dataset.launched, 'true', 'the title launches');
+  // Nothing rolls until the type has cleared the frame.
+  assert.equal(plays.length, 0, 'the film waits for the title to clear');
+
+  await wait(1700);
   const video = doc.querySelector('video');
   assert.ok(video, 'the page carries the sequence player');
-  assert.equal(plays.length, 1, 'clicking UNLOCK SKELETON calls play() on the sequence');
+  assert.equal(plays.length, 1, 'once the title has cleared, play() runs the sequence');
+  assert.equal(board('SKELETON'), 'SKELETON', 'MADNESS flapped into SKELETON during the launch');
+  assert.equal(tileW(0), '0.66em', 'the tiles tighten to SKELETON once it has landed');
 
   video.dispatchEvent(new window.Event('playing'));
   await wait(200);
   assert.ok(parseFloat(copy.style.opacity) < 0.05, 'the film takes the hero over: the copy clears while it runs');
 
   video.dispatchEvent(new window.Event('ended'));
-  await wait(200);
+  await wait(400);
   assert.ok(parseFloat(copy.style.opacity) > 0.5, 'the furniture comes back when the film ends');
+  // ...and it comes back reading SKELETON, with the rockets stood down.
+  assert.equal(h1().dataset.launched, 'false', 'the title returns once the film ends');
+  assert.equal(lockup().dataset.rocket, 'false', 'the U and P go back to being letters');
+  assert.equal(board('SKELETON'), 'SKELETON', 'the title comes back as SKELETON');
 
   // The hero was stripped back to match the homepage: only the nav is
   // constant, everything else that was About-only decoration is gone.
@@ -221,7 +240,7 @@ try {
     assert.ok(!heroText.includes(gone), `the hero no longer carries "${gone}"`);
   }
   assert.ok(!/\+/.test(heroText.replace(/\s/g, '')), 'the corner registrations are gone');
-  console.log('PASS  the player control runs the film, the hero copy clears for the takeover, and returns on ended');
+  console.log('PASS  Launch Madness arms the rockets, flips to SKELETON, clears the frame, then runs the film');
   console.log('PASS  the hero is stripped back to the photograph, the headline and the nav');
 } finally {
   assert.deepEqual(errors, [], 'no runtime errors or warnings: ' + errors.join(' | '));

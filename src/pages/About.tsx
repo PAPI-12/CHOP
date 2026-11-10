@@ -28,6 +28,11 @@ const About: React.FC = () => {
   // — so it is driven from the player's own phase rather than left to chance.
   const [xrayPhase, setXrayPhase] = useState<Phase>('idle');
   const takeover = xrayPhase === 'loading' || xrayPhase === 'playing';
+  // The headline is launched from the moment the control is pressed until the
+  // film ends: it arms its rockets and clears the frame, and comes back down
+  // afterwards. The 'launching' beat is not a takeover — the title is still
+  // on screen, flying out under its own animation.
+  const launched = xrayPhase === 'launching' || takeover;
   const takeoverRef = useRef(takeover);
   takeoverRef.current = takeover;
 
@@ -101,10 +106,11 @@ const About: React.FC = () => {
           >
             {/* Six rows widening downward — THE, ARCHITECTURE, OF ART BUILT,
                 FROM THE, SKELETON — so the block silhouettes a tree, with the
-                U+P lockup hanging below as the stem. SKELETON is the only row
-                that flaps, out of MADNESS; the film runs from the player's
-                own control. */}
-            <AboutHeroTitle layout="tree" palette="homepage" />
+                U+P lockup hanging below as the stem. It opens on MADNESS and
+                stays there: pressing Launch Madness turns the U and P into
+                rockets, flaps MADNESS into SKELETON, and sends the whole
+                block out of frame before the film runs. */}
+            <AboutHeroTitle layout="tree" palette="homepage" launched={launched} />
           </div>
         </div>
       </section>
