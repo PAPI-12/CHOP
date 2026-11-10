@@ -46,7 +46,6 @@ GRAIN = 7
 #   top view       topdown.png
 #   sneaker        a_Sneaker_detail_shot
 #   standing up    Standing Up.mp4, cut as he rises
-#   close up left  extreme close up left.png
 #   cocking        Cocking.mp4, ramped down into the mechanism
 #   back shot      Back shot.mp4, ramped up, slow then fast
 #   soft box       Soft box shooting.mp4, the shot, then the lights go out
@@ -72,7 +71,6 @@ SEG = {
     "td":  dict(src="topdown.png", still=True, dur=1.80, move="push"),
     "sn":  dict(src="sneaker.webp", still=True, dur=1.60, move="drift"),
     "su":  dict(src="standingup.mp4", t0=1.50, t1=4.50, move="none"),
-    "cl":  dict(src="closeup-white.png", still=True, dur=1.80, move="pull"),
     # The cock. Ramped 1.9x down to 0.8x: it arrives at speed and
     # decelerates into the mechanism, so the slide going back is legible
     # rather than a blur. The back shot after it ramps the other way, which
@@ -82,30 +80,34 @@ SEG = {
     "bs":  dict(src="backshot.mp4", t0=0.00, t1=3.16, move="none", ramp=(0.7, 2.5)),
     "sb":  dict(src="5.mp4", t0=1.50, t1=5.60, move="none"),
     "blk": dict(black=True, dur=0.50),
-    # The dark scene opens on the bullet dropping. Ramped 0.42x at the head
-    # up to 1.9x: the drop is only ~9 source frames, so at real speed it is a
-    # blink and you see the casing already at rest. Slowing the head stretches
-    # the fall to ~0.75s on screen and lets the reveal afterwards quicken.
-    "bf":  dict(src="bulletfalls.mp4", t0=2.38, t1=4.72, move="none",
-                ramp=(0.42, 1.9)),
-    # The holster. Measured: over 6.mp4 0.2-2.1s the right-hand waist band
-    # runs 9.6 -> 25.8 while the left sits at 0.2-2.8 and the upper body
-    # stays near 8-10. That is a one-handed action at the hip with the rest
-    # of the frame comparatively still, which is a holster, and it was in
-    # the part of 6.mp4 that used to be trimmed off.
-    "tk":  dict(src="6.mp4", t0=0.20, t1=2.10, move="none"),
+    # The whole clip, start to finish, as asked. Ramped 1.2x -> 0.75x: brisk
+    # through the setup and the muzzle flash, easing down through the drop
+    # and the dark. The casing falls at source 2.45-2.85, which is 52-60%
+    # along, by which point it is running at ~0.86x -- the fall gets 0.45s
+    # of screen time instead of 0.33s at a flat rate, without the setup
+    # dragging. Verified on the master: speck holds row 31 to 2.50s, is at
+    # row 98 by 2.83s, frame bottoms at luma 9 at 3.00s.
+    "bf":  dict(src="bulletfalls.mp4", t0=0.00, t1=4.75, move="none",
+                ramp=(1.2, 0.75)),
+    # The tuck. This used to cover 0.20-2.10 and then jump straight to
+    # 4.90, which skipped 2.67-3.33 -- the busiest stretch in the whole
+    # clip (motion 13.7-14.3 against a 7-10 baseline). That skip was the
+    # gun disappearing rather than being put away. It now runs 0.20-4.90
+    # unbroken and ramps 0.8x -> 1.05x, so it starts unhurried and only
+    # picks up once he has settled into it.
+    "tk":  dict(src="6.mp4", t0=0.20, t1=4.90, move="none", ramp=(0.8, 1.05)),
     "s6":  dict(src="6.mp4", t0=4.90, t1=7.70, move="settle"),
     "en":  dict(src="endframe-macro-xray.png", still=True, dur=2.60, move="creep"),
 }
 
-ORDER = ["mx", "td", "sn", "su", "cl", "ck", "bs", "sb", "blk", "bf",
+ORDER = ["mx", "td", "sn", "su", "ck", "bs", "sb", "blk", "bf",
          "tk", "s6", "en"]
 
 # Dissolve into each key. The cock is a hard cut -- it is the load, an action
 # beat, and a dissolve there softens the one moment that should snap.
 # The bullet dissolve is short at 0.18s: at 0.30s a third of the drop played
 # out under the fade from black, which is the one thing that has to be legible.
-XF = {"td": 0.30, "sn": 0.30, "su": 0.35, "cl": 0.30, "ck": 0.08,
+XF = {"td": 0.30, "sn": 0.30, "su": 0.35, "ck": 0.08,
       "bs": 0.30, "sb": 0.35, "blk": 0.30, "bf": 0.18,
       "tk": 0.30, "s6": 0.30, "en": 0.55}
 
@@ -273,12 +275,18 @@ def seg_graph(key, W, H, scale):
         # maskedmerge, not a blend with all_expr: this is the same filter
         # family that produced the magenta fringes, so the composite goes
         # through a mask input instead.
+        #
+        # The mask MUST be three-plane. maskedmerge takes its plane count
+        # from the mask, so a format=gray mask made it write plane 0's
+        # result into G and B as well -- every still rendered greyscale.
+        # Measured on the end frame: gray mask sat 0.0%, gbrp mask 28.7%
+        # against a source of 25.9%. This is why the bones looked grey.
         head = (
             f"[0:v]fps={FPS},format=yuv420p10le,split=2[fg_in][bg_in];"
             f"[fg_in]{fg},format=gbrp[fg];"
             f"[bg_in]{bg},format=gbrp,gblur=sigma={5 * scale:.1f},"
             f"eq=brightness=-0.05[bg];"
-            f"[2:v]scale={W}:{H}:flags=lanczos,format=gray[mk];"
+            f"[2:v]scale={W}:{H}:flags=lanczos,format=gbrp[mk];"
             f"[bg][fg][mk]maskedmerge,setsar=1,settb=1/{FPS}[cv]"
         )
         extra.append(os.path.join(PLATES, "parallax_mask.png"))

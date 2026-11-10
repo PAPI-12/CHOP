@@ -5,9 +5,18 @@
  * timers and rAF callbacks that only resolves at runtime, and the takeover
  * depends on the player's own phase reaching the page. This mounts the real
  * components, lets the sequence actually run against the clock, and asserts
- * what is on the board at each beat — including that the board grows, since
- * MADNESS (7) becomes SKELETON (8) and a fixed-width flip would silently drop
- * the tail.
+ * what is on the board at each beat.
+ *
+ * The beats, in order:
+ *
+ *   1. the page opens on the new line — ARCHITECTURE / OF ART BUILT FROM THE
+ *      / MADNESS / UP — as plain type. No split-flap board exists yet, and
+ *      there is no THE row
+ *   2. launching locks the U and P and arms the rockets, and the film waits
+ *      for the block to clear the frame
+ *   3. when the film ends the block comes back down carrying X's
+ *   4. the X's land and split-flap into the line — the first time SKELETON
+ *      is ever written — and the U and P come apart again
  */
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
@@ -73,182 +82,157 @@ window.eval(bundle);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const doc = window.document;
 
-/** what the board is actually showing, tile by tile */
+/** what a board is actually showing, tile by tile */
 const board = (word) => {
   const flap = doc.querySelector(`[aria-label="${word}"]`);
   // Faces render a non-breaking space, which String#trim would strip and
   // which would silently collapse 'SKELETON UP' into 'SKELETONUP'.
   return flap
-    ? [...flap.querySelectorAll('[data-face]')].map((s) => (s.textContent || '').replace(/\u00A0/g, ' ')).join('')
+    ? [...flap.querySelectorAll('[data-face]')].map((s) => (s.textContent || '').replace(/ /g, ' ')).join('')
     : null;
 };
-const tiles = (word) => doc.querySelectorAll(`[aria-label="${word}"] [data-face]`).length;
+
+// Advance widths in em for Inter Black uppercase, the same table the
+// component's tiles are cut from. jsdom resolves no Tailwind stylesheet, so
+// the vw figure is read off the class and multiplied by the row's width in
+// em to get the rendered width.
+const W = { A:.72,B:.72,C:.72,D:.78,E:.62,F:.6,G:.78,H:.78,I:.32,J:.5,K:.72,L:.58,
+  M:.92,N:.78,O:.82,P:.68,Q:.82,R:.72,S:.66,T:.62,U:.76,V:.72,W:.98,X:.68,Y:.66,Z:.62,' ':.34 };
+const sum = (t) => [...t].reduce((a, c) => a + (W[c] ?? 0.62), 0);
+const em = (t) => (t === 'UP' ? W.U + W.P - 0.34 : sum(t));   // no row carries tracking
+const tierOf = (el) => {
+  const m = /text-\[clamp\([^,]+,([\d.]+)vw/.exec(el.className);
+  return m ? parseFloat(m[1]) : NaN;
+};
+const rowEl = (t) => [...doc.querySelectorAll('h1 span')].find((n) => n.textContent.trim() === t);
+const widthOf = (label, el) => em(label) * tierOf(el);
 
 await wait(120);
 try {
-  // ── the sequence itself ───────────────────────────────────────────────
+  // ── beat 1: the page opens on the new line, as plain type ─────────────
   window.titleTest.mountTitle();
   await wait(250);
 
-  // ARCHITECTURE is plain type now; the only board is SKELETON, and it opens
-  // on MADNESS.
-  assert.equal(board('SKELETON'), 'MADNESS', 'beat 1: the board opens on MADNESS, not on the target');
-  // MADNESS must not be crushed into SKELETON's spacing. The M (0.92em) is
-  // wider than the S it will become (0.66em), so if the tile took only the
-  // target's width the glyph would overflow into the A beside it.
-  const tileW = (i) => doc.querySelectorAll('[aria-label="SKELETON"] .splitflap-tile')[i].style.width;
-  assert.equal(tileW(0), '0.92em', 'the M sets the first tile\'s width, not the S it becomes');
-  const arch = [...doc.querySelectorAll('h1 span')].find((n) => n.textContent.trim() === 'ARCHITECTURE');
+  const arch = rowEl('ARCHITECTURE');
   assert.ok(arch, 'ARCHITECTURE is on the board');
-  assert.equal(doc.querySelectorAll('[aria-label="ARCHITECTURE"]').length, 0,
-    'ARCHITECTURE is plain type — the split-flap moved to SKELETON');
+  const line = rowEl('OF ART BUILT FROM THE');
+  assert.ok(line, 'OF ART BUILT FROM THE is ONE line, not split across rows');
+  const madness = rowEl('MADNESS');
+  assert.ok(madness, 'the bottom word reads MADNESS before the film has run');
+  assert.equal(rowEl('SKELETON'), undefined,
+    'SKELETON is not written until the Xs land — it is not on the page yet');
+  // THE is gone from the top of the stack.
+  const theRow = [...doc.querySelectorAll('h1 > span')].find((n) => n.textContent.trim() === 'THE');
+  assert.equal(theRow, undefined, 'the leading THE row has been removed');
+  // ...and the old two-row split is gone with it.
+  assert.equal(rowEl('OF ART BUILT'), undefined, 'OF ART BUILT is no longer a row of its own');
+  assert.equal(rowEl('FROM THE'), undefined, 'FROM THE is no longer a row of its own');
+
+  // No board is mounted yet: the flap belongs to the landing, not the idle.
+  assert.equal(doc.querySelectorAll('[data-face]').length, 0,
+    'beat 1: nothing is a split-flap board at rest — the line is plain type');
+
+  // The headline: ARCHITECTURE measures the same as SKELETON, and the long
+  // line sits a little under both.
+  const skelSize = tierOf(madness);                    // MADNESS holds SKELETON's slot
+  const wArch = widthOf('ARCHITECTURE', arch);
+  const wSkel = em('SKELETON') * skelSize;
+  const wLine = widthOf('OF ART BUILT FROM THE', line);
+  assert.ok(Math.abs(wArch - wSkel) / wSkel < 0.02,
+    `ARCHITECTURE (${wArch.toFixed(1)}) is the same width as SKELETON (${wSkel.toFixed(1)})`);
+  assert.ok(wLine < wSkel && wLine > wSkel * 0.8,
+    `OF ART BUILT FROM THE (${wLine.toFixed(1)}) is slightly smaller than SKELETON (${wSkel.toFixed(1)})`);
+
   const upLock = doc.querySelector('[aria-label="UP"]');
   assert.ok(upLock, 'the headline ends in the U+P lockup');
-  // Three layers: U behind, P over it, and a clipped U woven back in front.
-  // Without the clip the two letters merely stack, which is not a lockup.
   const [uEl, pEl, weave] = upLock.children;
   assert.equal(uEl.textContent.trim(), 'U', 'the lockup is built from a U');
   assert.equal(pEl.textContent.trim(), 'P', '...and a P');
-  assert.ok(/-ml-/.test(pEl.className), 'the P is pulled into the U');
-  // ...but only once launched: at rest the two letters sit apart, and the
-  // launch is what brings them together.
-  assert.equal(pEl.dataset.docked, 'false', 'the P waits clear of the U until the launch');
+  assert.equal(pEl.dataset.docked, 'false', 'the P waits clear of the U at rest');
   assert.ok(weave && /clip-path/.test(weave.className), 'a clipped U weaves back in front of the P');
-  // Same size: neither letter is scaled against the other any more.
   const scale = (el) => /text-\[([\d.]+)em\]/.exec(el.className)?.[1] ?? '1';
   assert.equal(scale(uEl), scale(pEl), 'the U and the P are the same size');
-  assert.equal(doc.querySelectorAll('h1 button').length, 0, 'the headline carries no control — the film runs from the player');
-  assert.equal(doc.querySelectorAll('h1 [aria-hidden].bg-\\[\\#d7ff4f\\]').length, 0,
-    'no rule between the rows');
-  // The tree: the width of each row, not the size of its type, is what has
-  // to grow — the rows differ hugely in length. jsdom has no Tailwind
-  // stylesheet, so the vw figure is read off the class and multiplied by the
-  // row's width in em to get the rendered width.
-  const W = { A:.72,B:.72,C:.72,D:.78,E:.62,F:.6,G:.78,H:.78,I:.32,J:.5,K:.72,L:.58,
-    M:.92,N:.78,O:.82,P:.68,Q:.82,R:.72,S:.66,T:.62,U:.76,V:.72,W:.98,X:.68,Y:.66,Z:.62,' ':.34 };
-  const sum = (t) => [...t].reduce((a, c) => a + (W[c] ?? 0.62), 0);
-  const em = (t) => (t === 'SKELETON'
-    ? sum(t)                                        // the flap board carries no tracking
-    : t === 'UP'
-      ? W.U + W.P - 0.34                            // the woven lockup
-      : sum(t) - 0.04 * t.length);
-  const tierOf = (el) => {
-    const m = /text-\[clamp\([^,]+,([\d.]+)vw/.exec(el.className);
-    return m ? parseFloat(m[1]) : NaN;
-  };
-  const row = (t) => [...doc.querySelectorAll('h1 span')].find((n) => n.textContent.trim() === t);
-  const upEl = doc.querySelector('[aria-label="UP"]');
-  const upParent = upEl.parentElement;
-  const rows = [
-    ['THE', row('THE')],
-    ['ARCHITECTURE', arch],
-    ['OF ART BUILT', row('OF ART BUILT')],
-    ['FROM THE', row('FROM THE')],
-    // SKELETON is the flap board, so the size class sits on the board's own
-    // root rather than on the row wrapper around it.
-    ['SKELETON', doc.querySelector('[aria-label="SKELETON"]')],
-    ['UP', upParent],
-  ];
-  for (const [label, el] of rows) assert.ok(el, `the ${label} row is rendered`);
-  const width = ([label, el]) => em(label) * tierOf(el);
-  for (let i = 1; i < rows.length - 1; i += 1) {
-    const [below, w] = [rows[i][0], width(rows[i])];
-    const above = width(rows[i - 1]);
-    assert.ok(w > above, `${below} (${w.toFixed(1)}) is wider than ${rows[i - 1][0]} (${above.toFixed(1)})`);
-  }
-  // UP is the stem: a trunk hanging under the base, so narrower than it.
-  const stem = width(rows[5]);
-  assert.ok(stem < width(rows[4]), `UP (${stem.toFixed(1)}) is narrower than SKELETON — it is the stem`);
-  assert.equal(upParent.nextElementSibling, null, 'UP is the last row');
-  assert.ok(upParent.compareDocumentPosition(row('SKELETON')) & 2, 'SKELETON precedes UP in the document');
+  assert.equal(doc.querySelectorAll('h1 button').length, 0, 'the headline carries no control');
 
-  // Beat 2 — MAAAADNESSS flaps into ARCHITECTURE, and the board grows by one.
-  // The flap is no longer on a timer. MADNESS is what the page says, and it
-  // says it until the visitor launches — the flip is exercised on the real
-  // page below, where the launch is what drives it.
-  await wait(1400);
-  assert.equal(board('SKELETON'), 'MADNESS', 'MADNESS holds — nothing flaps until the launch');
-  assert.equal(tiles('SKELETON'), 'SKELETON'.length, 'the board is cut to SKELETON from the start');
-
-  // Beat 3 — no pull-back any more: both words hold their ground. The
-  // display word carries the lime and the bottom copy stays bone and still.
-  // The colour sits on the tile faces, not on the flap's root span. The
-  // hierarchy is the homepage hero's, read top to bottom: display word bone,
-  // lead tan, closing word lime.
-  const skelFace = doc.querySelector('[aria-label="SKELETON"] [data-face]');
-  assert.ok(/d7ff4f/.test(skelFace.className), 'beat 3: SKELETON has settled lime');
+  // Colour: bone, tan, lime for the closing word, lime for the stem.
   assert.ok(/f5f3ee/.test(arch.className), 'ARCHITECTURE is bone');
-  assert.ok(/d7ff4f/.test(arch.className) === false, 'ARCHITECTURE is not lime — lime is the closing word');
-  const leadLines = [...doc.querySelectorAll('h1 span')].filter(
-    (n) => n.textContent.trim() === 'OF ART BUILT' || n.textContent.trim() === 'FROM THE',
-  );
-  assert.equal(leadLines.length, 2, 'the rest of the line is set as display lines, not a caption');
-  const bottomLeft = leadLines[0];
-  assert.ok(/d7c4aa/.test(bottomLeft.className), 'the lead is tan');
-  assert.equal(doc.querySelectorAll('[data-face]').length, 'SKELETON'.length,
-    'only SKELETON is a split-flap board — every other row is plain type');
-  assert.ok(!/blur/.test(bottomLeft.getAttribute('style') || ''), 'the bottom copy does not recede — the pull-back beat is gone');
+  assert.ok(/d7c4aa/.test(line.className), 'the long line is tan');
+  assert.ok(/d7ff4f/.test(madness.className), 'MADNESS carries the closing-word lime');
 
-  console.log('PASS  the tree: six rows widening downward, UP the stem, no rule');
+  console.log('PASS  the line: ARCHITECTURE / OF ART BUILT FROM THE / MADNESS / UP, no THE row');
 
-  // ── the launch, on the real page ──────────────────────────────────────
+  // ── beats 2-4, on the real page ───────────────────────────────────────
   window.titleTest.mountPage();
   await wait(2400);
   const unlock = [...doc.querySelectorAll('button')].find((b) => /Launch Madness/i.test(b.textContent || ''));
   assert.ok(unlock, 'the player control reads Launch Madness');
-  assert.ok(doc.querySelector('[aria-label="UP"]'), 'the shipped hero ends in the U+P lockup');
-
   const copy = doc.querySelector('.will-change-\\[opacity\\,transform\\]');
   assert.ok(parseFloat(copy.style.opacity) > 0.5, 'the hero copy is up before the film runs');
-  // The page opens on madness and stays there.
-  assert.equal(board('SKELETON'), 'MADNESS', 'the hero opens on MADNESS, before any split flap');
 
   plays.length = 0;
   unlock.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
   await wait(300);
-  // The rockets arm the instant it is launched, and the block starts out.
   const lockup = () => doc.querySelector('[aria-label="UP"]');
   assert.equal(lockup().dataset.rocket, 'true', 'the U and P become rockets on launch');
   assert.equal(lockup().querySelectorAll('[data-nose="true"]').length, 2,
     'an arrow off the U and one off the P');
   assert.equal(lockup().querySelector('[data-docked]').dataset.docked, 'true',
-    'the U and P have come together');
+    'the U and P have come together for the launch');
   const h1 = () => doc.querySelector('h1');
   assert.equal(h1().dataset.launched, 'true', 'the title launches');
-  // Nothing rolls until the type has cleared the frame.
   assert.equal(plays.length, 0, 'the film waits for the title to clear');
 
   await wait(1900);
   const video = doc.querySelector('video');
   assert.ok(video, 'the page carries the sequence player');
   assert.equal(plays.length, 1, 'once the title has cleared, play() runs the sequence');
-  assert.equal(board('SKELETON'), 'SKELETON', 'MADNESS flapped into SKELETON during the launch');
-  assert.equal(tileW(0), '0.66em', 'the tiles tighten to SKELETON once it has landed');
+  // The launch no longer flaps MADNESS into SKELETON, so it still reads
+  // MADNESS while the film is running.
+  assert.equal(rowEl('MADNESS') !== undefined, true, 'MADNESS holds through the launch');
 
   video.dispatchEvent(new window.Event('playing'));
   await wait(200);
-  assert.ok(parseFloat(copy.style.opacity) < 0.05, 'the film takes the hero over: the copy clears while it runs');
+  assert.ok(parseFloat(copy.style.opacity) < 0.05, 'the film takes the hero over while it runs');
 
+  // ── beat 3: the block comes back down carrying Xs ─────────────────────
   video.dispatchEvent(new window.Event('ended'));
   await wait(400);
   assert.ok(parseFloat(copy.style.opacity) > 0.5, 'the furniture comes back when the film ends');
-  // ...and it comes back reading SKELETON, with the rockets stood down.
   assert.equal(h1().dataset.launched, 'false', 'the title returns once the film ends');
   assert.equal(lockup().dataset.rocket, 'false', 'the U and P go back to being letters');
-  // ...but the lock stays: they do not spring apart again on the way back.
-  assert.equal(lockup().querySelector('[data-docked]').dataset.docked, 'true',
-    'the U and P stay locked together');
-  assert.equal(board('SKELETON'), 'SKELETON', 'the title comes back as SKELETON');
+  assert.equal(h1().dataset.revealed, 'false', 'the Xs hold — the flip waits for the block to land');
+  const xs = board('SKELETON');
+  assert.ok(xs && /^X+$/.test(xs), `beat 3: every row comes down as Xs, got ${JSON.stringify(xs)}`);
+  assert.equal(board('ARCHITECTURE'), 'X'.repeat('ARCHITECTURE'.length),
+    'ARCHITECTURE comes down as Xs too');
+  assert.equal(board('OF ART BUILT FROM THE'), 'X'.repeat('OF ART BUILT FROM THE'.length),
+    'the long line comes down as Xs too');
+
+  // ── beat 4: the Xs land and split-flap the line out ───────────────────
+  await wait(2600);
+  assert.equal(h1().dataset.revealed, 'true', 'the Xs have landed and the flip has run');
+  assert.equal(board('ARCHITECTURE'), 'ARCHITECTURE', 'ARCHITECTURE flaps in');
+  assert.equal(board('OF ART BUILT FROM THE'), 'OF ART BUILT FROM THE', 'the long line flaps in');
+  assert.equal(board('SKELETON'), 'SKELETON',
+    'SKELETON appears for the first time, out of the Xs — not out of MADNESS');
+  assert.equal(rowEl('MADNESS'), undefined, 'MADNESS is gone once SKELETON has landed');
+  // ...and the U and P come apart again, so the stem reads UP.
+  assert.equal(lockup().querySelector('[data-docked]').dataset.docked, 'false',
+    'the U and P separate back into UP when it lands');
+  assert.ok(/d7ff4f/.test(doc.querySelector('[aria-label="SKELETON"] [data-face]').className),
+    'SKELETON has settled lime');
+
+  console.log('PASS  the block comes back down as Xs and split-flaps the new layout out');
+  console.log('PASS  SKELETON appears only on the landing, and the U and P separate into UP');
 
   // The hero was stripped back to match the homepage: only the nav is
   // constant, everything else that was About-only decoration is gone.
   const hero = doc.querySelector('section');
   const heroText = hero.textContent || '';
-  for (const gone of ['Fig. 01', 'Johannesburg', 'Practising since', 'JHB \u00B7 SA', 'About Me', 'design that moves people', 'Art comes 1st']) {
+  for (const gone of ['Fig. 01', 'Johannesburg', 'Practising since', 'JHB · SA', 'About Me', 'design that moves people', 'Art comes 1st']) {
     assert.ok(!heroText.includes(gone), `the hero no longer carries "${gone}"`);
   }
   assert.ok(!/\+/.test(heroText.replace(/\s/g, '')), 'the corner registrations are gone');
-  console.log('PASS  Launch Madness arms the rockets, flips to SKELETON, clears the frame, then runs the film');
   console.log('PASS  the hero is stripped back to the photograph, the headline and the nav');
 } finally {
   assert.deepEqual(errors, [], 'no runtime errors or warnings: ' + errors.join(' | '));

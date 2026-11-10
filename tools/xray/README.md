@@ -1,7 +1,7 @@
 # X-ray hero
 
 Builds the About-page hero: `public/videos/about-hero-xray.{webm,mp4}` plus its
-poster. **28.67 s**, 1280×720, 24 fps, no audio.
+poster. **32.19 s**, 1280×720, 24 fps, no audio.
 
 The sequence: it opens on a super close-up, the subject thinks and stands,
 draws, cocks the gun, we cut behind him, he shoots the light box, the room goes
@@ -15,7 +15,7 @@ See [Colour](#colour) below.
 ## Running it
 
 The footage is not in the repo — it is ~40 MB, gitignored, and lives in the
-Drive folder `1b4rDWyRwHtylPyxKeyhX7mPqYGI_1PRS`. Download the eleven items and
+Drive folder `1b4rDWyRwHtylPyxKeyhX7mPqYGI_1PRS`. Download the ten items and
 drop them into `assets/xray/source/` under the names in
 [Sources](#sources), then:
 
@@ -49,8 +49,8 @@ ramped shots are not their source lengths.
 | `bs`  | `backshot.mp4`            | 0.00–3.16 | 2.89 | **ramp 0.7× → 2.5×** |
 | `sb`  | `5.mp4`                   | 1.50–5.60 | 4.10 | the shot; lights go out |
 | `blk` | black                     | —         | 0.50 | the darkness |
-| `bf`  | `bulletfalls.mp4`         | 2.38–4.72 | 3.40 | **ramp 0.42× → 1.9×**, opens the dark scene |
-| `tk`  | `6.mp4`                   | 0.20–2.10 | 1.90 | the holster |
+| `bf`  | `bulletfalls.mp4`         | 0.00–4.75 | 5.15 | **ramp 1.2× → 0.75×**, opens the dark scene |
+| `tk`  | `6.mp4`                   | 0.20–4.90 | 5.18 | **ramp 0.8× → 1.05×**, the tuck |
 | `s6`  | `6.mp4`                   | 4.90–7.70 | 2.80 | settle |
 | `en`  | `endframe-macro-xray.png` | still     | 2.60 | held, becomes x-ray mode |
 
@@ -68,8 +68,15 @@ quick probe in the notes below):
 - **Bullet falls** — tracking the small bright speck (each frame minus a
   19×19 mean, so only compact highlights survive) puts the drop at 2.45–2.85:
   it hovers near row 41, falls to row 98 by 2.83, then holds there while luma
-  bottoms at 10 around 3.0 s and climbs to 63 by 4.6 s. Hence 2.38 in — the
-  old 2.90 started *after* it had landed, so you only ever saw it at rest
+  bottoms at 10 around 3.0 s and climbs to 63 by 4.6 s. The whole clip is
+  used, 0.00–4.75, ramped 1.2× → 0.75× so the setup runs briskly and it
+  eases down over the drop, which lands at ~0.86× and gets 0.45 s of screen
+  time rather than 0.33 s
+- **6.mp4 (the tuck)** — action runs through 2.67–3.33, the busiest stretch
+  in the clip (motion 13.7–14.3 against a 7–10 baseline), and does not calm
+  until ~5.7 s. The old cut ran 0.20–2.10 and jumped to 4.90, skipping that
+  peak entirely, which is why the gun appeared to vanish rather than be put
+  away. It now runs 0.20–4.90 unbroken
 
 ## Speed ramps
 
@@ -95,12 +102,15 @@ slows into the mechanism so the slide going back is legible, then the back shot
 accelerates away into the shot. Two identical ramps back to back read as one
 long lurch. **Flip `ck` to `(0.7, 2.5)` if you want both to build.**
 
-`bf` is slow at the head and quickens, because the drop is only about nine
-source frames — at real speed it is a blink. Stretched over the head of the
-ramp the fall gets 0.66 s of screen time, and the reveal behind it still
-quickens to 1.9×. Its dissolve is cut to 0.18 s from the usual 0.30 s: at
-0.30 s a third of the fall played out under the fade from black, which buried
-the one thing the shot exists to show.
+`bf` starts brisk and eases down: the muzzle flash and the setup do not
+need the time, the drop does. By the time the casing falls (52–60 % along) it
+is running at about 0.86×, which gives the fall 0.45 s of screen time. Its
+dissolve is cut to 0.18 s from the usual 0.30 s: at 0.30 s a third of the
+fall played out under the fade from black, which buried the one thing the
+shot exists to show.
+
+`tk` starts slow and picks up, so the tuck opens unhurried rather than
+snapping into it.
 
 ## Colour
 
@@ -122,6 +132,25 @@ Measured on the finished master, chromaticity against the source frame:
 Do not reintroduce a grade to make the sources match. The shared
 grain pass is what makes unrelated footage read as one piece, and it is not a
 colour operation.
+
+## Colour: the mask must be three-plane
+
+`maskedmerge` takes its plane count from the mask input. Feed it a
+`format=gray` mask and it writes plane 0's result into G and B as well, so
+**every still rendered greyscale** — the lime bones end frame came out at
+0.9 % saturation against a source of 25.9 %, R=G=B to within 0.1. Clips were
+never affected, which is what made it easy to miss and hard to find: only the
+stills go through `maskedmerge`, the clips go through `flat_canvas`.
+
+The mask has to be `format=gbrp`. Measured on the end frame:
+
+| mask format | saturation |
+|---|---|
+| `format=gray` (the bug) | 0.0 % |
+| `format=gbrp` (the fix) | 28.7 % |
+| source, untouched | 25.9 % |
+
+If a still ever comes out grey again, check this first.
 
 ## Two traps worth knowing about
 
@@ -157,7 +186,7 @@ Drive name → `assets/xray/source/` (gitignored, `.gitignore:21`):
 | `top view shot.png` | `topdown.png` |
 | `a_Sneaker_detail_shot,.webp` | `sneaker.webp` |
 | `Standing Up.mp4` | `standingup.mp4` |
-| `extreme close up left.png` | `closeup-white.png` |
+| ~~`extreme close up left.png`~~ | ~~`closeup-white.png`~~ (retired) |
 | `Cocking.mp4` | `cocking.mp4` |
 | `Back shot.mp4` | `backshot.mp4` |
 | `Soft box shooting.mp4` | `5.mp4` |
@@ -167,6 +196,7 @@ Drive name → `assets/xray/source/` (gitignored, `.gitignore:21`):
 | `extreme close up x-ray.png` | `endframe-macro-xray.png` |
 
 Retired: `Extreme close up gun cutaway.png` (`hand-goldband.png`), replaced by
-`Cocking.mp4` + `Back shot.mp4`; and `Extreme close shoes x-ray.png`
-(`groundlevel-xray.png`), the still that used to follow the bullet — cut so
-the dark scene stays on the drop.
+`Cocking.mp4` + `Back shot.mp4`; `Extreme close shoes x-ray.png`
+(`groundlevel-xray.png`), the still that used to follow the bullet; and
+`extreme close up left.png` (`closeup-white.png`), the still that used to
+follow Standing Up.

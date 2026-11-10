@@ -2,33 +2,37 @@ import React, { useEffect, useState } from 'react';
 import SplitFlapSwap from './SplitFlapSwap';
 
 /**
- * AboutHeroTitle — the hero headline as a tree.
+ * AboutHeroTitle — the hero headline.
  *
- *              THE             22% of the measure
- *          ARCHITECTURE        34%      widening
- *          OF ART BUILT        46%
- *           FROM THE           58%
- *           SKELETON           70%      the widest row — MADNESS flaps into it
- *                ⒰            12%      the stem, centred
+ *          ARCHITECTURE      756px @1280   the same width as SKELETON
+ *    OF ART BUILT FROM THE   696px          one line, slightly smaller
+ *          SKELETON          756px          the widest row, and the last to land
+ *              ⒰             128px          the stem, centred
  *
- * Every row is set wider than the one above it, so the block silhouettes a
- * triangle, and UP hangs below the base in the middle like a trunk. The
- * widths are what is stepped, not the sizes: the rows differ hugely in
- * length (THE is 3 characters, ARCHITECTURE is 12), so hitting a widening
- * silhouette means the short rows carry the larger type — 10vw, 3.9vw, 5.8vw,
- * 9.6vw, 10.9vw. Anything else and the shape comes out lopsided.
+ * THE is gone from the top: the line reads ARCHITECTURE OF ART BUILT FROM
+ * THE SKELETON UP, so the leading THE was doing nothing but adding a row.
+ * OF ART BUILT and FROM THE are one line now, which is what makes room for
+ * ARCHITECTURE to come up to SKELETON's width.
  *
- * The sequence is driven by `launched`, which the page raises when the
- * visitor presses Launch Madness and lowers when the film ends:
+ * ARCHITECTURE is 12 characters against SKELETON's 8, so equal widths mean
+ * very unequal type: 7.441vw against 10.9vw. Both measure 756px at 1280.
+ * Neither row carries tracking, because the split-flap board sizes its tiles
+ * from the raw advance widths and cannot apply letter-spacing — tracking the
+ * plain state but not the flapped state would make the row jump width
+ * mid-flip. So ARCHITECTURE is set tracking-normal throughout.
  *
- *   idle       the title reads MADNESS and holds there — nothing flaps on a
- *              timer, so the madness is simply what the page says. The U and
- *              the P sit apart, not yet locked
- *   launched   the U and P slide together and grow rocket noses, MADNESS
- *              flaps into SKELETON, and the block lifts off: gradually at
- *              first, then a slow creep, then it shoots out of frame
- *   returned   the block comes back down, now reading SKELETON, with the U
- *              and P left locked together and the noses stood down
+ * The sequence, driven by `launched` (raised when the visitor presses Launch
+ * Madness, lowered when the film ends):
+ *
+ *   idle     the title reads MADNESS in the bottom word row and holds there.
+ *            Nothing flaps on a timer — MADNESS is simply what the page says
+ *   launched the U and P lock together and grow rocket noses, and the block
+ *            lifts off: gradually, then a creep, then it shoots out of frame
+ *   falling  the film has ended and the block is on its way back down, and
+ *            every row comes back as X's
+ *   landing  the X's have touched down and split-flap into the real line —
+ *            this is the first time SKELETON appears — and the U and P come
+ *            apart again so the stem reads UP
  *
  * Colour keeps the homepage's order read top to bottom: bone, bone, tan, tan,
  * lime, lime. No scrim, no drop shadow, no rule.
@@ -43,28 +47,83 @@ const PALETTES: Record<Palette, { word: string; lead: string; tail: string; tail
   bone: { word: 'text-[#f5f3ee]', lead: 'text-[#f5f3ee]', tail: 'text-[#d7ff4f]', tailFlip: 'text-[#d7c4aa]', knock: 'text-[#f5f3ee]' },
 };
 
-// Sizes chosen so each row renders wider than the one above it, not so the
-// type simply gets bigger down the stack — the rows differ too much in
-// length for that to hold a shape.
-const T_THE = 'text-[clamp(2.2rem,10vw,4.9rem)] md:text-[clamp(3.05rem,10vw,10.8rem)]';
-const T_ARCH = 'text-[clamp(0.86rem,3.9vw,1.9rem)] md:text-[clamp(1.19rem,3.9vw,4.2rem)]';
-const T_ARTBUILT = 'text-[clamp(1.28rem,5.8vw,2.82rem)] md:text-[clamp(1.77rem,5.8vw,6.25rem)]';
-const T_FROMTHE = 'text-[clamp(2.11rem,9.6vw,4.68rem)] md:text-[clamp(2.93rem,9.6vw,10.3rem)]';
+// ARCHITECTURE carries no tracking — see the note above — and is sized so it
+// measures exactly what SKELETON does: 5.42em at 10.9vw is 59.08 units, and
+// 7.94em needs 7.441vw to cover the same ground. Both are 756px at 1280.
+const T_ARCH = 'text-[clamp(1.64rem,7.44vw,3.62rem)] md:text-[clamp(2.27rem,7.44vw,7.99rem)]';
+// OF ART BUILT FROM THE, one line, a shade under the two rows it sits
+// between: 696px against their 756px.
+const T_LINE = 'text-[clamp(0.93rem,4.21vw,2.05rem)] md:text-[clamp(1.28rem,4.21vw,4.52rem)]';
 const T_SKEL = 'text-[clamp(2.4rem,10.9vw,5.31rem)] md:text-[clamp(3.32rem,10.9vw,11.7rem)]';
 const T_UP = 'text-[clamp(2rem,9.1vw,4.43rem)] md:text-[clamp(2.78rem,9.1vw,9.8rem)]';
+
+// Kept for the /_lab variants, which are temporary.
+const T_THE = 'text-[clamp(2.2rem,10vw,4.9rem)] md:text-[clamp(3.05rem,10vw,10.8rem)]';
+const T_ARTBUILT = 'text-[clamp(1.28rem,5.8vw,2.82rem)] md:text-[clamp(1.77rem,5.8vw,6.25rem)]';
+const T_FROMTHE = 'text-[clamp(2.11rem,9.6vw,4.68rem)] md:text-[clamp(2.93rem,9.6vw,10.3rem)]';
+
 const SMALL = 'block text-[clamp(1rem,2.4vw,1.75rem)] leading-[1.25] tracking-[-0.01em]';
 const LEAD = 'leading-[0.88] tracking-[-0.04em] whitespace-nowrap';
+// The three word rows are split-flap boards once the block returns, and a
+// board sizes its own tiles, so it cannot inherit the tracking above.
+const LEAD_FLAP = 'leading-[0.88] whitespace-nowrap';
 
 // The launch runs in three legs — see the hero-launch keyframes: a gradual
 // lift-off, a slower creep, then the shoot. It has to be clear of the frame
 // before the film starts, so LAUNCH_MS in XrayHero is exactly this long.
 const LAUNCH = 'animate-[hero-launch_1700ms_linear_forwards]';
 const RETURN = 'animate-[hero-return_900ms_ease-out_forwards]';
+// The block has to finish coming down before the X's are allowed to flap, or
+// they flip in mid-air. Matches hero-return above.
+const RETURN_MS = 900;
 
 // How far out the P waits before the launch pulls it into the U. Docked it
 // sits at -0.34em; this is clear of the U's right edge at 0.76em, so at rest
 // the two letters read as separate rather than interlocked.
 const P_UNDOCKED = 'translate-x-[0.55em]';
+
+/**
+ * One row of the headline.
+ *
+ * Four states, and the split-flap is mounted for the last two so that the
+ * board is the same instance when `run` flips — remounting it would restart
+ * the flip from scratch every time.
+ *
+ *   idle/launched  plain type. Before the first run the bottom row reads
+ *                  MADNESS; after it, SKELETON
+ *   falling        the board, holding X's
+ *   landing        the same board, now running, so the X's flip to the word
+ */
+const FlapRow: React.FC<{
+  /** the word the board is cut for, and what it flaps to */
+  word: string;
+  /** what the row says while it is plain type, when that differs */
+  plain?: string;
+  size: string;
+  lead: string;
+  colour: string;
+  flip: string;
+  board: boolean;
+  run: boolean;
+  startDelay?: number;
+}> = ({ word, plain, size, lead, colour, flip, board, run, startDelay = 0 }) => {
+  if (!board) {
+    return <span className={`block ${size} ${lead} ${colour}`}>{plain ?? word}</span>;
+  }
+  return (
+    <SplitFlapSwap
+      from={'X'.repeat(word.length)}
+      to={word}
+      run={run}
+      step={60}
+      interval={72}
+      startDelay={startDelay}
+      settledClassName={colour}
+      flippingClassName={flip}
+      className={`block ${size} ${LEAD_FLAP}`}
+    />
+  );
+};
 
 /**
  * The U and P of "UP", woven into one mark.
@@ -85,12 +144,12 @@ const P_UNDOCKED = 'translate-x-[0.55em]';
  * 0.42em — inside that opening — and swings its bowl across the U's right
  * stem with 0.16em of overlap to weave through.
  *
- * Two separate things happen here, and they do not end together. `docked`
- * brings the P in from `P_UNDOCKED` so the letters close on each other — and
- * stays docked, because the lock is the design and undoing it would put the
- * pair back where it started. `rocket` grows a nose out of each letter, an
- * arrow off the U's free stem and one off the P's bowl, both rising clear of
- * the cap height; those belong to the launch and stand down when it is over.
+ * `docked` brings the P in from `P_UNDOCKED` so the letters close on each
+ * other; unlike the flap, it does NOT latch. The lock belongs to the launch,
+ * so when the block lands the P slides back out and the stem reads UP again.
+ * `rocket` grows a nose out of each letter, an arrow off the U's free stem
+ * and one off the P's bowl, both rising clear of the cap height; those stand
+ * down as soon as the launch is over.
  */
 const UpLock: React.FC<{ u: string; p: string; docked?: boolean; rocket?: boolean }> = ({ u, p, docked, rocket }) => (
   <span
@@ -138,50 +197,41 @@ type Props = {
 const AboutHeroTitle: React.FC<Props> = ({ layout = 'tree', palette = 'homepage', launched = false }) => {
   const pal = PALETTES[palette];
 
-  // The flap latches. MADNESS is a one-way door: the board only holds it
-  // while `run` is false, and `run` goes false again the moment the film ends
-  // and the title comes back — which would put MADNESS back on the hero. So
-  // the first launch is remembered and the board stays on SKELETON.
+  // `flipped` is one-way: it means the film has run at least once. The page
+  // must never go back to MADNESS once SKELETON has landed.
   const [flipped, setFlipped] = useState(false);
   useEffect(() => {
     if (launched) setFlipped(true);
   }, [launched]);
+
   // Flipped but no longer launched means the film has ended and the block is
   // on its way back down — that is the only time the return runs, so the
   // title does not fly in on first paint.
   const returning = flipped && !launched;
+  // The X's hold until the block has actually touched down, then flap.
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => {
+    if (!returning) return;
+    setRevealed(false);
+    const t = window.setTimeout(() => setRevealed(true), RETURN_MS);
+    return () => window.clearTimeout(t);
+  }, [returning]);
 
-  const arch = (
-    <span className={`block ${T_ARCH} ${LEAD} ${pal.word}`}>ARCHITECTURE</span>
-  );
-
-  // MADNESS holds until the launch, and it is the launch that flips it.
-  const skeleton = (
-    <SplitFlapSwap
-      from="MADNESS"
-      to="SKELETON"
-      run={flipped}
-      step={60}
-      interval={72}
-      settledClassName={pal.tail}
-      flippingClassName={pal.tailFlip}
-      className={`block ${T_SKEL} ${LEAD}`}
-    />
-  );
-
-  const closing = (
-    <span className={`block ${T_UP} ${LEAD} ${pal.tail}`}>
-      <UpLock u={pal.tail} p={pal.knock} docked={flipped} rocket={launched} />
-    </span>
-  );
+  // The bottom row reads MADNESS until the X's have landed, and SKELETON
+  // from then on. It hangs off `revealed`, NOT `flipped`: `flipped` goes true
+  // the moment the visitor launches, which would swap MADNESS for SKELETON
+  // while the block is still on its way up. Nothing is flapped into SKELETON
+  // here — the X-flap is the only thing that ever writes it.
 
   if (layout === 'split') {
     return (
       <h1 className="h-full flex flex-col justify-between gap-10 md:gap-14 font-display items-center text-center">
-        {arch}
+        <span className={`block ${T_ARCH} ${LEAD} ${pal.word}`}>ARCHITECTURE</span>
         <span className="flex items-end justify-between gap-6 md:gap-10 w-full">
           <span className={`${SMALL} ${pal.lead}`}>OF ART BUILT FROM THE</span>
-          {closing}
+          <span className={`block ${T_UP} ${LEAD} ${pal.tail}`}>
+            <UpLock u={pal.tail} p={pal.knock} docked={launched} rocket={launched} />
+          </span>
         </span>
       </h1>
     );
@@ -193,10 +243,12 @@ const AboutHeroTitle: React.FC<Props> = ({ layout = 'tree', palette = 'homepage'
       : 'h-full flex flex-col justify-center gap-[0.02em] font-display items-center text-center';
     return (
       <h1 className={cls}>
-        {arch}
+        <span className={`block ${T_ARCH} ${LEAD} ${pal.word}`}>ARCHITECTURE</span>
         <span className={`block ${T_SKEL} ${LEAD} ${pal.lead}`}>OF ART BUILT</span>
         <span className={`block ${T_SKEL} ${LEAD} ${pal.lead}`}>FROM THE</span>
-        {closing}
+        <span className={`block ${T_UP} ${LEAD} ${pal.tail}`}>
+          <UpLock u={pal.tail} p={pal.knock} docked={launched} rocket={launched} />
+        </span>
       </h1>
     );
   }
@@ -204,30 +256,87 @@ const AboutHeroTitle: React.FC<Props> = ({ layout = 'tree', palette = 'homepage'
   if (layout === 'stack') {
     return (
       <h1 className="h-full flex flex-col justify-center gap-[0.02em] font-display items-center text-center">
-        {arch}
+        <span className={`block ${T_ARCH} ${LEAD} ${pal.word}`}>ARCHITECTURE</span>
         <span className={`block ${T_ARTBUILT} ${LEAD} ${pal.lead}`}>OF ART BUILT</span>
         <span className={`block ${T_FROMTHE} ${LEAD} ${pal.lead}`}>FROM THE</span>
         <span className={`block ${T_SKEL} ${LEAD} ${pal.tail}`}>SKELETON</span>
-        {closing}
+        <span className={`block ${T_UP} ${LEAD} ${pal.tail}`}>
+          <UpLock u={pal.tail} p={pal.knock} docked={launched} rocket={launched} />
+        </span>
       </h1>
     );
   }
 
-  // tree — six rows widening downward, UP as the stem.
+  if (layout === 'pyramid' || layout === 'sketch') {
+    return (
+      <h1 className="h-full flex flex-col justify-center gap-[0.02em] font-display items-center text-center">
+        <span className={`block ${T_THE} ${LEAD} ${pal.word}`}>THE</span>
+        <span className={`block ${T_ARCH} ${LEAD} ${pal.word}`}>ARCHITECTURE</span>
+        <span className={`block ${T_ARTBUILT} ${LEAD} ${pal.lead}`}>OF ART BUILT</span>
+        <span className={`block ${T_FROMTHE} ${LEAD} ${pal.lead}`}>FROM THE</span>
+        <span className={`block ${T_SKEL} ${LEAD} ${pal.tail}`}>{revealed ? 'SKELETON' : 'MADNESS'}</span>
+        <span className={`block ${T_UP} ${LEAD} ${pal.tail}`}>
+          <UpLock u={pal.tail} p={pal.knock} docked={launched} rocket={launched} />
+        </span>
+      </h1>
+    );
+  }
+
+  // tree — the shipped layout.
+  //   ARCHITECTURE / OF ART BUILT FROM THE / SKELETON / UP
+  // The boards are mounted only while the block is coming back, so the same
+  // instance carries the X's down and then flips them.
+  const board = returning;
   return (
     <h1
       data-launched={launched ? 'true' : 'false'}
+      data-revealed={revealed ? 'true' : 'false'}
       className={`h-full flex flex-col justify-center font-display items-center text-center will-change-[transform,opacity] ${launched ? LAUNCH : returning ? RETURN : ''}`}
     >
-      <span className={`block ${T_THE} ${LEAD} ${pal.word}`}>THE</span>
-      {arch}
-      <span className={`block ${T_ARTBUILT} ${LEAD} ${pal.lead}`}>OF ART BUILT</span>
-      <span className={`block ${T_FROMTHE} ${LEAD} ${pal.lead}`}>FROM THE</span>
-      {/* The base — the widest row, and the only one that flaps. */}
-      <span className="block whitespace-nowrap">{skeleton}</span>
-      {/* The stem: narrow, centred, the U and P woven together. */}
+      {/* LEAD_FLAP, not LEAD: these three rows become split-flap boards, a
+          board sizes its tiles from the raw advance widths and cannot apply
+          letter-spacing, so tracking them in the plain state would make each
+          row visibly narrower the moment it flipped. Every width figure in
+          this file assumes no tracking. */}
+      <FlapRow
+        word="ARCHITECTURE"
+        size={T_ARCH}
+        lead={LEAD_FLAP}
+        colour={pal.word}
+        flip={pal.tailFlip}
+        board={board}
+        run={revealed}
+        startDelay={0}
+      />
+      <FlapRow
+        word="OF ART BUILT FROM THE"
+        size={T_LINE}
+        lead={LEAD_FLAP}
+        colour={pal.lead}
+        flip={pal.tailFlip}
+        board={board}
+        run={revealed}
+        startDelay={120}
+      />
+      {/* The bottom word: MADNESS as plain type, and the board is always cut
+          for SKELETON so the X's are 8 wide on the way down. If the board
+          took its target from the plain state it would be 7 tiles of X and
+          grow an eighth the instant the flip started. */}
+      <FlapRow
+        word="SKELETON"
+        plain={revealed ? undefined : 'MADNESS'}
+        size={T_SKEL}
+        lead={LEAD_FLAP}
+        colour={pal.tail}
+        flip={pal.tailFlip}
+        board={board}
+        run={revealed}
+        startDelay={240}
+      />
+      {/* The stem: narrow, centred. The U and P lock for the launch and come
+          apart again the moment the block lands, so it reads UP. */}
       <span className={`block ${T_UP} ${LEAD} ${pal.tail} mt-[1.2vh]`}>
-        <UpLock u={pal.tail} p={pal.knock} docked={flipped} rocket={launched} />
+        <UpLock u={pal.tail} p={pal.knock} docked={launched} rocket={launched} />
       </span>
     </h1>
   );
