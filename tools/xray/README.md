@@ -1,11 +1,11 @@
 # X-ray hero
 
 Builds the About-page hero: `public/videos/about-hero-xray.{webm,mp4}` plus its
-poster. **28.42 s**, 1280×720, 24 fps, no audio.
+poster. **28.67 s**, 1280×720, 24 fps, no audio.
 
 The sequence: it opens on a super close-up, the subject thinks and stands,
 draws, cocks the gun, we cut behind him, he shoots the light box, the room goes
-dark, a bullet falls through the darkness, and the x-ray comes up. He holsters
+dark, a bullet falls through the darkness and the light comes back up on it. He holsters
 and settles back into the crouch, and the piece ends on a still in x-ray.
 
 **Original colour.** There is no grade anywhere in the chain — no curves, no
@@ -15,7 +15,7 @@ See [Colour](#colour) below.
 ## Running it
 
 The footage is not in the repo — it is ~40 MB, gitignored, and lives in the
-Drive folder `1b4rDWyRwHtylPyxKeyhX7mPqYGI_1PRS`. Download the twelve items and
+Drive folder `1b4rDWyRwHtylPyxKeyhX7mPqYGI_1PRS`. Download the eleven items and
 drop them into `assets/xray/source/` under the names in
 [Sources](#sources), then:
 
@@ -49,8 +49,7 @@ ramped shots are not their source lengths.
 | `bs`  | `backshot.mp4`            | 0.00–3.16 | 2.89 | **ramp 0.7× → 2.5×** |
 | `sb`  | `5.mp4`                   | 1.50–5.60 | 4.10 | the shot; lights go out |
 | `blk` | black                     | —         | 0.50 | the darkness |
-| `bf`  | `bulletfalls.mp4`         | 2.90–4.72 | 1.82 | opens the dark scene |
-| `gx`  | `groundlevel-xray.png`    | still     | 1.80 | push |
+| `bf`  | `bulletfalls.mp4`         | 2.38–4.72 | 3.40 | **ramp 0.42× → 1.9×**, opens the dark scene |
 | `tk`  | `6.mp4`                   | 0.20–2.10 | 1.90 | the holster |
 | `s6`  | `6.mp4`                   | 4.90–7.70 | 2.80 | settle |
 | `en`  | `endframe-macro-xray.png` | still     | 2.60 | held, becomes x-ray mode |
@@ -66,12 +65,15 @@ quick probe in the notes below):
   5.5–8.75 is the usable half
 - **Back shot** — only 3.2 s long; motion decays 5.7 → 2.7 and luma 78 → 48
   across the whole clip, which is why the ramp runs opposite to the cock's
-- **Bullet falls** — luma bottoms out at 10 around 3.0 s and climbs to 63 by
-  4.6 s, so 2.9–4.72 starts in the dark and reveals
+- **Bullet falls** — tracking the small bright speck (each frame minus a
+  19×19 mean, so only compact highlights survive) puts the drop at 2.45–2.85:
+  it hovers near row 41, falls to row 98 by 2.83, then holds there while luma
+  bottoms at 10 around 3.0 s and climbs to 63 by 4.6 s. Hence 2.38 in — the
+  old 2.90 started *after* it had landed, so you only ever saw it at rest
 
 ## Speed ramps
 
-`ck` and `bs` carry a `ramp=(r0, r1)` pair — playback rate at the head and tail
+`ck`, `bs` and `bf` carry a `ramp=(r0, r1)` pair — playback rate at the head and tail
 of the clip. `ramp_pts()` turns that into a `setpts` expression.
 
 Output time is **quadratic** in source time, which makes `1/rate` linear: the
@@ -93,6 +95,13 @@ slows into the mechanism so the slide going back is legible, then the back shot
 accelerates away into the shot. Two identical ramps back to back read as one
 long lurch. **Flip `ck` to `(0.7, 2.5)` if you want both to build.**
 
+`bf` is slow at the head and quickens, because the drop is only about nine
+source frames — at real speed it is a blink. Stretched over the head of the
+ramp the fall gets 0.66 s of screen time, and the reveal behind it still
+quickens to 1.9×. Its dissolve is cut to 0.18 s from the usual 0.30 s: at
+0.30 s a third of the fall played out under the fade from black, which buried
+the one thing the shot exists to show.
+
 ## Colour
 
 None. `edit.py` applies no curves, gamma, hue, saturation, colour balance or
@@ -110,7 +119,7 @@ nothing in the render path calls. The sources go through untouched apart from:
 Measured on the finished master, chromaticity against the source frame:
 **soft box 0.24 %, bullet falls 1.36 %** — i.e. no shift.
 
-Do not reintroduce a grade to make the seven-ish sources match. The shared
+Do not reintroduce a grade to make the sources match. The shared
 grain pass is what makes unrelated footage read as one piece, and it is not a
 colour operation.
 
@@ -153,9 +162,11 @@ Drive name → `assets/xray/source/` (gitignored, `.gitignore:21`):
 | `Back shot.mp4` | `backshot.mp4` |
 | `Soft box shooting.mp4` | `5.mp4` |
 | `Bullet falls.mp4` | `bulletfalls.mp4` |
-| `Extreme close shoes x-ray.png` | `groundlevel-xray.png` |
+| ~~`Extreme close shoes x-ray.png`~~ | ~~`groundlevel-xray.png`~~ (retired) |
 | `6.mp4` | `6.mp4` |
 | `extreme close up x-ray.png` | `endframe-macro-xray.png` |
 
 Retired: `Extreme close up gun cutaway.png` (`hand-goldband.png`), replaced by
-`Cocking.mp4` + `Back shot.mp4`.
+`Cocking.mp4` + `Back shot.mp4`; and `Extreme close shoes x-ray.png`
+(`groundlevel-xray.png`), the still that used to follow the bullet — cut so
+the dark scene stays on the drop.

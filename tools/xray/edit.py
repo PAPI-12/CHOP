@@ -52,7 +52,7 @@ GRAIN = 7
 #   soft box       Soft box shooting.mp4, the shot, then the lights go out
 #   black          the darkness
 #   bullet falls   Bullet falls.mp4, opens the dark scene
-#   shoes x-ray    Extreme close shoes x-ray.png
+#   sit down       6.mp4
 #   sit down       6.mp4
 #   end            extreme close up x-ray.png, held, becomes X-ray mode
 #
@@ -82,10 +82,12 @@ SEG = {
     "bs":  dict(src="backshot.mp4", t0=0.00, t1=3.16, move="none", ramp=(0.7, 2.5)),
     "sb":  dict(src="5.mp4", t0=1.50, t1=5.60, move="none"),
     "blk": dict(black=True, dur=0.50),
-    # The dark scene opens on the bullet: starts near black and reveals,
-    # which is the hand-off into the x-ray.
-    "bf":  dict(src="bulletfalls.mp4", t0=2.90, t1=4.72, move="none"),
-    "gx":  dict(src="groundlevel-xray.png", still=True, dur=1.80, move="push"),
+    # The dark scene opens on the bullet dropping. Ramped 0.42x at the head
+    # up to 1.9x: the drop is only ~9 source frames, so at real speed it is a
+    # blink and you see the casing already at rest. Slowing the head stretches
+    # the fall to ~0.75s on screen and lets the reveal afterwards quicken.
+    "bf":  dict(src="bulletfalls.mp4", t0=2.38, t1=4.72, move="none",
+                ramp=(0.42, 1.9)),
     # The holster. Measured: over 6.mp4 0.2-2.1s the right-hand waist band
     # runs 9.6 -> 25.8 while the left sits at 0.2-2.8 and the upper body
     # stays near 8-10. That is a one-handed action at the hip with the rest
@@ -97,12 +99,14 @@ SEG = {
 }
 
 ORDER = ["mx", "td", "sn", "su", "cl", "ck", "bs", "sb", "blk", "bf",
-         "gx", "tk", "s6", "en"]
+         "tk", "s6", "en"]
 
 # Dissolve into each key. The cock is a hard cut -- it is the load, an action
 # beat, and a dissolve there softens the one moment that should snap.
+# The bullet dissolve is short at 0.18s: at 0.30s a third of the drop played
+# out under the fade from black, which is the one thing that has to be legible.
 XF = {"td": 0.30, "sn": 0.30, "su": 0.35, "cl": 0.30, "ck": 0.08,
-      "bs": 0.30, "sb": 0.35, "blk": 0.30, "bf": 0.30, "gx": 0.35,
+      "bs": 0.30, "sb": 0.35, "blk": 0.30, "bf": 0.18,
       "tk": 0.30, "s6": 0.30, "en": 0.55}
 
 
