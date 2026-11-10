@@ -17,6 +17,7 @@ tools/hero/source/debug-*.png
 # extracted frames are large and all of them are reproducible -- the footage
 # from the Drive folder, the rest by re-running tools/xray/edit.py. Only the
 # delivery encodes in public/videos are tracked.
+google_drive/
 assets/xray/source/
 assets/xray/work/
 assets/xray/frames/

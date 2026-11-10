@@ -1,132 +1,182 @@
 #!/usr/bin/env python3
-"""Cinematic X-RAY hero edit for the About page hero.
-
-Sources (Drive folder 1b4rDWyRwHtylPyxKeyhX7mPqYGI_1PRS):
-    1.webp   still   opening card  -- reality look
-    2..6     clips   think -> rise -> draw -> shoot -> blackout -> lime x-ray
-    7.webp   still   closing card  -- x-ray look
-
-Every frame is reframed onto a true 1920x1080 canvas. The two vertical clips
-keep a wide band of the action and extend the room outward with their own
-heavily defocused, darkened, vignetted selves -- so the frame is genuinely
-16:9 rather than a vertical strip parked on a black plate.
-
-Colour: one shared grade per look (REALITY / XRAY), each source first
-normalised to a common black point, white point and midtone so the cuts stop
-reading as five different renders. Halation, vignette and film grain are a
-single shared finishing chain, so texture and quality stay identical from the
-x-ray switch all the way to the end card.
-
-Rendered in two passes (the box has ~4 GB and one big graph OOMs):
-    pass 1  one small graph per segment -> 10-bit intermediates
-    pass 2  assemble -> grain -> delivery encodes
 """
-import argparse, os, subprocess, sys
+About hero: the x-ray sequence.
 
-FF = os.environ.get("FFMPEG", "/tmp/ffmpeg")
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
-PLATES = os.path.join(HERE, "plates")
+    python3 tools/xray/edit.py --out public/videos/about-hero-xray.mp4
+
+Two passes, because one filtergraph for the whole timeline gets OOM-killed on
+a 4 GB box. Pass 1 renders one 10-bit intermediate per segment, pass 2 joins
+them and applies grain, halation and the vignette ONCE over the assembled
+timeline -- that shared pass is what makes seven unrelated sources read as one
+piece.
+
+The grade is matched on COLOUR, not brightness. An earlier version equalised
+mid-tone luminance only and the result was unwatchable: the sources span hue
+7 deg to 280 deg, so each shot kept its native cast and the colour balance
+visibly changed at every cut while every luminance number looked perfect.
+Grade table lives in grade.json; grade.py derives it.
+
+See README.md for the traps (hue and unsharp are both broken at 16-bit here).
+"""
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(ROOT, "assets", "xray", "source")
+PLATES = os.path.join(ROOT, "tools", "xray", "plates")
 WORK = os.path.join(ROOT, "assets", "xray", "work")
 OUTD = os.path.join(ROOT, "public", "videos")
+FF = "/tmp/ffmpeg"
 
+BASE_W, BASE_H = 1280, 720
 FPS = 24
+RGB_MAX = 65535
 
-# tools/xray/calibrate.py measures every segment *after* reframing and writes
-# grade.json; those numbers win so the grade is derived from real pixels.
-import json as _json
-_GRADE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "grade.json")
+# ── the cut ───────────────────────────────────────────────────────────────
+# in/out points are chosen from measured motion, not by eye: 3.mp4 is dead for
+# its first 4.5 s, and cutting anywhere in there gives you four seconds of a
+# frozen frame. Its movement lives at 4.6-7.0 s, so that is what we use.
+SEG = {
+    "s1":    dict(src="1.webp",                   still=True,  dur=1.20, look="r"),
+    "c2":    dict(src="2.mp4",       t0=0.00, t1=1.90,                   look="r"),
+    "c3":    dict(src="3.mp4",       t0=4.60, t1=7.00, reframe=0.65,     look="r"),
+    "c4":    dict(src="4.mp4",       t0=0.20, t1=2.36, reframe=0.65,     look="r"),
+    "c5":    dict(src="5.mp4",       t0=1.00, t1=3.20,                   look="r"),
+    "mx":    dict(src="minimax.mp4", t0=7.60, t1=10.10,                  look="r", red=True),
+    "black": dict(black=True,                                dur=0.40),
+    "c6":    dict(src="6.mp4",       t0=0.00, t1=5.50,                   look="x"),
+    "end":   dict(src="endframe-macro-xray.png", still=True,  dur=2.30,  look="x"),
+}
+ORDER = ["s1", "c2", "c3", "c4", "c5", "mx", "black", "c6", "end"]
 
-# ── timeline (seconds) ──────────────────────────────────────────────────────
-TL = dict(s1=1.00, c2=1.80, c3=4.20, c4=2.30, c5=5.61,
-          black=0.42, c6=5.00, s7=2.80)
-XF_23, XF_34, XF_45, XF_67 = 0.18, 0.18, 0.15, 0.55
-
-# ── exposure normalisation: each source's own measured black/white point ────
-LEVELS = dict(
-    s1="0/0 0.025/0.020 0.820/0.880 1/1",
-    c2="0/0 0.031/0.020 0.758/0.880 1/1",
-    c3="0/0 0.024/0.020 0.746/0.880 1/1",
-    c4="0/0 0.020/0.020 0.833/0.880 1/1",
-    c5="0/0 0.030/0.020 1/1",
-    c6="0/0 0.093/0.075 0.742/0.800 1/1",
-    s7="0/0 0.102/0.075 0.693/0.800 1/1",
-)
-GAMMA = dict(s1=1.10, c2=0.95, c3=0.86, c4=0.89, c5=1.16, c6=1.00, s7=1.00)
-
-REALITY_CURVE = "0/0 0.200/0.165 0.420/0.405 0.620/0.655 0.850/0.885 1/1"
-XRAY_CURVE = "0/0 0.180/0.150 0.450/0.460 0.750/0.800 1/1"
-REALITY_TONE = "rs=-0.012:gs=-0.004:bs=0.040:rm=-0.004:gm=0:bm=0.008:rh=0.024:gh=0.008:bh=-0.032"
-XRAY_TONE = "rs=-0.010:gs=0.034:bs=0.004:rm=-0.008:gm=0.018:bm=0.000:rh=0.012:gh=0.032:bh=-0.062"
+# Dissolve INTO each key. Short dissolves read as soft hard cuts, which is the
+# worst of both worlds, so these are long enough to actually read. The one
+# exception is mx -> black. mx ends on the flash at its brightest (luma 0.55),
+# so a hard cut there was the single largest frame step in the whole piece --
+# 94 delta, 11x the local median. A 0.22 s fade reads as the flash decaying
+# into darkness instead of the picture being switched off.
+XF = {"c2": 0.60, "c3": 0.35, "c4": 0.35, "c5": 0.45,
+      "mx": 0.40, "black": 0.22, "c6": 0.30, "end": 0.95}
 
 GRAIN = 9
-RGB_MAX = 65535          # gbrp16le peak, for the hand-written blends
-CLARITY_R, CLARITY_X = 0.16, 0.14   # mid-frequency contrast per look
-# The footage sits at ~96 deg and the site accent #d7ff4f is at 74. hue is
-# applied as a luminance-preserving RGB matrix: the `hue` filter clips R and B
-# to zero somewhere in this 16-bit chain, and colorbalance only shifts ~4 deg.
-LIME_ROT = "colorchannelmixer=rr=1.0178:rg=0.1306:rb=-0.1484:gr=-0.0867:gg=0.9905:gb=0.0962:br=0.3998:bg=-0.2936:bb=0.8938"
-R_GLOW, R_THRESH = 0.24, 0.62   # reality halation: only true highlights bloom
-X_GLOW, X_THRESH = 0.34, 0.50   # x-ray halation: only the lime skeleton blooms
-# 1280x720 keeps every source at native or downscaled size (they are
-# 768-1344 px wide) -- real detail instead of upscaled pixels, far fewer bytes.
-BASE_W, BASE_H = 1280, 720
-SEGMENTS = ("s1", "c2", "c3", "c4", "c5", "c6", "s7", "black")
-SRC_FILE = dict(s1="1.webp", c2="2.mp4", c3="3.mp4", c4="4.mp4",
-                c5="5.mp4", c6="6.mp4", s7="7.webp")
-DIMS = dict(s1=(1344, 768), c2=(1280, 720), c3=(786, 1178), c4=(768, 1168),
-            c5=(1344, 768), c6=(1280, 704), s7=(1672, 941))
-LOOK = dict(s1="r", c2="r", c3="r", c4="r", c5="r", c6="x", s7="x")
-if os.path.exists(_GRADE_FILE):
-    with open(_GRADE_FILE) as _f:
-        _g = _json.load(_f)
-    LEVELS.update(_g["LEVELS"])
-    GAMMA.update(_g["GAMMA"])
+CLARITY_R, CLARITY_X = 0.16, 0.14
+R_GLOW, R_THRESH = 0.24, 0.62
+X_GLOW, X_THRESH = 0.34, 0.50
+REALITY_CURVE = "0/0 0.200/0.165 0.420/0.405 0.620/0.655 0.850/0.885 1/1"
+XRAY_CURVE = "0/0 0.180/0.150 0.450/0.460 0.750/0.800 1/1"
 
-# vertical reframing: fraction of the frame height kept, and the row it centres on
-REFRAME = dict(c3=(0.70, 643), c4=(0.70, 582))
-TRIM = dict(c4=0.10)
+# The lime shift. `hue` clips R and B to zero somewhere in this 16-bit chain --
+# the x-ray came out flat green with R=3, B=2 -- so this is a hand-written
+# luminance-preserving RGB matrix instead. Moves the footage from ~96 deg to
+# ~80 deg without touching exposure (the site's #d7ff4f sits at 74).
+def hue_matrix(deg):
+    """Luminance-preserving hue rotation as an RGB matrix.
+
+    Rotating in YIQ keeps the neutral axis fixed -- every row sums to 1, so
+    greys stay grey and only the colour moves. Emitted as colorchannelmixer
+    because the `hue` filter clips R and B to zero somewhere in this 16-bit
+    chain. Positive degrees move green towards lime.
+    """
+    import math
+    import numpy as np
+    t = math.radians(deg); c, s = math.cos(t), math.sin(t)
+    A = np.array([[0.299, 0.587, 0.114],
+                  [0.596, -0.274, -0.322],
+                  [0.211, -0.523, 0.312]])
+    R = np.array([[1.0, 0.0, 0.0], [0.0, c, -s], [0.0, s, c]])
+    M = np.linalg.inv(A) @ R @ A          # rows sum to 1 -> greys stay grey
+    return ("colorchannelmixer="
+            f"rr={M[0, 0]:.4f}:rg={M[0, 1]:.4f}:rb={M[0, 2]:.4f}"
+            f":gr={M[1, 0]:.4f}:gg={M[1, 1]:.4f}:gb={M[1, 2]:.4f}"
+            f":br={M[2, 0]:.4f}:bg={M[2, 1]:.4f}:bb={M[2, 2]:.4f}")
+
+
+# Default rotation per look: the x-ray footage sits near 96 deg and the site's
+# #d7ff4f is at 74, so it needs a pull towards lime. Reality needs none.
+DEFAULT_ROT = {"r": 0.0, "x": 18.0}
+
+
+def dur_of(k):
+    s = SEG[k]
+    return s["dur"] if ("still" in s or "black" in s) else s["t1"] - s["t0"]
+
+
+def load_grade():
+    p = os.path.join(ROOT, "tools", "xray", "grade.json")
+    if os.path.exists(p):
+        with open(p) as f:
+            g = json.load(f)
+        lev = g.get("LEVELS", {})
+        gam = g.get("GAMMA", {})
+        for k, v in list(gam.items()):
+            # migration: the table used to carry one scalar per shot, which
+            # cannot express a colour correction
+            if isinstance(v, (int, float)):
+                gam[k] = {"r": float(v), "g": float(v), "b": float(v)}
+        return lev, gam, g.get("TONE", {}), g.get("SAT", {}), g.get("ROT", {})
+    return {}, {}, {}, {}, {}
+
+
+LEVELS, GAMMA_RGB, TONE, SAT, ROT = load_grade()
 
 
 def feather_expr(W, fg_w, feather):
-    left = (W - fg_w) / 2.0
-    t = f"min(1,max(0,(min(X,W-X)-{left:.2f})/{feather:.2f}))"
-    return f"{t}*({t})*(3-2*({t}))"
+    """1 inside the sharp centre strip, 0 outside, smooth over `feather` px."""
+    x0 = (W - fg_w) / 2.0
+    return (f"if(lt(X,{x0}),if(lt(X,{x0 - feather}),0,(X-{x0 - feather})/{feather}),"
+            f"if(lt(X,{x0 + fg_w}),1,"
+            f"if(lt(X,{x0 + fg_w + feather}),({x0 + fg_w + feather}-X)/{feather},0)))")
+
+
+def flat_canvas(sw, sh, W, H):
+    """Fit a horizontal source to the 16:9 canvas, letterboxing on black."""
+    cw = min(W, int(round(H * sw / sh)))
+    if cw >= W - 1:
+        return f"scale={W}:{H}:flags=lanczos"
+    off = (W - cw) // 2
+    return (f"scale={cw}:{H}:flags=lanczos,pad={W}:{H}:{off}:0:color=black,"
+            f"setsar=1")
 
 
 def grade(key):
-    """normalise this source to the shared black/white point, then apply the
-    look. Runs in 16-bit RGB: the colour ops need RGB semantics, and 16-bit
-    keeps the deep x-ray shadows free of banding."""
-    look = LOOK[key]
-    lv = LEVELS[key]
+    look = SEG[key]["look"]
+    lv = LEVELS.get(key, "0/0 0.010/0.020 0.780/0.880 1/1")
+    g = GAMMA_RGB.get(key, {"r": 1.0, "g": 1.0, "b": 1.0})
+    tone = TONE.get(key, "")
+    # per-shot saturation: a per-channel gamma is a power law and simply
+    # cannot raise saturation, so it needs its own control in the table
+    sat = SAT.get(key, 1.10 if look == "x" else 0.94)
     curve = XRAY_CURVE if look == "x" else REALITY_CURVE
-    tone = XRAY_TONE if look == "x" else REALITY_TONE
-    sat = 1.10 if look == "x" else 0.94
-    return (f"format=gbrp16le,"
-            f"curves=r='{lv}':g='{lv}':b='{lv}',"
-            f"eq=gamma={GAMMA[key]}:saturation={sat},"
-            f"curves=r='{curve}':g='{curve}':b='{curve}',"
-            f"colorbalance={tone}"
-            + (f",{LIME_ROT}" if look == "x" else ""))
+    chain = (f"format=gbrp16le,"
+             f"curves=r='{lv}':g='{lv}':b='{lv}',"
+             f"eq=gamma_r={g['r']:.4f}:gamma_g={g['g']:.4f}:gamma_b={g['b']:.4f}"
+             f":saturation={sat},"
+             f"curves=r='{curve}':g='{curve}':b='{curve}'")
+    if tone:
+        chain += f",colorbalance={tone}"
+    rot = ROT.get(key, DEFAULT_ROT[look])
+    if abs(rot) > 0.05:
+        chain += f",{hue_matrix(rot)}"
+    return chain
 
 
 def finish(look, W, H, vig_in, scale=1.0):
-    """halation -> vignette. Grain is applied once over the whole timeline.
+    """clarity -> halation -> vignette, all in 16-bit RGB.
 
-    Both are done in 16-bit RGB on purpose. Multiplying in YUV would scale the
-    U/V planes too, which slides the hue instead of dimming the frame, and
-    blend's `screen` mode misbehaves above 8-bit -- so the glow is written out
-    as an explicit expression with the range normalised by hand.
+    Multiplying in YUV would scale U/V too and slide the hue instead of
+    dimming, and blend's `screen` misbehaves above 8-bit, so the glow is an
+    explicit expression with the range normalised by hand.
     """
     strength = X_GLOW if look == "x" else R_GLOW
     thresh = X_THRESH if look == "x" else R_THRESH
     screen = f"A+{strength}*(B-A*B/{RGB_MAX})"
     clarity = CLARITY_R if look == "r" else CLARITY_X
     return (
-        # clarity: lift mid-frequency structure so surfaces read as textured
-        # rather than smooth. Written by hand -- unsharp is broken at 16-bit.
+        # micro-contrast: written by hand, unsharp is broken at 16-bit here
         f"split=2[cl_a][cl_b];"
         f"[cl_b]gblur=sigma={8 * scale:.1f}[cl_bl];"
         f"[cl_a][cl_bl]blend=all_mode=normal:all_expr='A+{clarity}*(A-B)'[cl];"
@@ -143,41 +193,37 @@ def finish(look, W, H, vig_in, scale=1.0):
     )
 
 
-def flat_canvas(sw, sh, W, H):
-    if abs(sw / sh - W / H) < 0.006:
-        return f"scale={W}:{H}:flags=lanczos"
-    if sw / sh > W / H:
-        nh, nw = H, int(round(H * sw / sh))
-    else:
-        nw, nh = W, int(round(W * sh / sw))
-    return f"scale={nw}:{nh}:flags=lanczos,crop={W}:{H}:(iw-{W})/2:(ih-{H})/2"
-
-
 def seg_graph(key, W, H, scale):
-    """pass-1 filtergraph for one segment. Returns (graph, extra_inputs)."""
-    if key == "black":
+    s = SEG[key]
+    dur = dur_of(key)
+    if s.get("black"):
         return (f"[0:v]format=yuv420p10le,setsar=1,settb=1/{FPS},fps={FPS},"
-                f"trim=0:{TL[key]},setpts=PTS-STARTPTS[outv]"), []
-    look = LOOK[key]
-    sw, sh = DIMS[key]
-    dur = TL[key]
-    extra = []
+                f"trim=0:{dur},setpts=PTS-STARTPTS[outv]"), []
 
-    if key in ("s1", "s7"):
+    look = s["look"]
+    extra = []
+    import re as _re
+    r = subprocess.run([FF, "-hide_banner", "-i", os.path.join(SRC, s["src"])],
+                       capture_output=True, text=True).stderr
+    m = _re.search(r", (\d+)x(\d+)", r)
+    sw, sh = int(m.group(1)), int(m.group(2))
+
+    if s.get("still"):
         pre = f"fps={FPS},"
     else:
-        st = TRIM.get(key, 0.0)
-        pre = f"fps={FPS},trim={st}:{st + dur:.3f},setpts=PTS-STARTPTS,"
+        pre = f"fps={FPS},trim={s['t0']}:{s['t1']:.3f},setpts=PTS-STARTPTS,"
 
-    if key in REFRAME:
-        keep, ctr = REFRAME[key]
+    if "reframe" in s:
+        # Vertical source: a sharp centre band over a defocused, dimmed copy of
+        # itself, feathered together, so nothing in the piece is portrait.
+        keep, ctr = 0.90, s["reframe"]
         ch = int(round(sh * keep))
         top = max(0, min(int(round(ctr - ch / 2)), sh - ch))
         fg_w = int(round(H * sw / ch))
-        fg_w += fg_w % 2                      # keep the pad offset integral
+        fg_w += fg_w % 2
         cover_h = int(round(W * ch / sw))
         off = max(0, (cover_h - H) // 2)
-        m = feather_expr(W, fg_w, 210.0 * scale)
+        msk = feather_expr(W, fg_w, 210.0 * scale)
         extra += [os.path.join(PLATES, "backdrop_falloff.png"),
                   os.path.join(PLATES, "vignette.png")]
         head = (
@@ -190,38 +236,16 @@ def seg_graph(key, W, H, scale):
             f"format=gbrp16le[bg0];"
             f"[1:v]scale={W}:{H}:flags=lanczos,format=gbrp16le[bf];"
             f"[bg0][bf]blend=all_mode=multiply[bg];"
-            f"[bg][fg]blend=all_mode=normal:all_expr='A*(1-{m})+B*{m}'[cv]"
+            f"[bg][fg]blend=all_mode=normal:all_expr='A*(1-{msk})+B*{msk}'[cv]"
         )
         vig_in = "2:v"
     else:
-        canvas = flat_canvas(sw, sh, W, H)
-        head = f"[0:v]{pre}format=yuv420p10le,{canvas}[cv0]"
-        if key == "c5":
-            # muzzle / light-box burst, timed off the measured flash peak (3.375 s)
-            bsz = int(round(1700 * scale))
-            extra += [os.path.join(PLATES, "burst.png"),
-                      os.path.join(PLATES, "flash_pop.png")]
-            head += (
-                f";[1:v]scale={bsz}:{bsz},format=yuva420p,"
-                f"colorchannelmixer=aa=0.62,"
-                f"fade=t=in:st=3.20:d=0.08:alpha=1,"
-                f"fade=t=out:st=3.32:d=0.34:alpha=1[bu];"
-                f"[cv0][bu]overlay=x={int(round(241 * scale))}:y={int(round(-462 * scale))}"
-                f":enable='between(t,3.16,3.68)'[cv1];"
-                f"[2:v]scale={W}:{H},format=yuva420p,colorchannelmixer=aa=0.13,"
-                f"fade=t=in:st=3.30:d=0.03:alpha=1,"
-                f"fade=t=out:st=3.34:d=0.13:alpha=1[fp];"
-                f"[cv1][fp]overlay=0:0:enable='between(t,3.28,3.50)'[cv2];"
-                f"[cv2]format=gbrp16le[cv]"
-            )
-            vig_in = "3:v"
-        else:
-            head += f";[cv0]format=gbrp16le[cv]"
-            vig_in = "1:v"
+        head = f"[0:v]{pre}format=yuv420p10le,{flat_canvas(sw, sh, W, H)}[cv0]"
+        head += f";[cv0]format=gbrp16le[cv]"
         extra.append(os.path.join(PLATES, "vignette.png"))
+        vig_in = "1:v"
 
-    graph = head + ";[cv]" + grade(key) + "[gd];[gd]" + finish(look, W, H, vig_in, scale)
-    return graph, extra
+    return head + ";[cv]" + grade(key) + "[gd];[gd]" + finish(look, W, H, vig_in, scale), extra
 
 
 def run(cmd):
@@ -231,32 +255,41 @@ def run(cmd):
         raise SystemExit(f"ffmpeg failed ({r.returncode})")
 
 
+def _cached_size(path):
+    """Width/height of an existing intermediate, or None."""
+    r = subprocess.run([FF, "-hide_banner", "-i", path], capture_output=True, text=True)
+    m = re.search(r", (\d+)x(\d+)[,\s]", r.stderr)
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
 def pass1(W, H, scale, force=False):
     outs = {}
-    for key in SEGMENTS:
+    for key in ORDER:
         dst = os.path.join(WORK, f"seg_{key}.mkv")
         outs[key] = dst
-        if os.path.exists(dst) and not force:
+        # The cache is keyed on nothing but the filename, but the render is
+        # scale-dependent -- reusing a half-res intermediate for a full-res
+        # assembly silently ships a 640x360 master. Check the actual size.
+        if os.path.exists(dst) and not force and _cached_size(dst) == (W, H):
             continue
         graph, extra = seg_graph(key, W, H, scale)
-        dur = TL[key]
-        cmd = [FF, "-hide_banner", "-y", "-loglevel", "error", "-stats"]
-        if key in ("s1", "s7"):
+        dur = dur_of(key)
+        s = SEG[key]
+        cmd = [FF, "-hide_banner", "-y", "-loglevel", "error"]
+        if s.get("still"):
             cmd += ["-loop", "1", "-framerate", str(FPS), "-t", f"{dur:.3f}",
-                    "-i", os.path.join(SRC, SRC_FILE[key])]
-        elif key == "black":
+                    "-i", os.path.join(SRC, s["src"])]
+        elif s.get("black"):
             cmd += ["-f", "lavfi", "-i",
                     f"color=c=black:s={W}x{H}:r={FPS}:d={dur + 0.3:.2f}"]
         else:
-            cmd += ["-i", os.path.join(SRC, SRC_FILE[key])]
+            cmd += ["-i", os.path.join(SRC, s["src"])]
         for e in extra:
-            # a looped still never reaches EOF, so cap every plate at the
-            # segment length or the filtergraph runs forever
-            cmd += ["-loop", "1", "-framerate", str(FPS), "-t", f"{dur + 0.6:.3f}",
-                    "-i", e]
-        cmd += ["-filter_complex", graph, "-map", "[outv]", "-an",
-                "-t", f"{dur:.3f}"]
-        cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "8",
+            # a looped still never reaches EOF, so cap every plate or the
+            # filtergraph runs forever
+            cmd += ["-loop", "1", "-framerate", str(FPS), "-t", f"{dur + 0.6:.3f}", "-i", e]
+        cmd += ["-filter_complex", graph, "-map", "[outv]", "-an", "-t", f"{dur:.3f}",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "8",
                 "-pix_fmt", "yuv420p10le", "-g", "48", dst]
         print(f"  pass1 {key}")
         run(cmd)
@@ -264,63 +297,38 @@ def pass1(W, H, scale, force=False):
 
 
 def pass2(outs, W, H, out, crf, preset, codec, grain, scale):
-    # inputs: s1 c2 c3 c4 c5 c6 s7 black  sweep
-    order = ("s1", "c2", "c3", "c4", "c5", "c6", "s7", "black")
-    g = []
-    idx = {k: i for i, k in enumerate(order)}
-    cmd = [FF, "-hide_banner", "-y", "-loglevel", "error", "-stats"]
-    for k in order:
+    idx = {k: i for i, k in enumerate(ORDER)}
+    cmd = [FF, "-hide_banner", "-y", "-loglevel", "error"]
+    for k in ORDER:
         cmd += ["-i", outs[k]]
-    cmd += ["-loop", "1", "-framerate", str(FPS), "-t", f"{TL['c6'] + 0.5:.3f}",
-            "-i", os.path.join(PLATES, "sweep.png")]
-    swi = len(order)
-
-    def cat(x, y):
-        o = f"k{len(g)}"
-        g.append(f"[{x}][{y}]concat=n=2:v=1:a=0,settb=1/{FPS},fps={FPS}[{o}]")
-        return o
-
-    def xf(x, y, d, off):
-        o = f"k{len(g)}"
-        g.append(f"[{x}][{y}]xfade=transition=fade:duration={d}:offset={off:.3f},"
-                 f"settb=1/{FPS},fps={FPS}[{o}]")
-        return o
+    g = []
+    for k in ORDER:
+        g.append(f"[{idx[k]}:v]settb=1/{FPS},fps={FPS},format=yuv420p10le[{k}]")
 
     def one(x, f):
-        o = f"p{len(g)}"
-        g.append(f"[{x}]{f}[{o}]")
-        return o
+        n = f"{x}_{f}"
+        g.append(f"[{x}]{f}[{n}]")
+        return n
 
     def two(x, y, f):
-        o = f"p{len(g)}"
-        g.append(f"[{x}][{y}]{f}[{o}]")
-        return o
+        n = f"{x}_{y}_{f}"
+        g.append(f"[{x}][{y}]{f}[{n}]")
+        return n
 
-    # matroska intermediates carry a 1/1000 timebase -- normalise every input
-    # first or concat/xfade refuse to bind
-    norm = {k: one(f"{idx[k]}:v", f"settb=1/{FPS},fps={FPS}") for k in order}
+    a = one("s1", "split=1")
+    t = dur_of("s1")
+    for i in range(1, len(ORDER)):
+        k = ORDER[i]
+        d = XF.get(k, 0.0)
+        src = one(k, "split=1")
+        if d > 0:
+            a = two(a, src, f"xfade=transition=fade:duration={d:.3f}:offset={t - d:.3f}")
+            t += dur_of(k) - d
+        else:
+            a = two(a, src, "concat=n=2:v=1:a=0")
+            t += dur_of(k)
 
-    # the x-ray switch: clip 6 bleeds up out of the blackout behind a lime sweep
-    c6 = norm["c6"]
-    s = one(f"{swi}:v", f"scale={int(round(460 * scale))}:{H},format=yuva420p,"
-                        f"colorchannelmixer=aa=0.55,"
-                        f"fade=t=out:st=0.10:d=0.55:alpha=1")
-    c6 = two(c6, s, "overlay=x='(W-w)*t/0.62':y=0:enable='between(t,0,0.68)'")
-    c6 = one(c6, "fade=t=in:st=0:d=0.42:color=black")
-
-    blk = one(norm["black"], f"trim=0:{TL['black']},setpts=PTS-STARTPTS")
-    a = cat(norm["s1"], norm["c2"])
-    t = TL["s1"] + TL["c2"]
-    a = xf(a, norm["c3"], XF_23, t - XF_23); t += TL["c3"] - XF_23
-    a = xf(a, norm["c4"], XF_34, t - XF_34); t += TL["c4"] - XF_34
-    a = xf(a, norm["c5"], XF_45, t - XF_45); t += TL["c5"] - XF_45
-    a = cat(a, blk);                         t += TL["black"]
-    a = cat(a, c6);                          t += TL["c6"]
-    a = xf(a, norm["s7"], XF_67, t - XF_67); t += TL["s7"] - XF_67
-
-    # one shared film-grain pass over the whole timeline
     fin = one(a, f"format=gbrp16le,noise=alls={grain}:allf=t+u,format=yuv420p")
-
     cmd += ["-filter_complex", ";\n".join(g), "-map", f"[{fin}]", "-an",
             "-r", str(FPS), "-t", f"{t:.3f}"]
     if codec == "h264":
@@ -341,19 +349,19 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scale", type=float, default=1.0)
     ap.add_argument("--out", default=None)
-    ap.add_argument("--crf", type=int, default=19)
+    ap.add_argument("--crf", type=int, default=22)
     ap.add_argument("--preset", default="slow")
     ap.add_argument("--grain", type=int, default=GRAIN)
     ap.add_argument("--codec", default="h264", choices=["h264", "vp9"])
     ap.add_argument("--force", action="store_true")
-    ap.add_argument("--only", default=None)
     a = ap.parse_args()
 
     os.makedirs(WORK, exist_ok=True)
     os.makedirs(OUTD, exist_ok=True)
     W, H = int(round(BASE_W * a.scale)), int(round(BASE_H * a.scale))
     outs = pass1(W, H, a.scale, a.force)
-    out = a.out or os.path.join(OUTD, "about-hero-xray.mp4")
+    ext = "webm" if a.codec == "vp9" else "mp4"
+    out = a.out or os.path.join(OUTD, f"about-hero-xray.{ext}")
     pass2(outs, W, H, out, a.crf, a.preset, a.codec, a.grain, a.scale)
     print("wrote", out)
 
