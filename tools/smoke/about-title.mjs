@@ -95,15 +95,26 @@ try {
   const btn = () => doc.querySelector('button[aria-label]');
   assert.equal(btn().disabled, true, 'the control is inert while it is still flipping');
 
+  // Sampled mid-flap-1: the second word must not have started moving yet.
+  // (The gap between the two flips is only 250ms, far too narrow to sample
+  // reliably, so prove the ordering here instead.)
+  await wait(1250);
+  assert.equal(board('UNLOCK SKELETON'), 'SKELETON UP', 'beat 2: SKELETON UP holds while the display word flaps');
+
   // Beat 2 — MAAAADNESSS flaps into ARCHITECTURE, and the board grows by one.
-  await wait(2300);
+  await wait(1050);
   assert.equal(board('ARCHITECTURE'), 'ARCHITECTURE', 'beat 2: MAAAADNESSS has flapped into ARCHITECTURE');
   assert.equal(tiles('ARCHITECTURE'), 'ARCHITECTURE'.length, 'the board grew to fit ARCHITECTURE');
 
-  // Beat 3 — the line pulls back. Framer writes the transform inline.
-  const receded = [...doc.querySelectorAll('h1 > span')].filter((s) => /blur|opacity/.test(s.getAttribute('style') || ''));
-  assert.ok(receded.length >= 6, `beat 3: the line pulls back (${receded.length} words carrying a recede transform)`);
-  assert.ok(board('UNLOCK SKELETON') === 'SKELETON UP', 'beat 3: SKELETON UP is what is left standing');
+  // Beat 3 — no pull-back any more: both words hold their ground. The
+  // display word carries the lime and the bottom copy stays bone and still.
+  // The colour sits on the tile faces, not on the flap's root span.
+  const bigFace = doc.querySelector('[aria-label="ARCHITECTURE"] [data-face]');
+  assert.ok(/d7ff4f/.test(bigFace.className), 'beat 3: the display word carries the lime');
+  const bottomLeft = [...doc.querySelectorAll('h1 span')].find((n) => n.textContent.trim() === 'OF ART BUILT FROM THE');
+  assert.ok(bottomLeft, 'the rest of the line sits bottom-left');
+  assert.ok(/f5f3ee/.test(bottomLeft.className), 'the bottom copy is bone, not lime');
+  assert.ok(!/blur/.test(bottomLeft.getAttribute('style') || ''), 'the bottom copy does not recede — the pull-back beat is gone');
 
   // Beat 4 — SKELETON UP flaps into UNLOCK SKELETON (11 -> 15 tiles).
   await wait(2400);
@@ -115,7 +126,7 @@ try {
   // The array is constructed inside the jsdom realm, so compare its
   // contents (deepStrictEqual would fail on the differing prototype).
   assert.deepEqual([...window.titleTest.unlocks], ['unlock'], 'clicking UNLOCK SKELETON starts the film');
-  console.log('PASS  the title plays its four beats and the last word starts the film');
+  console.log('PASS  the display word flaps to ARCHITECTURE and the last word starts the film');
 
   // ── the takeover on the real page ─────────────────────────────────────
   window.titleTest.mountPage();
@@ -141,7 +152,17 @@ try {
   video.dispatchEvent(new window.Event('ended'));
   await wait(200);
   assert.ok(parseFloat(copy.style.opacity) > 0.5, 'the furniture comes back when the film ends');
+
+  // The hero was stripped back to match the homepage: only the nav is
+  // constant, everything else that was About-only decoration is gone.
+  const hero = doc.querySelector('section');
+  const heroText = hero.textContent || '';
+  for (const gone of ['Fig. 01', 'Johannesburg', 'Practising since', 'JHB \u00B7 SA', 'About Me', 'design that moves people', 'Art comes 1st']) {
+    assert.ok(!heroText.includes(gone), `the hero no longer carries "${gone}"`);
+  }
+  assert.ok(!/\+/.test(heroText.replace(/\s/g, '')), 'the corner registrations are gone');
   console.log('PASS  clicking it runs the film, the hero copy clears for the takeover, and returns on ended');
+  console.log('PASS  the hero is stripped back to the photograph, the headline and the nav');
 } finally {
   assert.deepEqual(errors, [], 'no runtime errors or warnings: ' + errors.join(' | '));
   window.close();

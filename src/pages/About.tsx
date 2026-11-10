@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import CTAButton from '../components/CTAButton';
 import AboutHeroTitle from '../components/AboutHeroTitle';
 import WhatIDo from '../components/WhatIDo';
-import { ScribbleX } from '../components/Scribbles';
 import XrayHero, { type XrayHeroHandle, type Phase } from '../components/XrayHero';
 
 /**
@@ -13,13 +12,10 @@ import XrayHero, { type XrayHeroHandle, type Phase } from '../components/XrayHer
  * — no gradients, no masks. It idles on the first frame of the x-ray sequence
  * (see components/XrayHero), held as a grayscale study exactly the way the
  * photograph it replaced was; pressing the control runs the sequence in colour
- * and it settles on its closing x-ray frame. Readability comes from the
- * hard-edged left plate (a solid, translucent surface, not a fade), so the
- * headline sits on a clear field while the subject stays visible on the right,
- * whether the hero is still or running. A thin lime hairline is struck at the
- * left edge where the headline begins — that line is the origin of the
- * hero→What I Do transition, which grows it into a full-width black panel
- * that reveals the practice.
+ * and it settles on its closing x-ray frame. The hero carries nothing but the
+ * photograph, the headline and the site's nav, so it reads as the same page as
+ * the homepage hero; legibility comes from a shadow on the copy itself rather
+ * than a plate behind it.
  */
 const About: React.FC = () => {
   const heroRef = useRef<HTMLElement>(null);
@@ -76,101 +72,42 @@ const About: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#000000]">
-      {/* ── About hero — full-bleed image, copy on top ──────────────────
-          No gradients and no masks. The photograph is dimmed with a CSS filter
-          (the study look), and the copy sits on a hard-edged translucent left
-          plate. The lime hairline at the left is where the headline begins and
-          where the transition line is struck. */}
+      {/* ── About hero ──────────────────────────────────────────────────
+          Stripped back to the same furniture the homepage hero runs: the
+          photograph, the headline, and the nav. The eyebrow, the facts rail,
+          the caption strip, the corner registrations, the contact-sheet
+          hairlines, the index tab and the scribble are all gone — they were
+          About-only decoration that made the two heroes read as different
+          pages. The lime origin hairline went with them; the scroll wipe into
+          What I Do draws its own line inside that component, so the
+          transition is unaffected. */}
       <section
         ref={heroRef}
         className="relative h-[100svh] min-h-[560px] overflow-hidden bg-[#000000]"
       >
         {/* The hero plate: idles on the opening frame of the sequence, held in
-            the grayscale study treatment. Pressing the control runs the video,
-            which holds on its closing x-ray frame when it ends. */}
+            the grayscale study treatment. Running the sequence holds on its
+            closing x-ray frame when it ends. */}
         <XrayHero ref={xrayRef} onPhaseChange={setXrayPhase} />
 
-        {/* Plate, hairlines and the origin line sit OVER the video so the copy
-            stays legible whether the hero is still or running. */}
-        <div aria-hidden className="absolute inset-0">
-          {/* The left scrim plate the copy used to sit on is gone — it cut the
-              frame in half and pushed the subject off to one side. Legibility
-              now comes from a text shadow on the copy itself, so the image
-              reads edge to edge. */}
-          {/* Contact-sheet hairlines framing the hero. */}
-          <div className="absolute inset-x-0 top-0 h-px bg-white/10" />
-          <div className="absolute inset-x-0 bottom-0 h-px bg-white/10" />
-          {/* The transition's origin line: a thin lime vertical hairline where
-              the headline begins on the left. It grows into the wipe. */}
-          <div className="absolute inset-y-0 left-4 sm:left-6 lg:left-12 xl:left-24 w-[2px] bg-[#d7ff4f]/50" />
-        </div>
-
-        {/* Mono corner registrations, like the edge of a contact sheet. */}
-        <span aria-hidden className="absolute top-5 left-4 sm:left-6 lg:left-12 xl:left-24 z-20 font-mono text-[9px] tracking-[0.3em] text-[#8f8f88]">+</span>
-        <span aria-hidden className="absolute bottom-5 right-4 sm:right-6 lg:right-12 xl:right-24 z-20 font-mono text-[9px] tracking-[0.3em] text-[#8f8f88]">+</span>
-
-        <ScribbleX className="absolute top-16 md:top-20 right-4 md:right-10 w-6 h-6 md:w-8 md:h-8 opacity-70 hidden md:block z-20" />
-
-        {/* Copy on top. Contained to the hard-edged left plate. */}
-        <div className="relative z-10 h-full flex items-center px-4 sm:px-6 lg:px-12 xl:px-24">
-          {/* With the scrim gone the copy sits straight on the photograph, so
-              it carries its own shadow instead of a plate behind it. One
-              drop-shadow on the container covers every line, rather than a
-              shadow per element that would double up where they overlap. */}
+        {/* Copy on top. The display word sits high in the frame and the rest
+            of the line splits to the bottom corners, after the reference. */}
+        <div className="relative z-10 h-full px-4 sm:px-6 lg:px-12 xl:px-24">
           <div
             ref={heroCopyRef}
-            className={`max-w-[1600px] w-full mx-auto will-change-[opacity,transform] [filter:drop-shadow(0_2px_12px_rgba(0,0,0,0.8))_drop-shadow(0_1px_2px_rgba(0,0,0,0.9))] ${
+            className={`h-full pt-[16svh] pb-10 md:pb-12 max-w-[1600px] mx-auto will-change-[opacity,transform] [filter:drop-shadow(0_2px_12px_rgba(0,0,0,0.8))_drop-shadow(0_1px_2px_rgba(0,0,0,0.9))] ${
               takeover ? 'pointer-events-none transition-opacity duration-500 ease-out' : ''
             }`}
           >
-            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-              <div className="flex items-center gap-4 mb-6 md:mb-10">
-                <p className="text-[10px] md:text-xs font-bold tracking-[0.3em] uppercase text-[#8f8f88]">About Me</p>
-                <span className="h-px flex-1 bg-[#f5f3ee]/12" aria-hidden />
-                <p className="font-mono text-[10px] md:text-xs tracking-[0.3em] text-[#8f8f88]">JHB · SA</p>
-              </div>
-
-              {/* The headline is also the trigger: it runs its own four-beat
-                  sequence (MAAAADNESSS -> ARCHITECTURE, the line pulls back,
-                  SKELETON UP -> UNLOCK SKELETON) and the last word starts
-                  the film. Type matches the homepage hero. */}
-              <AboutHeroTitle
-                onUnlock={() => xrayRef.current?.engage()}
-                suppressed={takeover}
-              />
-
-              <motion.div className="mt-6 md:mt-9 inline-block" style={{ transform: 'rotate(-4deg)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
-                <span className="hand-note text-[#d7c4aa] text-lg md:text-3xl">design that moves people</span>
-              </motion.div>
-
-              {/* Facts rail: three plain cells, hairline-separated. Reads as a
-                  colophon under the headline rather than decoration. */}
-              <dl className="mt-8 md:mt-12 grid grid-cols-2 sm:grid-cols-3 border-t border-[#f5f3ee]/12 max-w-md lg:max-w-lg">
-                {[
-                  { k: 'Based in', v: 'Johannesburg' },
-                  { k: 'Practising since', v: '2015' },
-                  { k: 'Currently', v: 'Open to work' },
-                ].map((item) => (
-                  <div key={item.k} className="py-4 pr-4 border-b sm:border-b-0 border-[#f5f3ee]/12">
-                    <dt className="font-mono text-[9px] md:text-[10px] tracking-[0.28em] uppercase text-[#8f8f88]">{item.k}</dt>
-                    <dd className="mt-1.5 text-[#f5f3ee] text-sm md:text-base font-medium">{item.v}</dd>
-                  </div>
-                ))}
-              </dl>
-
-              {/* Caption strip tying the plate back to the portrait. */}
-              <div className="mt-6 md:mt-8 flex items-center justify-between gap-4 max-w-md lg:max-w-lg border-t border-[#f5f3ee]/12 pt-3">
-                <span className="font-mono text-[9px] md:text-[10px] tracking-[0.28em] uppercase text-[#8f8f88]">Papi Raborife</span>
-                <span className="font-mono text-[9px] md:text-[10px] tracking-[0.28em] uppercase text-[#8f8f88]">Art comes 1st</span>
-              </div>
-            </motion.div>
+            {/* The headline is also the trigger: MAAAADNESSS flaps to
+                ARCHITECTURE, SKELETON UP flaps to UNLOCK SKELETON, and that
+                last word starts the film. */}
+            <AboutHeroTitle
+              onUnlock={() => xrayRef.current?.engage()}
+              suppressed={takeover}
+            />
           </div>
         </div>
-
-        {/* Index tab — the single point of overlap, in brand lime. */}
-        <span className="absolute z-20 left-4 sm:left-6 lg:left-12 xl:left-24 top-22 md:top-24 rotate-[-2deg] bg-[#d7ff4f] text-[#000000] font-mono text-[9px] md:text-[10px] font-bold tracking-[0.3em] uppercase px-3 py-1.5">
-          Fig. 01 — the maker
-        </span>
       </section>
 
       <WhatIDo variant="about" />

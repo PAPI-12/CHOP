@@ -1,54 +1,29 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
 import SplitFlapSwap from './SplitFlapSwap';
 
 /**
  * AboutHeroTitle — the hero headline, and the control that starts the film.
  *
- * It is a four-beat sequence rather than a static headline:
+ * Two beats, laid out after the reference: the display word sits on its own
+ * high in the frame, and the rest of the line splits to the bottom corners.
  *
- *   1. THE MAAAADNESSS OF ART BUILT FROM THE SKELETON UP
- *   2. MAAAADNESSS split-flaps into ARCHITECTURE
- *   3. the whole line pulls back into the background — smaller, dimmer,
- *      slightly out of focus — so that only SKELETON UP is left standing
- *   4. SKELETON UP split-flaps into UNLOCK SKELETON, which is the button
- *      that runs the x-ray sequence
+ *   MAAAADNESSS                      (lime, display size, split-flaps)
+ *   OF ART BUILT FROM THE     SKELETON UP → UNLOCK SKELETON
  *
- * The type matches the homepage hero: text-[11vw] sm:text-[9vw]
- * md:text-[5.5vw], font-display, leading-[0.88].
+ * The display word carries the homepage hero's exact type scale
+ * (clamp(2.2rem,10.8vw,10rem) / md clamp(3.5rem,8.6vw,9.5rem), leading 0.86,
+ * tracking -0.04em) and the second flaps SKELETON UP into UNLOCK SKELETON,
+ * which is the button that runs the x-ray sequence.
  *
- * The recede animates each word as its own inline-block. Animating the
- * wrapping span as a single inline-block would make the whole clause one
- * atomic box and break the headline's natural line wrapping; per-word boxes
- * wrap normally and can still be scaled, since transforms are ignored on
- * plain inline elements.
+ * The pull-back beat is gone: the line used to recede into the background
+ * before the second flip, and on this layout it just made the bottom corners
+ * dissolve for no reason. Both words now stay put.
  */
 
 const FLAP1_START = 1100; // let the headline land before the first flip
-const RECEDE_MS = 700;
+const GAP_MS = 250; // a beat between the two flips
 
-type Phase = 'intro' | 'flap1' | 'recede' | 'flap2' | 'ready';
-
-/** One word of the line that pulls back once the flip has played. */
-const Recede: React.FC<{ back: boolean; children: React.ReactNode; className?: string }> = ({
-  back,
-  children,
-  className = '',
-}) => (
-  <motion.span
-    className={`inline-block will-change-[transform,opacity,filter] ${className}`}
-    style={{ transformOrigin: 'left center' }}
-    initial={false}
-    animate={
-      back
-        ? { opacity: 0.2, scale: 0.86, filter: 'blur(5px)', y: -4 }
-        : { opacity: 1, scale: 1, filter: 'blur(0px)', y: 0 }
-    }
-    transition={{ duration: RECEDE_MS / 1000, ease: [0.22, 1, 0.36, 1] }}
-  >
-    {children}
-  </motion.span>
-);
+type Phase = 'intro' | 'flap1' | 'gap' | 'flap2' | 'ready';
 
 type Props = {
   /** start the x-ray film */
@@ -59,8 +34,6 @@ type Props = {
 
 const AboutHeroTitle: React.FC<Props> = ({ onUnlock, suppressed = false }) => {
   const [phase, setPhase] = useState<Phase>('intro');
-
-  const back = phase === 'recede' || phase === 'flap2' || phase === 'ready';
   const ready = phase === 'ready';
 
   useEffect(() => {
@@ -68,71 +41,70 @@ const AboutHeroTitle: React.FC<Props> = ({ onUnlock, suppressed = false }) => {
     return () => window.clearTimeout(t);
   }, []);
 
-  // Hold the pulled-back line for a beat before the second flip, so the
-  // change of focus registers before the word changes.
   useEffect(() => {
-    if (phase !== 'recede') return;
-    const t = window.setTimeout(() => setPhase('flap2'), RECEDE_MS);
+    if (phase !== 'gap') return;
+    const t = window.setTimeout(() => setPhase('flap2'), GAP_MS);
     return () => window.clearTimeout(t);
   }, [phase]);
 
-  const onFlap1Done = () => setPhase((p) => (p === 'flap1' ? 'recede' : p));
+  const onFlap1Done = () => setPhase((p) => (p === 'flap1' ? 'gap' : p));
   const onFlap2Done = () => setPhase((p) => (p === 'flap2' ? 'ready' : p));
 
   return (
-    <h1 className="text-[11vw] sm:text-[9vw] md:text-[5.5vw] font-display leading-[0.88] text-[#f5f3ee]">
-      <Recede back={back}>THE&nbsp;</Recede>
-      <Recede back={back}>
+    <h1 className="h-full flex flex-col justify-between gap-10 md:gap-14 font-display">
+      {/* The display word. Same scale as the homepage hero's own headline. */}
+      <span className="block whitespace-nowrap">
         <SplitFlapSwap
           from="MAAAADNESSS"
           to="ARCHITECTURE"
           run={phase !== 'intro'}
-          settledClassName="text-[#f5f3ee]"
+          settledClassName="text-[#d7ff4f]"
           flippingClassName="text-[#d7ff4f]"
           onComplete={onFlap1Done}
-          className="whitespace-nowrap"
+          className="block text-[clamp(2.2rem,10.8vw,10rem)] md:text-[clamp(3.5rem,8.6vw,9.5rem)] leading-[0.86] tracking-[-0.04em]"
         />
-      </Recede>
-      <Recede back={back}>&nbsp;OF&nbsp;</Recede>
-      <Recede back={back}>ART&nbsp;</Recede>
-      <Recede back={back}>BUILT&nbsp;</Recede>
-      <Recede back={back}>FROM&nbsp;</Recede>
-      <Recede back={back}>THE&nbsp;</Recede>
+      </span>
 
-      {/* The one thing left standing once the line pulls back. It becomes
-          the control, but only after it has finished flipping — a button
-          mid-flip would be a moving target. */}
-      <button
-        type="button"
-        onClick={ready && !suppressed ? onUnlock : undefined}
-        disabled={!ready || suppressed}
-        aria-label={ready ? 'Unlock skeleton — play the x-ray sequence' : 'Skeleton up'}
-        className={`relative inline-block align-baseline whitespace-nowrap text-left transition-opacity duration-300 ${
-          ready && !suppressed
-            ? 'cursor-pointer focus-visible:outline-none'
-            : 'cursor-default'
-        } ${suppressed ? 'opacity-0' : 'opacity-100'}`}
-      >
-        <SplitFlapSwap
-          from="SKELETON UP"
-          to="UNLOCK SKELETON"
-          run={phase === 'flap2' || phase === 'ready'}
-          settledClassName="text-[#f5f3ee]"
-          flippingClassName="text-[#d7ff4f]"
-          onComplete={onFlap2Done}
-          className="whitespace-nowrap"
-        />
-        {/* The affordance: a lime hairline that draws under the word once it
-            is live, so it reads as a control without recolouring the tiles
-            (changing their settled class mid-life would restart the flap). */}
-        <span
-          aria-hidden
-          className={`absolute -bottom-[0.06em] left-0 h-[2px] bg-[#d7ff4f] origin-left transition-transform duration-500 ease-out ${
-            ready && !suppressed ? 'scale-x-100' : 'scale-x-0'
-          }`}
-          style={{ width: '100%' }}
-        />
-      </button>
+      {/* The rest of the line, split to the bottom corners. */}
+      <span className="flex items-end justify-between gap-6 md:gap-10">
+        <span className="block text-[#f5f3ee] text-[clamp(0.95rem,2.9vw,2.1rem)] leading-[1.05] tracking-[-0.02em]">
+          OF ART BUILT FROM THE
+        </span>
+
+        {/* Becomes the control once it has finished flipping — a button
+            mid-flip would be a moving target. */}
+        <button
+          type="button"
+          onClick={ready && !suppressed ? onUnlock : undefined}
+          disabled={!ready || suppressed}
+          aria-label={ready ? 'Unlock skeleton — play the x-ray sequence' : 'Skeleton up'}
+          className={`relative inline-block align-baseline whitespace-nowrap text-left transition-opacity duration-300 ${
+            ready && !suppressed
+              ? 'cursor-pointer focus-visible:outline-none'
+              : 'cursor-default'
+          } ${suppressed ? 'opacity-0' : 'opacity-100'}`}
+        >
+          <SplitFlapSwap
+            from="SKELETON UP"
+            to="UNLOCK SKELETON"
+            run={phase === 'flap2' || phase === 'ready'}
+            settledClassName="text-[#f5f3ee]"
+            flippingClassName="text-[#d7ff4f]"
+            onComplete={onFlap2Done}
+            className="block text-[clamp(0.95rem,2.9vw,2.1rem)] leading-[1.05] tracking-[-0.02em]"
+          />
+          {/* The affordance: a lime hairline that draws under the word once it
+              is live, so it reads as a control without recolouring the tiles
+              (changing their settled class mid-life would restart the flap). */}
+          <span
+            aria-hidden
+            className={`absolute -bottom-[0.12em] left-0 h-[2px] bg-[#d7ff4f] origin-left transition-transform duration-500 ease-out ${
+              ready && !suppressed ? 'scale-x-100' : 'scale-x-0'
+            }`}
+            style={{ width: '100%' }}
+          />
+        </button>
+      </span>
     </h1>
   );
 };
