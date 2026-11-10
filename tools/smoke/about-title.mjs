@@ -6,8 +6,8 @@
  * depends on the player's own phase reaching the page. This mounts the real
  * components, lets the sequence actually run against the clock, and asserts
  * what is on the board at each beat — including that the board grows, since
- * SKELETON UP (11) becomes UNLOCK SKELETON (15) and a fixed-width flip would
- * silently drop the tail.
+ * MADNESS (7) becomes SKELETON (8) and a fixed-width flip would silently drop
+ * the tail.
  */
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
@@ -90,16 +90,23 @@ try {
   window.titleTest.mountTitle();
   await wait(250);
 
-  assert.equal(board('ARCHITECTURE'), 'MAAAADNESSS', 'beat 1: the board opens on MAAAADNESSS, not on the target');
-  // The closing pair is set, not flapped: SKELETON over the U+P lockup.
-  const closing = [...doc.querySelectorAll('h1 span')].find((n) => n.textContent.trim() === 'SKELETON');
-  assert.ok(closing, 'the closing pair opens on SKELETON');
+  // ARCHITECTURE is plain type now; the only board is SKELETON, and it opens
+  // on MADNESS.
+  assert.equal(board('SKELETON'), 'MADNESS', 'beat 1: the board opens on MADNESS, not on the target');
+  const arch = [...doc.querySelectorAll('h1 span')].find((n) => n.textContent.trim() === 'ARCHITECTURE');
+  assert.ok(arch, 'ARCHITECTURE is on the board');
+  assert.equal(doc.querySelectorAll('[aria-label="ARCHITECTURE"]').length, 0,
+    'ARCHITECTURE is plain type — the split-flap moved to SKELETON');
   const upLock = doc.querySelector('[aria-label="UP"]');
-  assert.ok(upLock, 'the closing pair ends in the U+P lockup');
-  assert.equal(upLock.textContent.replace(/\s/g, ''), 'UP', 'the lockup is built from U and P');
-  // The U and P must actually overlap, or it is not a lockup.
-  const [uEl, pEl] = upLock.children;
+  assert.ok(upLock, 'the headline ends in the U+P lockup');
+  // Three layers: U behind, P over it, and a clipped U woven back in front.
+  // Without the clip the two letters merely stack, which is not a lockup.
+  const [uEl, pEl, weave] = upLock.children;
+  assert.equal(uEl.textContent.trim(), 'U', 'the lockup is built from a U');
+  assert.equal(pEl.textContent.trim(), 'P', '...and a P');
   assert.ok(/-ml-/.test(pEl.className), 'the P is pulled into the U');
+  assert.ok(weave && /clip-path/.test(weave.className), 'a clipped U weaves back in front of the P');
+  assert.ok(/1\.3em/.test(uEl.className), 'the U is the bigger of the two');
   assert.equal(doc.querySelectorAll('h1 button').length, 0, 'the headline carries no control — the film runs from the player');
   assert.equal(doc.querySelectorAll('h1 [aria-hidden].bg-\\[\\#d7ff4f\\]').length, 0,
     'no rule between the rows');
@@ -110,7 +117,7 @@ try {
   const W = { A:.72,B:.72,C:.72,D:.78,E:.62,F:.6,G:.78,H:.78,I:.32,J:.5,K:.72,L:.58,
     M:.92,N:.78,O:.82,P:.68,Q:.82,R:.72,S:.66,T:.62,U:.76,V:.72,W:.98,X:.68,Y:.66,Z:.62,' ':.34 };
   const em = (t) => (t === 'UP'
-    ? W.U + W.P - 0.34 - 0.08                       // the interlocked lockup
+    ? W.U * 1.3 + W.P - 0.57                        // the woven lockup
     : [...t].reduce((a, c) => a + (W[c] ?? 0.62), 0) - 0.04 * t.length);
   const tierOf = (el) => {
     const m = /text-\[clamp\([^,]+,([\d.]+)vw/.exec(el.className);
@@ -121,10 +128,12 @@ try {
   const upParent = upEl.parentElement;
   const rows = [
     ['THE', row('THE')],
-    ['ARCHITECTURE', doc.querySelector('[aria-label="ARCHITECTURE"]')],
-    ['OF ART', row('OF ART')],
-    ['BUILT FROM THE', row('BUILT FROM THE')],
-    ['SKELETON', row('SKELETON')],
+    ['ARCHITECTURE', arch],
+    ['ART BUILT', row('ART BUILT')],
+    ['FROM THERE', row('FROM THERE')],
+    // SKELETON is the flap board, so the size class sits on the board's own
+    // root rather than on the row wrapper around it.
+    ['SKELETON', doc.querySelector('[aria-label="SKELETON"]')],
     ['UP', upParent],
   ];
   for (const [label, el] of rows) assert.ok(el, `the ${label} row is rendered`);
@@ -142,26 +151,26 @@ try {
 
   // Beat 2 — MAAAADNESSS flaps into ARCHITECTURE, and the board grows by one.
   await wait(2300);
-  assert.equal(board('ARCHITECTURE'), 'ARCHITECTURE', 'beat 2: MAAAADNESSS has flapped into ARCHITECTURE');
-  assert.equal(tiles('ARCHITECTURE'), 'ARCHITECTURE'.length, 'the board grew to fit ARCHITECTURE');
+  assert.equal(board('SKELETON'), 'SKELETON', 'beat 2: MADNESS has flapped into SKELETON');
+  assert.equal(tiles('SKELETON'), 'SKELETON'.length, 'the board grew to fit SKELETON');
 
   // Beat 3 — no pull-back any more: both words hold their ground. The
   // display word carries the lime and the bottom copy stays bone and still.
   // The colour sits on the tile faces, not on the flap's root span. The
   // hierarchy is the homepage hero's, read top to bottom: display word bone,
   // lead tan, closing word lime.
-  const bigFace = doc.querySelector('[aria-label="ARCHITECTURE"] [data-face]');
-  assert.ok(/f5f3ee/.test(bigFace.className), 'beat 3: the display word is bone');
-  assert.ok(/d7ff4f/.test(bigFace.className) === false, 'the display word is not lime — lime is the closing word');
+  const skelFace = doc.querySelector('[aria-label="SKELETON"] [data-face]');
+  assert.ok(/d7ff4f/.test(skelFace.className), 'beat 3: SKELETON has settled lime');
+  assert.ok(/f5f3ee/.test(arch.className), 'ARCHITECTURE is bone');
+  assert.ok(/d7ff4f/.test(arch.className) === false, 'ARCHITECTURE is not lime — lime is the closing word');
   const leadLines = [...doc.querySelectorAll('h1 span')].filter(
-    (n) => n.textContent.trim() === 'OF ART' || n.textContent.trim() === 'BUILT FROM THE',
+    (n) => n.textContent.trim() === 'ART BUILT' || n.textContent.trim() === 'FROM THERE',
   );
   assert.equal(leadLines.length, 2, 'the rest of the line is set as display lines, not a caption');
   const bottomLeft = leadLines[0];
   assert.ok(/d7c4aa/.test(bottomLeft.className), 'the lead is tan');
-  assert.ok(/d7ff4f/.test(closing.className), 'the closing line is lime');
-  assert.equal(doc.querySelectorAll('[data-face]').length, 'ARCHITECTURE'.length,
-    'only the display word is a split-flap board — the closing line is plain type');
+  assert.equal(doc.querySelectorAll('[data-face]').length, 'SKELETON'.length,
+    'only SKELETON is a split-flap board — every other row is plain type');
   assert.ok(!/blur/.test(bottomLeft.getAttribute('style') || ''), 'the bottom copy does not recede — the pull-back beat is gone');
 
   console.log('PASS  the tree: six rows widening downward, UP the stem, no rule');
