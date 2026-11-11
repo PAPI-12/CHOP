@@ -21,6 +21,7 @@ const Sars = lazy(() => import('./pages/Sars'));
 const Resume = lazy(() => import('./pages/Resume'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Privacy = lazy(() => import('./pages/Privacy'));
+const HeroLab = lazy(() => import('./pages/HeroLab'));
 
 /**
  * Open a page at the top of it. Every time, on every route.
@@ -201,6 +202,7 @@ const AppContent: React.FC = () => {
               <Route path="/work/sars" element={<Sars />} />
               <Route path="/resume" element={<Resume />} />
               <Route path="/privacy" element={<Privacy />} />
+              <Route path="/_lab" element={<HeroLab />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </div>

@@ -125,6 +125,34 @@
 .splitflap-hero[data-flipping="true"] {
   animation-duration: 0.58s;
 }
+/* The About hero launches like a rocket rather than sliding away: it lifts
+   off gradually, creeps, and only then shoots out of frame. Three distinct
+   legs, each with its own timing, so it is a keyframe animation and not a
+   single transition curve. The last leg ends well past the top of the
+   viewport — the title has to be gone before the film rolls. */
+@keyframes hero-launch {
+  0%   { transform: translate3d(0, 0, 0);      opacity: 1; }
+  20%  { transform: translate3d(0, 0, 0);      opacity: 1;
+         animation-timing-function: cubic-bezier(0.25, 0.55, 0.45, 1); }
+  42%  { transform: translate3d(0, -6vh, 0);   opacity: 1;
+         animation-timing-function: linear; }
+  72%  { transform: translate3d(0, -10vh, 0);  opacity: 1;
+         animation-timing-function: cubic-bezier(0.7, 0, 0.85, 0.2); }
+  100% { transform: translate3d(0, -150vh, 0); opacity: 0; }
+}
+
+/* ...and it comes back down onto the closing frame once the film ends. */
+@keyframes hero-return {
+  0%   { transform: translate3d(0, -16vh, 0); opacity: 0; }
+  100% { transform: translate3d(0, 0, 0);     opacity: 1; }
+}
+
+/* The rocket noses pop out of the letters as the U and the P dock. */
+@keyframes nose-pop {
+  from { transform: scale(0.2); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
 .hero-physics-letter {
   display: inline-block;
   pointer-events: none;

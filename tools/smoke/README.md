@@ -35,6 +35,16 @@ canvas guard is exercised, then reports:
   backgrounds, reduced motion and the rain-free About variant. Its small test
   bundle is built in memory; no browser install is needed.
 
+- `about-title.mjs` — runs the About hero title sequence against the real
+  clock and asserts the board at each beat: it opens on MAAAADNESSS /
+  SKELETON UP, flaps into ARCHITECTURE, pulls the line back so only SKELETON
+  UP is left, then flaps that into UNLOCK SKELETON. Also checks the board
+  *grows* (11 tiles become 15, which a fixed-width flip would drop), that the
+  control stays inert until the flip settles, and that clicking it calls
+  play() — after which the hero copy clears for the takeover and comes back
+  on `ended`. `tsc` and `vite build` cannot see any of this; it is timers and
+  rAF all the way down.
+
 - `hero.mjs` — exercises the wipe controller and the real Hero effects in
   StrictMode: the photograph is the original portrait, the rain pane is a
   plate built on it (no computed glass field) that is decoded but never
