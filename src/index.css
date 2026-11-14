@@ -153,6 +153,109 @@
   to   { transform: scale(1);   opacity: 1; }
 }
 
+/* ── Skeleton mode ──────────────────────────────────────────────────────
+   Every section of the About page has two states. Normal shows the finished
+   surface; skeleton shows the structure underneath it — the letterform's
+   own skeleton, the timeline's spine, the subject's bones.
+
+   The rule throughout: skeleton mode must never reflow. It takes a fill away
+   and leaves a stroke where it was, so the switch is a reveal rather than a
+   relayout, and the two states stay the same page. */
+
+/* One sweep of the switch track on each throw. Short and functional — the
+   machine checking itself, not a decoration. */
+.skel-scan {
+  animation: skel-scan 520ms ease-out 1 both;
+}
+@keyframes skel-scan {
+  0%   { transform: translateX(-100%); opacity: 0; }
+  35%  { opacity: 1; }
+  100% { transform: translateX(100%);  opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel-scan { animation: none; opacity: 0; }
+}
+
+/* The switch focus ring is drawn by the component; this keeps the hit area
+   honest without changing layout. */
+button[role='switch'] { position: relative; }
+
+/* Outline type: the fill is taken away and a hairline is left standing in
+   the letter's own colour. Stroke width scales with the type, so the big
+   display sizes read as drawn bone rather than as a thin font.
+
+   The stroke colour comes from --skel-stroke, NOT currentColor: the fill has
+   to go transparent to take it away, and currentColor would then resolve to
+   transparent too and the letter would vanish entirely. */
+.skel-stroke {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: 1.5px var(--skel-stroke, #f5f3ee);
+  paint-order: stroke fill;
+}
+.skel-stroke--xl { -webkit-text-stroke-width: 2px; }
+.skel-stroke--sm { -webkit-text-stroke-width: 1px; }
+@media (max-width: 768px) {
+  .skel-stroke { -webkit-text-stroke-width: 1px; }
+  .skel-stroke--xl { -webkit-text-stroke-width: 1.25px; }
+}
+
+/* The construction rules: cap, x-height and baseline, drawn the way a
+   typesetter or an architect would draw them. They sit behind the type and
+   only exist while a section is in skeleton mode. */
+.skel-rule {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(215, 255, 79, 0.16) 12%,
+    rgba(215, 255, 79, 0.16) 88%,
+    transparent 100%
+  );
+}
+.skel-rule--bone {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(245, 243, 238, 0.14) 12%,
+    rgba(245, 243, 238, 0.14) 88%,
+    transparent 100%
+  );
+}
+
+/* The Experience spine: a vertical hairline with a node at every entry. It
+   turns a list of rows into a structure you can read down. */
+.skel-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(215, 255, 79, 0.28) 6%,
+    rgba(215, 255, 79, 0.28) 94%,
+    transparent 100%
+  );
+}
+/* A node's position is set by whoever places it — the spine's owner knows
+   where its entries are, the class does not. Only the centring is fixed. */
+.skel-node {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  margin-top: -2.5px;
+  border-radius: 999px;
+  background: #d7ff4f;
+  box-shadow: 0 0 8px rgba(215, 255, 79, 0.55);
+}
+
 .hero-physics-letter {
   display: inline-block;
   pointer-events: none;
