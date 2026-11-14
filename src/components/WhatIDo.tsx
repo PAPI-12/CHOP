@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useRef } from 'react';
+import SkeletonSwitch from './SkeletonSwitch';
 
 /**
  * Each skill is a spread in a book of the work — the picture is evidence of
@@ -207,7 +208,11 @@ export type MatrixHandoff = {
 const WhatIDo: React.FC<{
   variant?: 'home' | 'about';
   matrixHandoffRef?: React.RefObject<MatrixHandoff>;
-}> = ({ variant = 'home', matrixHandoffRef }) => {
+  /** About: the section is showing the structure under the work, not the surface */
+  skeleton?: boolean;
+  /** renders the switch in the section header so it lives with the section */
+  onSkeletonChange?: (next: boolean) => void;
+}> = ({ variant = 'home', matrixHandoffRef, skeleton = false, onSkeletonChange }) => {
   /**
    * home  — skills glide → ART COMES 1ST parks and encodes → it browns out,
    *         then WHAT I DO · INITIALIZING decrypts (auto-played, scroll-held),
@@ -1334,6 +1339,21 @@ const WhatIDo: React.FC<{
           </p>
         </div>
 
+        {/* Skeleton switch. Deliberately NOT inside headerRef: the header is
+            faded out by the scroll drive as the practice is walked through,
+            and a control that disappears when you scroll is not a control.
+            It sits in the bottom-left corner instead, clear of the stack,
+            the captions, the counter and the guide. */}
+        {onSkeletonChange && (
+          <div className="absolute bottom-5 md:bottom-7 left-4 sm:left-6 lg:left-12 xl:left-24 z-30">
+            <SkeletonSwitch
+              on={skeleton}
+              onChange={onSkeletonChange}
+              label="Skeleton mode for What I Do"
+            />
+          </div>
+        )}
+
         {/* The book of work — Home only. Below the type (z-5 under the
             stack's z-10), so the ghosted skills stacked behind the front
             title still read over the picture. Driven by paint(). */}
@@ -1381,6 +1401,31 @@ const WhatIDo: React.FC<{
             The motto card (Home only) rises after the skills and parks. */}
         <div ref={stackRef} className="reveal-stack absolute inset-0 z-10 flex items-center justify-center px-4 sm:px-6 lg:px-12">
           <div className="relative w-full h-full">
+            {/* Skeleton mode: the typesetter's construction lines. Cap,
+                x-height and baseline, drawn the way an architect would draw
+                them, so the display type reads as something built rather
+                than something set. They are placed off the centre the type
+                is centred on and sized in the same vw, so they track the
+                letterforms at every breakpoint without being measured. */}
+            {skeleton && (
+              <div aria-hidden className="pointer-events-none absolute inset-0 z-0">
+                {[
+                  { at: '-3.1vw', label: 'CAP' },
+                  { at: '-1.4vw', label: 'X', bone: true },
+                  { at: '2.9vw', label: 'BASE' },
+                ].map((r) => (
+                  <div key={r.label} className="absolute left-0 right-0" style={{ top: `calc(50% + ${r.at})` }}>
+                    <span className={`skel-rule${r.bone ? ' skel-rule--bone' : ''}`} />
+                    <span
+                      className="absolute left-0 font-mono text-[8px] tracking-[0.3em] text-[#d7ff4f]/45 hidden md:block"
+                      style={{ transform: 'translateY(-1.1em)' }}
+                    >
+                      {r.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
             {SKILLS.map((skill, i) => (
               <div
                 key={skill.title}
@@ -1390,8 +1435,18 @@ const WhatIDo: React.FC<{
               >
                 <h3
                   ref={(el) => { titleRefs.current[i] = el; }}
-                  className="font-display text-center text-[9.6vw] sm:text-[9.2vw] md:text-[9vw] lg:text-[8.5vw] leading-[0.95] tracking-[-0.04em] whitespace-nowrap"
-                  style={{ color: skill.color }}
+                  className={`font-display text-center text-[9.6vw] sm:text-[9.2vw] md:text-[9vw] lg:text-[8.5vw] leading-[0.95] tracking-[-0.04em] whitespace-nowrap ${
+                    skeleton ? 'skel-stroke skel-stroke--xl' : ''
+                  }`}
+                  style={{
+                    // Inline colour wins over the class, so it has to be
+                    // switched here as well — the class alone cannot take the
+                    // fill away from an inline `color`.
+                    color: skeleton ? 'transparent' : skill.color,
+                    // ...and the stroke keeps the skill's own colour, so the
+                    // skeleton is drawn in lime, bone or tan as the row is.
+                    ['--skel-stroke' as any]: skill.color,
+                  }}
                 >
                   {Array.from(skill.title).map((ch, li) => (
                     <span key={li}>{ch === ' ' ? '\u00A0' : ch}</span>

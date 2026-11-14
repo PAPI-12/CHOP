@@ -21,6 +21,10 @@ const SRC_MP4 = '/videos/about-hero-xray.mp4';
 // video opens on a close-up, which is the wrong thing to greet someone
 // with, so the idle state is the wide plate instead.
 const SRC_HERO = '/images/about-hero-idle.webp';
+// The subject's skeleton: the frame the sequence holds on when it ends —
+// the lime x-ray of the bones. Skeleton mode idles on this instead of the
+// photograph, so the switch moves between the surface and what holds it up.
+const SRC_SKELETON = '/images/about-hero-skeleton.webp';
 
 export type Phase = 'idle' | 'launching' | 'loading' | 'playing' | 'ended';
 
@@ -44,13 +48,16 @@ type XrayHeroProps = {
   className?: string;
   /** lets the hero copy react to the film taking over */
   onPhaseChange?: (phase: Phase) => void;
+  /** idle on the bones plate instead of the photograph */
+  skeleton?: boolean;
 };
 
 const XrayHero = forwardRef<XrayHeroHandle, XrayHeroProps>(function XrayHero(
-  { className = '', onPhaseChange },
+  { className = '', onPhaseChange, skeleton = false },
   ref,
 ) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const idleSrc = skeleton ? SRC_SKELETON : SRC_HERO;
   const [phase, setPhase] = useState<Phase>('idle');
   const [progress, setProgress] = useState(0);
   const launchTimer = useRef<number | undefined>(undefined);
@@ -123,7 +130,7 @@ const XrayHero = forwardRef<XrayHeroHandle, XrayHeroProps>(function XrayHero(
         loading="eager"
         decoding="async"
         fetchPriority="high"
-        src={SRC_HERO}
+        src={idleSrc}
         alt=""
         width={1280}
         height={720}
@@ -136,7 +143,7 @@ const XrayHero = forwardRef<XrayHeroHandle, XrayHeroProps>(function XrayHero(
       {/* The sequence. Holds its last frame when it ends. */}
       <video
         ref={videoRef}
-        poster={SRC_HERO}
+        poster={idleSrc}
         preload="none"
         muted
         playsInline
